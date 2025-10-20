@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'home/home_tab.dart';
+import 'analysis/analysis_tab.dart';
+import 'settings/settings_tab.dart';
 
 /// 메인 네비게이션 화면
 /// 하단 탭 바와 Pro 모드 상태 관리를 담당
@@ -17,12 +20,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   // 3개 탭 페이지들 (Pro 상태 전달)
   List<Widget> get _pages => [
-    // Phase 5에서 HomeTab import 예정
-    const Center(child: Text('Home Tab - Phase 5에서 구현')),
-    // Phase 6에서 AnalysisTab import 예정  
-    const Center(child: Text('Analysis Tab - Phase 6에서 구현')),
+    // Phase 5: HomeTab 실제 구현 완료
+    HomeTab(isProUser: _isProUser, onProToggle: _toggleProMode),
+    // Phase 6에서 AnalysisTab import 예정
+    AnalysisTab(isProUser: _isProUser, onProToggle: _toggleProMode),
     // Phase 7에서 SettingsTab import 예정
-    const Center(child: Text('Settings Tab - Phase 7에서 구현')),
+    SettingsTab(isProUser: _isProUser, onProToggle: _toggleProMode),
   ];
 
   @override

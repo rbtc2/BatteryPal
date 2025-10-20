@@ -12,13 +12,29 @@ void main() {
     // Build our app and trigger a frame.
     await tester.pumpWidget(const BatteryPalApp());
 
-    // Phase 1: 기본 구조만 테스트 (Phase 5-8에서 상세 테스트 추가 예정)
+    // Phase 5: HomeTab 실제 구현 완료로 테스트 업데이트
     // Verify that bottom navigation is present.
     expect(find.text('홈'), findsOneWidget);
     expect(find.text('분석'), findsOneWidget);
     expect(find.text('설정'), findsOneWidget);
     
-    // Verify that temporary content is displayed
-    expect(find.text('Home Tab - Phase 5에서 구현'), findsOneWidget);
+    // Verify that HomeTab content is displayed (Phase 5 완료)
+    expect(find.text('BatteryPal'), findsOneWidget); // AppBar title
+    expect(find.text('현재 배터리'), findsOneWidget); // Battery status card
+    expect(find.text('⚡ 배터리 부스트'), findsOneWidget); // Battery boost button
+    
+    // Verify that navigation works
+    await tester.tap(find.text('분석'));
+    await tester.pump();
+    // Analysis tab should be accessible
+    
+    await tester.tap(find.text('설정'));
+    await tester.pump();
+    // Settings tab should be accessible
+    
+    // Return to home tab
+    await tester.tap(find.text('홈'));
+    await tester.pump();
+    expect(find.text('BatteryPal'), findsOneWidget); // Back to home
   });
 }
