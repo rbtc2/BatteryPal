@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import '../screens/main_navigation_screen.dart';
+import 'app_theme_manager.dart';
 
 /// BatteryPal 앱의 메인 설정 클래스
-/// 테마, 라우팅 등 앱 레벨 설정을 담당
+/// Phase 9에서 테마 관리 시스템 통합
 class BatteryPalApp extends StatelessWidget {
   const BatteryPalApp({super.key});
 
@@ -10,14 +11,11 @@ class BatteryPalApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'BatteryPal',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF4CAF50), // 배터리 테마 그린
-          brightness: Brightness.dark,
-        ),
-        useMaterial3: true,
-      ),
+      theme: AppThemeManager.lightTheme,
+      darkTheme: AppThemeManager.darkTheme,
+      themeMode: ThemeMode.dark, // 기본값: 다크 모드
       home: const MainNavigationScreen(),
+      debugShowCheckedModeBanner: false,
     );
   }
 }
