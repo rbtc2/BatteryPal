@@ -23,7 +23,7 @@ class BatteryDashboardChart extends StatefulWidget {
   final String? subtitle;
   
   /// 표시할 차트 타입들
-  final List<BatteryChartType> visibleCharts;
+  final List<BatteryDashboardChartType> visibleCharts;
   
   /// 차트 간격
   final double chartSpacing;
@@ -45,9 +45,9 @@ class BatteryDashboardChart extends StatefulWidget {
     this.title,
     this.subtitle,
     this.visibleCharts = const [
-      BatteryChartType.level,
-      BatteryChartType.temperature,
-      BatteryChartType.voltage,
+      BatteryDashboardChartType.level,
+      BatteryDashboardChartType.temperature,
+      BatteryDashboardChartType.voltage,
     ],
     this.chartSpacing = 24.0,
     this.enableTouchInteraction = true,
@@ -124,12 +124,12 @@ class _BatteryDashboardChartState extends State<BatteryDashboardChart> {
   }
 
   /// 단일 차트 구성
-  Widget _buildSingleChart(BatteryChartType chartType) {
+  Widget _buildSingleChart(BatteryDashboardChartType chartType) {
     return _buildChartByType(chartType, isFullHeight: true);
   }
 
   /// 두 개 차트 구성
-  Widget _buildTwoCharts(List<BatteryChartType> chartTypes) {
+  Widget _buildTwoCharts(List<BatteryDashboardChartType> chartTypes) {
     return Column(
       children: [
         Expanded(
@@ -144,7 +144,7 @@ class _BatteryDashboardChartState extends State<BatteryDashboardChart> {
   }
 
   /// 세 개 차트 구성
-  Widget _buildThreeCharts(List<BatteryChartType> chartTypes) {
+  Widget _buildThreeCharts(List<BatteryDashboardChartType> chartTypes) {
     return Column(
       children: [
         Expanded(
@@ -170,11 +170,11 @@ class _BatteryDashboardChartState extends State<BatteryDashboardChart> {
   }
 
   /// 차트 타입에 따른 차트 구성
-  Widget _buildChartByType(BatteryChartType chartType, {bool isFullHeight = false}) {
+  Widget _buildChartByType(BatteryDashboardChartType chartType, {bool isFullHeight = false}) {
     final chartHeight = isFullHeight ? null : 200.0;
     
     switch (chartType) {
-      case BatteryChartType.level:
+      case BatteryDashboardChartType.level:
         return BatteryLevelChart(
           dataPoints: widget.dataPoints,
           height: chartHeight ?? 200.0,
@@ -185,7 +185,7 @@ class _BatteryDashboardChartState extends State<BatteryDashboardChart> {
           animationDuration: widget.animationDuration,
         );
       
-      case BatteryChartType.temperature:
+      case BatteryDashboardChartType.temperature:
         return BatteryTemperatureChart(
           dataPoints: widget.dataPoints,
           height: chartHeight ?? 200.0,
@@ -196,7 +196,7 @@ class _BatteryDashboardChartState extends State<BatteryDashboardChart> {
           animationDuration: widget.animationDuration,
         );
       
-      case BatteryChartType.voltage:
+      case BatteryDashboardChartType.voltage:
         return BatteryVoltageChart(
           dataPoints: widget.dataPoints,
           height: chartHeight ?? 200.0,
@@ -252,8 +252,8 @@ class _BatteryDashboardChartState extends State<BatteryDashboardChart> {
   }
 }
 
-/// 배터리 차트 타입 열거형 (대시보드용)
-enum BatteryChartType {
+/// 배터리 대시보드 차트 타입 열거형
+enum BatteryDashboardChartType {
   level,
   temperature,
   voltage,
@@ -262,10 +262,10 @@ enum BatteryChartType {
 /// 배터리 대시보드 설정 클래스
 class BatteryDashboardConfig {
   /// 기본 표시 차트
-  static const List<BatteryChartType> defaultVisibleCharts = [
-    BatteryChartType.level,
-    BatteryChartType.temperature,
-    BatteryChartType.voltage,
+  static const List<BatteryDashboardChartType> defaultVisibleCharts = [
+    BatteryDashboardChartType.level,
+    BatteryDashboardChartType.temperature,
+    BatteryDashboardChartType.voltage,
   ];
   
   /// 차트 간격
@@ -278,23 +278,23 @@ class BatteryDashboardConfig {
   static const Duration defaultAnimationDuration = Duration(milliseconds: 1500);
   
   /// 차트별 기본 높이
-  static const Map<BatteryChartType, double> chartHeights = {
-    BatteryChartType.level: 200.0,
-    BatteryChartType.temperature: 150.0,
-    BatteryChartType.voltage: 150.0,
+  static const Map<BatteryDashboardChartType, double> chartHeights = {
+    BatteryDashboardChartType.level: 200.0,
+    BatteryDashboardChartType.temperature: 150.0,
+    BatteryDashboardChartType.voltage: 150.0,
   };
   
   /// 차트별 제목
-  static const Map<BatteryChartType, String> chartTitles = {
-    BatteryChartType.level: '배터리 레벨',
-    BatteryChartType.temperature: '배터리 온도',
-    BatteryChartType.voltage: '배터리 전압',
+  static const Map<BatteryDashboardChartType, String> chartTitles = {
+    BatteryDashboardChartType.level: '배터리 레벨',
+    BatteryDashboardChartType.temperature: '배터리 온도',
+    BatteryDashboardChartType.voltage: '배터리 전압',
   };
   
   /// 차트별 부제목
-  static const Map<BatteryChartType, String> chartSubtitles = {
-    BatteryChartType.level: '시간별 배터리 사용량',
-    BatteryChartType.temperature: '시간별 온도 변화',
-    BatteryChartType.voltage: '시간별 전압 변화',
+  static const Map<BatteryDashboardChartType, String> chartSubtitles = {
+    BatteryDashboardChartType.level: '시간별 배터리 사용량',
+    BatteryDashboardChartType.temperature: '시간별 온도 변화',
+    BatteryDashboardChartType.voltage: '시간별 전압 변화',
   };
 }

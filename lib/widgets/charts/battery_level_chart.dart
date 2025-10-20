@@ -37,7 +37,7 @@ class BatteryLevelChart extends StatefulWidget {
   final Duration animationDuration;
   
   /// 차트 타입
-  final BatteryChartType chartType;
+  final BatteryLevelChartType chartType;
 
   const BatteryLevelChart({
     super.key,
@@ -51,7 +51,7 @@ class BatteryLevelChart extends StatefulWidget {
     this.onTouchDataPoint,
     this.enableAnimation = true,
     this.animationDuration = const Duration(milliseconds: 1500),
-    this.chartType = BatteryChartType.line,
+    this.chartType = BatteryLevelChartType.line,
   });
 
   @override
@@ -137,11 +137,11 @@ class _BatteryLevelChartState extends State<BatteryLevelChart>
   /// 실제 차트 구성
   Widget _buildChart(BatteryChartTheme theme) {
     switch (widget.chartType) {
-      case BatteryChartType.line:
+      case BatteryLevelChartType.line:
         return _buildLineChart(theme);
-      case BatteryChartType.area:
+      case BatteryLevelChartType.area:
         return _buildAreaChart(theme);
-      case BatteryChartType.bar:
+      case BatteryLevelChartType.bar:
         return _buildBarChart(theme);
     }
   }
@@ -633,8 +633,8 @@ class _BatteryLevelChartState extends State<BatteryLevelChart>
   }
 }
 
-/// 배터리 차트 타입 열거형
-enum BatteryChartType {
+/// 배터리 레벨 차트 타입 열거형
+enum BatteryLevelChartType {
   line,
   area,
   bar,
