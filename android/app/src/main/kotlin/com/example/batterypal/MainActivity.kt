@@ -50,7 +50,13 @@ class MainActivity : FlutterActivity() {
         try {
             val batteryManager = getSystemService(Context.BATTERY_SERVICE) as BatteryManager
             val batteryIntent = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
-            val temperature = batteryIntent?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, -1) ?: -1
+            
+            if (batteryIntent == null) {
+                android.util.Log.w("BatteryPal", "배터리 인텐트가 null입니다")
+                return -1.0
+            }
+            
+            val temperature = batteryIntent.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, -1)
             val result = if (temperature != -1) temperature / 10.0 else -1.0 // 온도는 0.1도 단위로 저장됨
             android.util.Log.d("BatteryPal", "배터리 온도: $result°C (원본: $temperature)")
             return result
@@ -64,7 +70,13 @@ class MainActivity : FlutterActivity() {
         try {
             val batteryManager = getSystemService(Context.BATTERY_SERVICE) as BatteryManager
             val batteryIntent = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
-            val voltage = batteryIntent?.getIntExtra(BatteryManager.EXTRA_VOLTAGE, -1) ?: -1
+            
+            if (batteryIntent == null) {
+                android.util.Log.w("BatteryPal", "배터리 인텐트가 null입니다")
+                return -1
+            }
+            
+            val voltage = batteryIntent.getIntExtra(BatteryManager.EXTRA_VOLTAGE, -1)
             android.util.Log.d("BatteryPal", "배터리 전압: ${voltage}mV")
             return voltage
         } catch (e: Exception) {
@@ -110,10 +122,16 @@ class MainActivity : FlutterActivity() {
         try {
             val batteryManager = getSystemService(Context.BATTERY_SERVICE) as BatteryManager
             val batteryIntent = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
-            val level = batteryIntent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
-            val scale = batteryIntent?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
             
-            val result = if (level != -1 && scale != -1) {
+            if (batteryIntent == null) {
+                android.util.Log.w("BatteryPal", "배터리 인텐트가 null입니다")
+                return -1.0
+            }
+            
+            val level = batteryIntent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+            val scale = batteryIntent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+            
+            val result = if (level != -1 && scale != -1 && scale > 0) {
                 (level * 100.0) / scale // 실제 배터리 퍼센트 계산 (소수점 포함)
             } else -1.0
             
