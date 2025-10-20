@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'services/battery_service.dart';
 
 void main() {
   runApp(const BatteryPalApp());
@@ -119,13 +120,45 @@ class HomeTab extends StatefulWidget {
 }
 
 class _HomeTabState extends State<HomeTab> {
+  // 배터리 서비스
+  final BatteryService _batteryService = BatteryService();
+  
   // 스켈레톤용 더미 데이터
-  int batteryLevel = 85;
   int remainingHours = 4;
   int remainingMinutes = 30;
   int batteryTemp = 32;
   int dailyUsage = 2;
   int dailyLimit = 3;
+  
+  // 실제 배터리 정보
+  BatteryInfo? _batteryInfo;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeBatteryService();
+  }
+
+  @override
+  void dispose() {
+    _batteryService.stopMonitoring();
+    super.dispose();
+  }
+
+  /// 배터리 서비스 초기화
+  Future<void> _initializeBatteryService() async {
+    // 배터리 정보 스트림 구독
+    _batteryService.batteryInfoStream.listen((batteryInfo) {
+      if (mounted) {
+        setState(() {
+          _batteryInfo = batteryInfo;
+        });
+      }
+    });
+    
+    // 배터리 모니터링 시작
+    await _batteryService.startMonitoring();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -135,6 +168,23 @@ class _HomeTabState extends State<HomeTab> {
         backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 0,
         actions: [
+          // 배터리 새로고침 버튼
+          IconButton(
+            onPressed: () async {
+              final scaffoldMessenger = ScaffoldMessenger.of(context);
+              await _batteryService.refreshBatteryInfo();
+              if (mounted) {
+                scaffoldMessenger.showSnackBar(
+                  const SnackBar(
+                    content: Text('배터리 정보를 새로고침했습니다'),
+                    duration: Duration(seconds: 1),
+                  ),
+                );
+              }
+            },
+            icon: const Icon(Icons.refresh),
+            tooltip: '배터리 정보 새로고침',
+          ),
           // Pro 배지
           if (!widget.isProUser)
             Container(
@@ -203,19 +253,19 @@ class _HomeTabState extends State<HomeTab> {
                       ),
                     ),
                     Text(
-                      '$batteryLevel%',
+                      _batteryInfo?.formattedLevel ?? '--.-%',
                       style: Theme.of(context).textTheme.headlineLarge?.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: _getBatteryColor(batteryLevel),
+                        color: _batteryInfo?.levelColor ?? Colors.grey,
                       ),
                     ),
                   ],
                 ),
                 // 배터리 아이콘
                 Icon(
-                  Icons.battery_6_bar,
+                  _batteryInfo?.levelIcon ?? Icons.battery_unknown,
                   size: 48,
-                  color: _getBatteryColor(batteryLevel),
+                  color: _batteryInfo?.levelColor ?? Colors.grey,
                 ),
               ],
             ),
@@ -227,9 +277,22 @@ class _HomeTabState extends State<HomeTab> {
               children: [
                 _buildInfoItem('남은 시간', '$remainingHours시간 $remainingMinutes분'),
                 _buildInfoItem('온도', '$batteryTemp°C'),
-                _buildInfoItem('상태', '정상'),
+                _buildInfoItem('상태', _batteryInfo?.stateText ?? '알 수 없음'),
               ],
             ),
+            
+            // 마지막 업데이트 시간
+            if (_batteryInfo != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Text(
+                  '마지막 업데이트: ${_formatTime(_batteryInfo!.timestamp)}',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                    fontSize: 12,
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -418,10 +481,20 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
-  Color _getBatteryColor(int level) {
-    if (level > 50) return Colors.green;
-    if (level > 20) return Colors.orange;
-    return Colors.red;
+  /// 시간 포맷팅 메서드
+  String _formatTime(DateTime dateTime) {
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
+    
+    if (difference.inSeconds < 60) {
+      return '${difference.inSeconds}초 전';
+    } else if (difference.inMinutes < 60) {
+      return '${difference.inMinutes}분 전';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours}시간 전';
+    } else {
+      return '${dateTime.month}/${dateTime.day} ${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')}';
+    }
   }
 
   void _showOptimizationDialog() {

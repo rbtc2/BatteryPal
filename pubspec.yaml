@@ -34,6 +34,9 @@ dependencies:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
+  
+  # 배터리 정보 접근을 위한 패키지
+  battery_plus: ^4.0.2
 
 dev_dependencies:
   flutter_test:
