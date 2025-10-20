@@ -37,6 +37,14 @@ dependencies:
   
   # 배터리 정보 접근을 위한 패키지
   battery_plus: ^4.0.2
+  
+  # 로컬 데이터베이스 (SQLite)
+  sqflite: ^2.3.0
+  path: ^1.8.3
+  path_provider: ^2.1.1
+  
+  # JSON 직렬화
+  json_annotation: ^4.8.1
 
 dev_dependencies:
   flutter_test:
@@ -48,6 +56,10 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
+  
+  # JSON 직렬화 코드 생성
+  json_serializable: ^6.7.1
+  build_runner: ^2.4.7
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
