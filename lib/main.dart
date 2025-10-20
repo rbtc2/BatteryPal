@@ -58,7 +58,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         type: BottomNavigationBarType.fixed,
         backgroundColor: Theme.of(context).colorScheme.surface,
         selectedItemColor: Theme.of(context).colorScheme.primary,
-        unselectedItemColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+        unselectedItemColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.home),
@@ -199,7 +199,7 @@ class _HomeTabState extends State<HomeTab> {
                     Text(
                       '현재 배터리',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                       ),
                     ),
                     Text(
@@ -225,8 +225,8 @@ class _HomeTabState extends State<HomeTab> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildInfoItem('남은 시간', '${remainingHours}시간 ${remainingMinutes}분'),
-                _buildInfoItem('온도', '${batteryTemp}°C'),
+                _buildInfoItem('남은 시간', '$remainingHours시간 $remainingMinutes분'),
+                _buildInfoItem('온도', '$batteryTemp°C'),
                 _buildInfoItem('상태', '정상'),
               ],
             ),
@@ -244,7 +244,7 @@ class _HomeTabState extends State<HomeTab> {
         gradient: LinearGradient(
           colors: [
             Theme.of(context).colorScheme.primary,
-            Theme.of(context).colorScheme.primary.withOpacity(0.8),
+            Theme.of(context).colorScheme.primary.withValues(alpha: 0.8),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -252,7 +252,7 @@ class _HomeTabState extends State<HomeTab> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),
@@ -288,7 +288,7 @@ class _HomeTabState extends State<HomeTab> {
                 Text(
                   '원클릭으로 즉시 최적화',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.9),
+                    color: Colors.white.withValues(alpha: 0.9),
                     fontSize: 14,
                   ),
                 ),
@@ -326,7 +326,7 @@ class _HomeTabState extends State<HomeTab> {
                   Text(
                     '오늘 $dailyUsage/$dailyLimit회 사용',
                     style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                       fontSize: 12,
                     ),
                   ),
@@ -388,7 +388,7 @@ class _HomeTabState extends State<HomeTab> {
         Text(
           label,
           style: TextStyle(
-            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
             fontSize: 12,
           ),
         ),
@@ -410,7 +410,7 @@ class _HomeTabState extends State<HomeTab> {
         Text(
           label,
           style: TextStyle(
-            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
             fontSize: 12,
           ),
         ),
@@ -551,7 +551,7 @@ class _AnalysisTabState extends State<AnalysisTab> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.orange.withOpacity(0.2),
+                      color: Colors.orange.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Text(
@@ -571,7 +571,7 @@ class _AnalysisTabState extends State<AnalysisTab> {
             Container(
               height: 200,
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+                color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Center(
@@ -581,13 +581,13 @@ class _AnalysisTabState extends State<AnalysisTab> {
                     Icon(
                       Icons.show_chart,
                       size: 48,
-                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       '배터리 사용량 차트',
                       style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                         fontSize: 16,
                       ),
                     ),
@@ -595,7 +595,7 @@ class _AnalysisTabState extends State<AnalysisTab> {
                     Text(
                       'Phase 5에서 실제 차트 구현 예정',
                       style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                         fontSize: 12,
                       ),
                     ),
@@ -638,7 +638,7 @@ class _AnalysisTabState extends State<AnalysisTab> {
             // 앱 사용량 리스트 (무료: 상위 5개만)
             ...appUsageData.take(widget.isProUser ? appUsageData.length : 5).map((app) {
               return _buildAppUsageItem(app);
-            }).toList(),
+            }),
             
             // Pro 기능 안내
             if (!widget.isProUser)
@@ -646,7 +646,7 @@ class _AnalysisTabState extends State<AnalysisTab> {
                 margin: const EdgeInsets.only(top: 16),
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
@@ -686,7 +686,7 @@ class _AnalysisTabState extends State<AnalysisTab> {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(
@@ -711,7 +711,7 @@ class _AnalysisTabState extends State<AnalysisTab> {
                 Text(
                   '${app['usage']}% 배터리 사용',
                   style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                     fontSize: 12,
                   ),
                 ),
@@ -724,7 +724,7 @@ class _AnalysisTabState extends State<AnalysisTab> {
             width: 60,
             height: 8,
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceVariant,
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(4),
             ),
             child: FractionallySizedBox(
@@ -864,7 +864,7 @@ class _AnalysisTabState extends State<AnalysisTab> {
         Text(
           label,
           style: TextStyle(
-            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
             fontSize: 12,
           ),
         ),
@@ -1009,7 +1009,7 @@ class _SettingsTabState extends State<SettingsTab> {
           gradient: LinearGradient(
             colors: [
               Theme.of(context).colorScheme.primary,
-              Theme.of(context).colorScheme.primary.withOpacity(0.8),
+              Theme.of(context).colorScheme.primary.withValues(alpha: 0.8),
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
@@ -1204,36 +1204,31 @@ class _SettingsTabState extends State<SettingsTab> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('언어 선택'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              title: const Text('한국어'),
-              leading: Radio<String>(
-                value: '한국어',
-                groupValue: selectedLanguage,
-                onChanged: (value) {
-                  setState(() {
-                    selectedLanguage = value!;
-                  });
-                  Navigator.pop(context);
-                },
+        content: RadioGroup<String>(
+          groupValue: selectedLanguage,
+          onChanged: (value) {
+            setState(() {
+              selectedLanguage = value!;
+            });
+            Navigator.pop(context);
+          },
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                title: const Text('한국어'),
+                leading: Radio<String>(
+                  value: '한국어',
+                ),
               ),
-            ),
-            ListTile(
-              title: const Text('English'),
-              leading: Radio<String>(
-                value: 'English',
-                groupValue: selectedLanguage,
-                onChanged: (value) {
-                  setState(() {
-                    selectedLanguage = value!;
-                  });
-                  Navigator.pop(context);
-                },
+              ListTile(
+                title: const Text('English'),
+                leading: Radio<String>(
+                  value: 'English',
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
