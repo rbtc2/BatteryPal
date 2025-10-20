@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'home/home_tab.dart';
 import 'analysis/analysis_tab.dart';
 import 'settings/settings_tab.dart';
+import '../utils/app_utils.dart';
 
 /// 메인 네비게이션 화면
-/// 하단 탭 바와 Pro 모드 상태 관리를 담당
+/// Phase 8에서 실제 구현
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key});
 
@@ -15,16 +16,13 @@ class MainNavigationScreen extends StatefulWidget {
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
   
-  // Pro 모드 상태 관리 (Phase 5: 통합)
+  // Pro 모드 상태 관리 (Phase 8: 통합)
   bool _isProUser = false;
 
   // 3개 탭 페이지들 (Pro 상태 전달)
   List<Widget> get _pages => [
-    // Phase 5: HomeTab 실제 구현 완료
     HomeTab(isProUser: _isProUser, onProToggle: _toggleProMode),
-    // Phase 6에서 AnalysisTab import 예정
     AnalysisTab(isProUser: _isProUser, onProToggle: _toggleProMode),
-    // Phase 7에서 SettingsTab import 예정
     SettingsTab(isProUser: _isProUser, onProToggle: _toggleProMode),
   ];
 
@@ -58,7 +56,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           ),
         ],
       ),
-      // Phase 5: Pro 모드 토글 플로팅 액션 버튼 (개발용)
+      // Phase 8: Pro 모드 토글 플로팅 액션 버튼 (개발용)
       floatingActionButton: FloatingActionButton(
         onPressed: _toggleProMode,
         backgroundColor: _isProUser ? Colors.amber : Theme.of(context).colorScheme.primary,
@@ -70,19 +68,16 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     );
   }
 
-  // Phase 5: Pro 모드 토글 기능 (개발용)
+  // Phase 8: Pro 모드 토글 기능 (개발용)
   void _toggleProMode() {
     setState(() {
       _isProUser = !_isProUser;
     });
     
-    // Pro 모드 변경 알림
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(_isProUser ? 'Pro 모드 활성화!' : '무료 모드로 전환'),
-        backgroundColor: _isProUser ? Colors.amber : Theme.of(context).colorScheme.primary,
-        duration: const Duration(seconds: 2),
-      ),
+    // Pro 모드 변경 알림 (Phase 4의 SnackBarUtils 활용)
+    SnackBarUtils.showSuccess(
+      context,
+      _isProUser ? 'Pro 모드 활성화!' : '무료 모드로 전환',
     );
   }
 }
