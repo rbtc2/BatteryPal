@@ -5,7 +5,7 @@ import '../../utils/dialog_utils.dart';
 import '../../constants/app_constants.dart';
 
 /// 설정 탭 화면
-/// Phase 7에서 실제 구현
+/// 일반 설정과 배터리 설정을 탭으로 분리
 class SettingsTab extends StatefulWidget {
   final bool isProUser;
   final VoidCallback onProToggle;
@@ -38,91 +38,125 @@ class _SettingsTabState extends State<SettingsTab> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('설정'),
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        elevation: 0,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('설정'),
+          backgroundColor: Theme.of(context).colorScheme.surface,
+          elevation: 0,
+          bottom: TabBar(
+            tabs: const [
+              Tab(
+                icon: Icon(Icons.settings),
+                text: '일반',
+              ),
+              Tab(
+                icon: Icon(Icons.battery_std),
+                text: '배터리',
+              ),
+            ],
+            labelColor: Theme.of(context).colorScheme.primary,
+            unselectedLabelColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+            indicatorColor: Theme.of(context).colorScheme.primary,
+          ),
+        ),
+        body: TabBarView(
           children: [
-            // Pro 업그레이드 카드 (무료 사용자용)
-            if (!widget.isProUser) _buildProUpgradeCard(),
-            
-            const SizedBox(height: 24),
-            
-            // 기본 설정
-            _buildSettingsSection('기본 설정', [
-              _buildSettingsItem(
-                '알림 설정',
-                Icons.notifications,
-                _appSettings.notificationsEnabled ? '켜짐' : '꺼짐',
-                () => _toggleNotifications(),
-              ),
-              _buildSettingsItem(
-                '테마 설정',
-                Icons.dark_mode,
-                _appSettings.darkModeEnabled ? '다크 모드' : '라이트 모드',
-                () => _toggleTheme(),
-              ),
-              _buildSettingsItem(
-                '언어 설정',
-                Icons.language,
-                _appSettings.selectedLanguage,
-                () => _showLanguageDialog(),
-              ),
-            ]),
-            
-            const SizedBox(height: 24),
-            
-            // 배터리 관리 설정
-            _buildBatteryManagementSection(),
-            
-            const SizedBox(height: 24),
-            
-            // Pro 설정 (Pro 사용자용)
-            if (widget.isProUser) _buildProSettingsSection(),
-            
-            const SizedBox(height: 24),
-            
-            // 앱 정보
-            _buildSettingsSection('앱 정보', [
-              _buildSettingsItem(
-                '버전 정보',
-                Icons.info,
-                AppConstants.appVersion,
-                () => DialogUtils.showDefaultAppInfoDialog(context),
-              ),
-              _buildSettingsItem(
-                '라이선스',
-                Icons.description,
-                AppConstants.license,
-                () => DialogUtils.showInfoDialog(
-                  context,
-                  title: '라이선스',
-                  content: '${AppConstants.appName}은 ${AppConstants.license} 하에 배포됩니다.',
-                ),
-              ),
-              _buildSettingsItem(
-                '개발자 정보',
-                Icons.person,
-                AppConstants.developerName,
-                () => DialogUtils.showInfoDialog(
-                  context,
-                  title: '개발자 정보',
-                  content: '${AppConstants.appName}은 ${AppConstants.developerName}에서 개발되었습니다.',
-                ),
-              ),
-            ]),
-            
-            const SizedBox(height: 24),
-            
-            // Pro 구독 관리 (Pro 사용자용)
-            if (widget.isProUser) _buildProSubscriptionCard(),
+            _buildGeneralSettingsTab(),
+            _buildBatterySettingsTab(),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildGeneralSettingsTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          // Pro 업그레이드 카드 (무료 사용자용)
+          if (!widget.isProUser) _buildProUpgradeCard(),
+          
+          const SizedBox(height: 24),
+          
+          // 기본 설정
+          _buildSettingsSection('기본 설정', [
+            _buildSettingsItem(
+              '알림 설정',
+              Icons.notifications,
+              _appSettings.notificationsEnabled ? '켜짐' : '꺼짐',
+              () => _toggleNotifications(),
+            ),
+            _buildSettingsItem(
+              '테마 설정',
+              Icons.dark_mode,
+              _appSettings.darkModeEnabled ? '다크 모드' : '라이트 모드',
+              () => _toggleTheme(),
+            ),
+            _buildSettingsItem(
+              '언어 설정',
+              Icons.language,
+              _appSettings.selectedLanguage,
+              () => _showLanguageDialog(),
+            ),
+          ]),
+          
+          const SizedBox(height: 24),
+          
+          // Pro 설정 (Pro 사용자용)
+          if (widget.isProUser) _buildProSettingsSection(),
+          
+          const SizedBox(height: 24),
+          
+          // 앱 정보
+          _buildSettingsSection('앱 정보', [
+            _buildSettingsItem(
+              '버전 정보',
+              Icons.info,
+              AppConstants.appVersion,
+              () => DialogUtils.showDefaultAppInfoDialog(context),
+            ),
+            _buildSettingsItem(
+              '라이선스',
+              Icons.description,
+              AppConstants.license,
+              () => DialogUtils.showInfoDialog(
+                context,
+                title: '라이선스',
+                content: '${AppConstants.appName}은 ${AppConstants.license} 하에 배포됩니다.',
+              ),
+            ),
+            _buildSettingsItem(
+              '개발자 정보',
+              Icons.person,
+              AppConstants.developerName,
+              () => DialogUtils.showInfoDialog(
+                context,
+                title: '개발자 정보',
+                content: '${AppConstants.appName}은 ${AppConstants.developerName}에서 개발되었습니다.',
+              ),
+            ),
+          ]),
+          
+          const SizedBox(height: 24),
+          
+          // Pro 구독 관리 (Pro 사용자용)
+          if (widget.isProUser) _buildProSubscriptionCard(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBatterySettingsTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          // 배터리 관리 설정
+          _buildBatteryManagementSection(),
+        ],
       ),
     );
   }
@@ -349,27 +383,7 @@ class _SettingsTabState extends State<SettingsTab> {
 
   Widget _buildBatteryManagementSection() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 섹션 제목
-        Row(
-          children: [
-            Icon(
-              Icons.battery_std,
-              color: Theme.of(context).colorScheme.primary,
-              size: 24,
-            ),
-            const SizedBox(width: 12),
-            Text(
-              '배터리 관리',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        
         // 절전 모드 설정
         _buildBatterySettingsCard(
           '절전 모드',
