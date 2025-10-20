@@ -271,16 +271,55 @@ class _HomeTabState extends State<HomeTab> {
             ),
             const SizedBox(height: 16),
             
-            // 배터리 정보
+            // 배터리 정보 (4개 항목으로 확장)
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildInfoItem('남은 시간', '$remainingHours시간 $remainingMinutes분'),
                 _buildInfoItem('온도', _batteryInfo?.formattedTemperature ?? '--.-°C', 
                     valueColor: _batteryInfo?.temperatureColor),
-                _buildInfoItem('상태', _batteryInfo?.stateText ?? '알 수 없음'),
+                _buildInfoItem('전압', _batteryInfo?.formattedVoltage ?? '--mV',
+                    valueColor: _batteryInfo?.voltageColor),
+                _buildInfoItem('용량', _batteryInfo?.formattedCapacity ?? '--mAh'),
+                _buildInfoItem('건강도', _batteryInfo?.healthText ?? '알 수 없음',
+                    valueColor: _batteryInfo?.healthColor),
               ],
             ),
+            
+            // 충전 정보 섹션
+            if (_batteryInfo != null && _batteryInfo!.isCharging) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.bolt,
+                      color: Theme.of(context).colorScheme.primary,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _batteryInfo!.chargingStatusText,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.primary,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             
             // 마지막 업데이트 시간
             if (_batteryInfo != null)

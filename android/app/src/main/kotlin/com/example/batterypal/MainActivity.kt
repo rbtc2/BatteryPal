@@ -35,6 +35,10 @@ class MainActivity : FlutterActivity() {
                     val level = getBatteryLevel()
                     result.success(level)
                 }
+                "getChargingInfo" -> {
+                    val chargingInfo = getChargingInfo()
+                    result.success(chargingInfo)
+                }
                 else -> {
                     result.notImplemented()
                 }
@@ -76,5 +80,45 @@ class MainActivity : FlutterActivity() {
         return if (level != -1 && scale != -1) {
             (level * 100.0) / scale // 실제 배터리 퍼센트 계산 (소수점 포함)
         } else -1.0
+    }
+
+    private fun getChargingInfo(): Map<String, Any> {
+        val batteryManager = getSystemService(Context.BATTERY_SERVICE) as BatteryManager
+        val batteryIntent = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        
+        val plugged = batteryIntent?.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1) ?: -1
+        
+        // 충전 방식 구분
+        val chargingType = when (plugged) {
+            BatteryManager.BATTERY_PLUGGED_AC -> "AC"
+            BatteryManager.BATTERY_PLUGGED_USB -> "USB"
+            BatteryManager.BATTERY_PLUGGED_WIRELESS -> "Wireless"
+            else -> "Unknown"
+        }
+        
+        // BatteryManager를 사용하여 현재 전류 가져오기 (API 21+)
+        var currentNow = -1
+        var currentAverage = -1
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+                currentNow = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW)
+                currentAverage = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_AVERAGE)
+            }
+        } catch (e: Exception) {
+            // API가 지원되지 않거나 오류가 발생한 경우
+            currentNow = -1
+            currentAverage = -1
+        }
+        
+        // 충전 전류 (mA)
+        val chargingCurrent = if (currentNow != -1) currentNow / 1000 else -1
+        
+        return mapOf(
+            "chargingType" to chargingType,
+            "chargingCurrent" to chargingCurrent,
+            "currentNow" to currentNow,
+            "currentAverage" to currentAverage,
+            "isCharging" to (plugged != 0)
+        )
     }
 }

@@ -64,4 +64,22 @@ class NativeBatteryService {
       return -1.0;
     }
   }
+
+  /// 충전 정보 가져오기
+  static Future<Map<String, dynamic>> getChargingInfo() async {
+    try {
+      final Map<dynamic, dynamic> chargingInfo = await _channel.invokeMethod('getChargingInfo');
+      debugPrint('네이티브 충전 정보: $chargingInfo');
+      return Map<String, dynamic>.from(chargingInfo);
+    } catch (e) {
+      debugPrint('충전 정보 가져오기 실패: $e');
+      return {
+        'chargingType': 'Unknown',
+        'chargingCurrent': -1,
+        'currentNow': -1,
+        'currentAverage': -1,
+        'isCharging': false,
+      };
+    }
+  }
 }

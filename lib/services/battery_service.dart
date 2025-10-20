@@ -68,6 +68,7 @@ class BatteryService {
       final voltage = await NativeBatteryService.getBatteryVoltage();
       final capacity = await NativeBatteryService.getBatteryCapacity();
       final health = await NativeBatteryService.getBatteryHealth();
+      final chargingInfo = await NativeBatteryService.getChargingInfo();
       
       _currentBatteryInfo = BatteryInfo(
         level: preciseLevel,
@@ -77,6 +78,9 @@ class BatteryService {
         voltage: voltage,
         capacity: capacity,
         health: health,
+        chargingType: chargingInfo['chargingType'] ?? 'Unknown',
+        chargingCurrent: chargingInfo['chargingCurrent'] ?? -1,
+        isCharging: chargingInfo['isCharging'] ?? false,
       );
       
       _batteryInfoController.add(_currentBatteryInfo!);
@@ -108,6 +112,9 @@ class BatteryInfo {
   final int voltage; // 배터리 전압 (mV)
   final int capacity; // 배터리 용량
   final int health; // 배터리 건강도
+  final String chargingType; // 충전 방식 (AC/USB/Wireless)
+  final int chargingCurrent; // 충전 전류 (mA)
+  final bool isCharging; // 충전 중 여부
 
   BatteryInfo({
     required this.level,
@@ -117,6 +124,9 @@ class BatteryInfo {
     required this.voltage,
     required this.capacity,
     required this.health,
+    required this.chargingType,
+    required this.chargingCurrent,
+    required this.isCharging,
   });
 
   /// 배터리 레벨을 정확하게 포맷팅 (소수점이 의미가 있을 때만 표시)
@@ -151,6 +161,28 @@ class BatteryInfo {
     }
   }
   
+  /// 충전 방식 텍스트 변환
+  String get chargingTypeText {
+    switch (chargingType) {
+      case 'AC': return 'AC 충전';
+      case 'USB': return 'USB 충전';
+      case 'Wireless': return '무선 충전';
+      default: return '알 수 없음';
+    }
+  }
+  
+  /// 충전 전류 포맷팅
+  String get formattedChargingCurrent {
+    if (chargingCurrent < 0) return '--mA';
+    return '${chargingCurrent}mA';
+  }
+  
+  /// 충전 상태 요약
+  String get chargingStatusText {
+    if (!isCharging) return '방전 중';
+    return '$chargingTypeText ($formattedChargingCurrent)';
+  }
+  
   /// 배터리 상태를 한국어로 변환
   String get stateText {
     switch (state) {
@@ -179,6 +211,23 @@ class BatteryInfo {
     if (temperature < 40) return Colors.green; // 정상 온도
     if (temperature < 50) return Colors.orange; // 높은 온도
     return Colors.red; // 위험 온도
+  }
+  
+  /// 배터리 전압에 따른 색상 반환
+  Color get voltageColor {
+    if (voltage < 0) return Colors.grey; // 전압 정보 없음
+    if (voltage >= 3600 && voltage <= 4200) return Colors.green; // 정상 범위
+    if (voltage < 3600 || voltage > 4200) return Colors.orange; // 주의 범위
+    return Colors.red; // 위험 범위
+  }
+  
+  /// 배터리 건강도에 따른 색상 반환
+  Color get healthColor {
+    switch (health) {
+      case 2: return Colors.green; // 양호
+      case 3: case 4: case 5: case 6: case 7: return Colors.red; // 문제 있음
+      default: return Colors.grey; // 알 수 없음
+    }
   }
   
   /// 배터리 레벨에 따른 아이콘 반환
