@@ -14,17 +14,42 @@ class BatteryService {
   StreamSubscription<BatteryState>? _batteryStateSubscription;
   
   // 배터리 정보 스트림
-  final StreamController<BatteryInfo> _batteryInfoController = 
-      StreamController<BatteryInfo>.broadcast();
+  StreamController<BatteryInfo>? _batteryInfoController;
   
-  Stream<BatteryInfo> get batteryInfoStream => _batteryInfoController.stream;
+  Stream<BatteryInfo> get batteryInfoStream {
+    if (_batteryInfoController == null || _batteryInfoController!.isClosed) {
+      _batteryInfoController = StreamController<BatteryInfo>.broadcast();
+    }
+    return _batteryInfoController!.stream;
+  }
   
   /// 배터리 정보 모델
   BatteryInfo? _currentBatteryInfo;
   BatteryInfo? get currentBatteryInfo => _currentBatteryInfo;
+  
+  /// 서비스가 dispose되었는지 확인하는 플래그
+  bool _isDisposed = false;
+
+  /// 안전하게 스트림에 이벤트 추가
+  void _safeAddEvent(BatteryInfo batteryInfo) {
+    if (!_isDisposed && _batteryInfoController != null && !_batteryInfoController!.isClosed) {
+      try {
+        _batteryInfoController!.add(batteryInfo);
+      } catch (e) {
+        debugPrint('스트림에 이벤트 추가 실패: $e');
+      }
+    } else {
+      debugPrint('스트림이 닫혔거나 서비스가 dispose됨, 이벤트 추가 건너뜀');
+    }
+  }
 
   /// 배터리 모니터링 시작
   Future<void> startMonitoring() async {
+    if (_isDisposed) {
+      debugPrint('서비스가 이미 dispose됨, 모니터링 시작 건너뜀');
+      return;
+    }
+    
     try {
       // 초기 배터리 정보 가져오기
       await _updateBatteryInfo();
@@ -32,7 +57,9 @@ class BatteryService {
       // 배터리 상태 변화 감지
       _batteryStateSubscription = _battery.onBatteryStateChanged.listen(
         (BatteryState state) async {
-          await _updateBatteryInfo();
+          if (!_isDisposed) {
+            await _updateBatteryInfo();
+          }
         },
       );
     } catch (e) {
@@ -48,6 +75,11 @@ class BatteryService {
 
   /// 배터리 정보 업데이트
   Future<void> _updateBatteryInfo() async {
+    if (_isDisposed) {
+      debugPrint('서비스가 이미 dispose됨, 배터리 정보 업데이트 건너뜀');
+      return;
+    }
+    
     try {
       debugPrint('배터리 정보 업데이트 시작...');
       
@@ -134,8 +166,7 @@ class BatteryService {
         isCharging: chargingInfo['isCharging'] ?? false,
       );
       
-      _batteryInfoController.add(_currentBatteryInfo!);
-      
+      _safeAddEvent(_currentBatteryInfo!);
       debugPrint('배터리 정보 업데이트 완료: ${preciseLevel.toStringAsFixed(2)}%, 상태: $batteryState, 온도: ${temperature.toStringAsFixed(1)}°C, 전압: ${voltage}mV, 용량: ${capacity}mAh, 건강도: $health');
     } catch (e, stackTrace) {
       debugPrint('배터리 정보 업데이트 실패: $e');
@@ -159,7 +190,7 @@ class BatteryService {
           isCharging: false,
         );
         
-        _batteryInfoController.add(_currentBatteryInfo!);
+        _safeAddEvent(_currentBatteryInfo!);
         debugPrint('최소 배터리 정보로 폴백: $batteryLevel%, 상태: $batteryState');
       } catch (fallbackError) {
         debugPrint('최종 폴백도 실패: $fallbackError');
@@ -176,19 +207,26 @@ class BatteryService {
           chargingCurrent: -1,
           isCharging: false,
         );
-        _batteryInfoController.add(_currentBatteryInfo!);
+        _safeAddEvent(_currentBatteryInfo!);
       }
     }
   }
 
   /// 수동으로 배터리 정보 새로고침
   Future<void> refreshBatteryInfo() async {
+    if (_isDisposed) {
+      debugPrint('서비스가 이미 dispose됨, 배터리 정보 새로고침 건너뜀');
+      return;
+    }
     await _updateBatteryInfo();
   }
 
   /// 리소스 정리
   void dispose() {
+    _isDisposed = true;
     stopMonitoring();
-    _batteryInfoController.close();
+    if (_batteryInfoController != null && !_batteryInfoController!.isClosed) {
+      _batteryInfoController!.close();
+    }
   }
 }

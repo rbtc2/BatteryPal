@@ -44,6 +44,7 @@ class _HomeTabState extends State<HomeTab> {
   @override
   void dispose() {
     _batteryService.stopMonitoring();
+    _batteryService.dispose();
     super.dispose();
   }
 

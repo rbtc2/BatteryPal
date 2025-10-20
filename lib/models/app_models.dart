@@ -349,6 +349,7 @@ class AppSettings {
   final double batteryThreshold;
   final bool smartChargingEnabled;
   final bool backgroundAppRestriction;
+  final bool chargingCompleteNotificationEnabled; // 충전 완료 알림 활성화
   final DateTime lastUpdated;
   
   const AppSettings({
@@ -362,6 +363,7 @@ class AppSettings {
     this.batteryThreshold = 20.0,
     this.smartChargingEnabled = false,
     this.backgroundAppRestriction = false,
+    this.chargingCompleteNotificationEnabled = false, // 기본값: false (Pro 기능)
     required this.lastUpdated,
   });
   
@@ -381,6 +383,7 @@ class AppSettings {
       'batteryThreshold': batteryThreshold,
       'smartChargingEnabled': smartChargingEnabled,
       'backgroundAppRestriction': backgroundAppRestriction,
+      'chargingCompleteNotificationEnabled': chargingCompleteNotificationEnabled,
       'lastUpdated': lastUpdated.toIso8601String(),
     };
   }
@@ -398,6 +401,7 @@ class AppSettings {
       batteryThreshold: json['batteryThreshold']?.toDouble() ?? 20.0,
       smartChargingEnabled: json['smartChargingEnabled'] ?? false,
       backgroundAppRestriction: json['backgroundAppRestriction'] ?? false,
+      chargingCompleteNotificationEnabled: json['chargingCompleteNotificationEnabled'] ?? false,
       lastUpdated: DateTime.parse(json['lastUpdated']),
     );
   }
@@ -414,6 +418,7 @@ class AppSettings {
     double? batteryThreshold,
     bool? smartChargingEnabled,
     bool? backgroundAppRestriction,
+    bool? chargingCompleteNotificationEnabled,
     DateTime? lastUpdated,
   }) {
     return AppSettings(
@@ -427,6 +432,7 @@ class AppSettings {
       batteryThreshold: batteryThreshold ?? this.batteryThreshold,
       smartChargingEnabled: smartChargingEnabled ?? this.smartChargingEnabled,
       backgroundAppRestriction: backgroundAppRestriction ?? this.backgroundAppRestriction,
+      chargingCompleteNotificationEnabled: chargingCompleteNotificationEnabled ?? this.chargingCompleteNotificationEnabled,
       lastUpdated: lastUpdated ?? this.lastUpdated,
     );
   }
@@ -450,6 +456,7 @@ class AppSettings {
         other.batteryThreshold == batteryThreshold &&
         other.smartChargingEnabled == smartChargingEnabled &&
         other.backgroundAppRestriction == backgroundAppRestriction &&
+        other.chargingCompleteNotificationEnabled == chargingCompleteNotificationEnabled &&
         other.lastUpdated == lastUpdated;
   }
   
@@ -466,6 +473,7 @@ class AppSettings {
       batteryThreshold,
       smartChargingEnabled,
       backgroundAppRestriction,
+      chargingCompleteNotificationEnabled,
       lastUpdated,
     );
   }

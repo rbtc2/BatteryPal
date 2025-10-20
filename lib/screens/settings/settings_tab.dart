@@ -33,6 +33,7 @@ class _SettingsTabState extends State<SettingsTab> {
     batteryThreshold: 20.0,
     smartChargingEnabled: false,
     backgroundAppRestriction: false,
+    chargingCompleteNotificationEnabled: false, // Pro 기능
     lastUpdated: DateTime.now(),
   );
 
@@ -446,6 +447,17 @@ class _SettingsTabState extends State<SettingsTab> {
               '${_appSettings.batteryThreshold.toStringAsFixed(0)}%',
               '배터리가 이 수준 이하로 떨어지면 알림',
             ),
+            _buildProSwitchItem(
+              '충전 완료 알림',
+              _appSettings.chargingCompleteNotificationEnabled,
+              (value) => setState(() {
+                _appSettings = _appSettings.copyWith(
+                  chargingCompleteNotificationEnabled: value,
+                  lastUpdated: DateTime.now(),
+                );
+              }),
+              '충전 완료 시 알림 받기',
+            ),
           ],
         ),
         
@@ -687,6 +699,72 @@ class _SettingsTabState extends State<SettingsTab> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildProSwitchItem(String title, bool value, ValueChanged<bool> onChanged, String subtitle) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w500,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(
+                          color: Colors.amber.withValues(alpha: 0.5),
+                          width: 1,
+                        ),
+                      ),
+                      child: const Text(
+                        'Pro',
+                        style: TextStyle(
+                          color: Colors.amber,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Switch(
+            value: widget.isProUser ? value : false, // Pro 사용자가 아니면 항상 false
+            onChanged: widget.isProUser ? onChanged : (val) {
+              // Pro 사용자가 아니면 업그레이드 다이얼로그 표시
+              DialogUtils.showSettingsProUpgradeDialog(
+                context,
+                onUpgrade: widget.onProToggle,
+              );
+            },
+            activeTrackColor: Theme.of(context).colorScheme.primary,
+          ),
+        ],
       ),
     );
   }
