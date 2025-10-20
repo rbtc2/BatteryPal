@@ -296,8 +296,6 @@ class _AnalysisTabState extends State<AnalysisTab> {
             _buildAppUsageCard(),
             const SizedBox(height: 24),
             
-            // Pro 기능 미리보기
-            if (!widget.isProUser) _buildProPreviewCard(),
             
             const SizedBox(height: 24),
             
@@ -879,83 +877,6 @@ class _AnalysisTabState extends State<AnalysisTab> {
     );
   }
 
-  Widget _buildProPreviewCard() {
-    return CustomCard(
-      elevation: 2,
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.star,
-                color: Colors.amber,
-                size: 24,
-              ),
-              const SizedBox(width: 8),
-              const Text(
-                'Pro 기능 미리보기',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          
-          // Pro 기능 목록
-          _buildProFeatureItem('배터리 건강도 트렌드', Icons.trending_up),
-          _buildProFeatureItem('충전 패턴 분석', Icons.battery_charging_full),
-          _buildProFeatureItem('AI 인사이트', Icons.psychology),
-          _buildProFeatureItem('상세 리포트', Icons.assessment),
-          
-          const SizedBox(height: 16),
-          
-          // 업그레이드 버튼
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () => DialogUtils.showAnalysisProUpgradeDialog(
-                context,
-                onUpgrade: widget.onProToggle,
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-              ),
-              child: const Text(
-                'Pro로 업그레이드',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildProFeatureItem(String title, IconData icon) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        children: [
-          Icon(
-            icon,
-            size: 20,
-            color: Theme.of(context).colorScheme.primary,
-          ),
-          const SizedBox(width: 12),
-          Text(
-            title,
-            style: const TextStyle(fontSize: 14),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildDailySummaryCard() {
     return CustomCard(
