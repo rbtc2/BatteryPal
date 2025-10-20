@@ -31,6 +31,10 @@ class MainActivity : FlutterActivity() {
                     val health = getBatteryHealth()
                     result.success(health)
                 }
+                "getBatteryLevel" -> {
+                    val level = getBatteryLevel()
+                    result.success(level)
+                }
                 else -> {
                     result.notImplemented()
                 }
@@ -61,5 +65,16 @@ class MainActivity : FlutterActivity() {
         val batteryManager = getSystemService(Context.BATTERY_SERVICE) as BatteryManager
         val batteryIntent = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
         return batteryIntent?.getIntExtra(BatteryManager.EXTRA_HEALTH, -1) ?: -1
+    }
+
+    private fun getBatteryLevel(): Double {
+        val batteryManager = getSystemService(Context.BATTERY_SERVICE) as BatteryManager
+        val batteryIntent = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        val level = batteryIntent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+        val scale = batteryIntent?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
+        
+        return if (level != -1 && scale != -1) {
+            (level * 100.0) / scale // 실제 배터리 퍼센트 계산 (소수점 포함)
+        } else -1.0
     }
 }

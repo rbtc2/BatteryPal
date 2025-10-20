@@ -52,4 +52,16 @@ class NativeBatteryService {
       return -1;
     }
   }
+
+  /// 배터리 레벨 가져오기 (더 정확한 소수점 포함)
+  static Future<double> getBatteryLevel() async {
+    try {
+      final double level = await _channel.invokeMethod('getBatteryLevel');
+      debugPrint('네이티브 배터리 레벨: ${level.toStringAsFixed(2)}%');
+      return level;
+    } catch (e) {
+      debugPrint('배터리 레벨 가져오기 실패: $e');
+      return -1.0;
+    }
+  }
 }

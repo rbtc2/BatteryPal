@@ -48,11 +48,20 @@ class BatteryService {
   /// 배터리 정보 업데이트
   Future<void> _updateBatteryInfo() async {
     try {
-      final batteryLevel = await _battery.batteryLevel;
       final batteryState = await _battery.batteryState;
       
-      // 배터리 레벨을 더 정확하게 계산 (소숫점 포함)
-      double preciseLevel = batteryLevel.toDouble();
+      // 네이티브에서 더 정확한 배터리 레벨 가져오기
+      final nativeLevel = await NativeBatteryService.getBatteryLevel();
+      double preciseLevel;
+      
+      if (nativeLevel >= 0) {
+        // 네이티브에서 정확한 레벨을 가져온 경우
+        preciseLevel = nativeLevel;
+      } else {
+        // 네이티브에서 실패한 경우 기본 플러그인 사용
+        final batteryLevel = await _battery.batteryLevel;
+        preciseLevel = batteryLevel.toDouble();
+      }
       
       // 네이티브 배터리 정보 가져오기
       final temperature = await NativeBatteryService.getBatteryTemperature();
@@ -72,7 +81,7 @@ class BatteryService {
       
       _batteryInfoController.add(_currentBatteryInfo!);
       
-      debugPrint('배터리 정보 업데이트: ${preciseLevel.toStringAsFixed(1)}%, 상태: $batteryState, 온도: ${temperature.toStringAsFixed(1)}°C');
+      debugPrint('배터리 정보 업데이트: ${preciseLevel.toStringAsFixed(2)}%, 상태: $batteryState, 온도: ${temperature.toStringAsFixed(1)}°C (네이티브: ${nativeLevel >= 0 ? "사용" : "기본 플러그인 사용"})');
     } catch (e) {
       debugPrint('배터리 정보 업데이트 실패: $e');
     }
@@ -110,8 +119,14 @@ class BatteryInfo {
     required this.health,
   });
 
-  /// 배터리 레벨을 소숫점 한자리까지 포맷팅
-  String get formattedLevel => '${level.toStringAsFixed(1)}%';
+  /// 배터리 레벨을 정확하게 포맷팅 (소수점이 의미가 있을 때만 표시)
+  String get formattedLevel {
+    if (level == level.round()) {
+      return '${level.round()}%'; // 정수인 경우 소수점 없이 표시
+    } else {
+      return '${level.toStringAsFixed(1)}%'; // 소수점이 있는 경우에만 표시
+    }
+  }
   
   /// 배터리 온도를 소숫점 한자리까지 포맷팅
   String get formattedTemperature => temperature >= 0 ? '${temperature.toStringAsFixed(1)}°C' : '--.-°C';
