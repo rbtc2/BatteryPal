@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../models/app_models.dart';
 import '../../widgets/common/common_widgets.dart';
 import '../../utils/dialog_utils.dart';
+import '../../services/battery_service.dart';
 
 /// 분석 탭 화면
 /// Phase 6에서 실제 구현
@@ -20,6 +21,9 @@ class AnalysisTab extends StatefulWidget {
 }
 
 class _AnalysisTabState extends State<AnalysisTab> {
+  final BatteryService _batteryService = BatteryService();
+  BatteryInfo? _currentBatteryInfo;
+  
   // 스켈레톤용 더미 데이터
   List<AppUsageData> appUsageData = [
     AppUsageData(
@@ -68,6 +72,29 @@ class _AnalysisTabState extends State<AnalysisTab> {
       powerConsumption: 60.0,
     ),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeBatteryService();
+  }
+
+  @override
+  void dispose() {
+    _batteryService.dispose();
+    super.dispose();
+  }
+
+  Future<void> _initializeBatteryService() async {
+    await _batteryService.startMonitoring();
+    _batteryService.batteryInfoStream.listen((batteryInfo) {
+      if (mounted) {
+        setState(() {
+          _currentBatteryInfo = batteryInfo;
+        });
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -480,13 +507,14 @@ class _AnalysisTabState extends State<AnalysisTab> {
           ),
           const SizedBox(height: 20),
           
-          // 배터리 기술 정보
-          _buildDetailRow('배터리 기술', 'Li-Ion'),
-          _buildDetailRow('제조사', 'Samsung SDI'),
-          _buildDetailRow('설계 용량', '4,500 mAh'),
-          _buildDetailRow('현재 용량', '4,200 mAh (93%)'),
-          _buildDetailRow('충전 사이클', '1,247회'),
-          _buildDetailRow('마지막 교체', '2023년 3월'),
+          // 배터리 용량 정보 (실제 데이터)
+          if (_currentBatteryInfo != null) ...[
+            _buildDetailRow('설계 용량', _currentBatteryInfo!.formattedCapacity),
+            _buildDetailRow('현재 용량', _currentBatteryInfo!.formattedLevel),
+          ] else ...[
+            _buildDetailRow('설계 용량', '--mAh'),
+            _buildDetailRow('현재 용량', '--%'),
+          ],
           
           const SizedBox(height: 16),
           
