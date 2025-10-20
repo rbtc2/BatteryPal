@@ -34,6 +34,7 @@ class _HomeTabState extends State<HomeTab> {
   
   // 실제 배터리 정보
   BatteryInfo? _batteryInfo;
+  bool _isRefreshing = false;
 
   @override
   void initState() {
@@ -107,21 +108,47 @@ class _HomeTabState extends State<HomeTab> {
         backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 0,
         actions: [
-          // 배터리 새로고침 버튼
+          // 배터리 새로고침 버튼 (로딩 상태/중복 클릭 방지)
           IconButton(
-            onPressed: () async {
-              final scaffoldMessenger = ScaffoldMessenger.of(context);
-              await _batteryService.refreshBatteryInfo();
-              if (mounted) {
-                scaffoldMessenger.showSnackBar(
-                  const SnackBar(
-                    content: Text('배터리 정보를 새로고침했습니다'),
-                    duration: Duration(seconds: 1),
-                  ),
-                );
-              }
-            },
-            icon: const Icon(Icons.refresh),
+            onPressed: _isRefreshing
+                ? null
+                : () async {
+                    setState(() {
+                      _isRefreshing = true;
+                    });
+                    try {
+                      final scaffoldMessenger = ScaffoldMessenger.of(context);
+                      await _batteryService.refreshBatteryInfo();
+                      // 즉시 현재 정보 반영 시도 (스트림 업데이트 전 폴백)
+                      final latest = _batteryService.currentBatteryInfo;
+                      if (mounted && latest != null) {
+                        setState(() {
+                          _batteryInfo = latest;
+                        });
+                      }
+                      if (mounted) {
+                        scaffoldMessenger.showSnackBar(
+                          const SnackBar(
+                            content: Text('배터리 정보를 새로고침했습니다'),
+                            duration: Duration(seconds: 1),
+                          ),
+                        );
+                      }
+                    } finally {
+                      if (mounted) {
+                        setState(() {
+                          _isRefreshing = false;
+                        });
+                      }
+                    }
+                  },
+            icon: _isRefreshing
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.refresh),
             tooltip: '배터리 정보 새로고침',
           ),
           // Pro 배지
