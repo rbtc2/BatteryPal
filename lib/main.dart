@@ -1,29 +1,12 @@
 import 'package:flutter/material.dart';
-import 'services/battery_service.dart';
+import 'app/battery_pal_app.dart';
 
 void main() {
   runApp(const BatteryPalApp());
 }
 
-class BatteryPalApp extends StatelessWidget {
-  const BatteryPalApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'BatteryPal',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF4CAF50), // 배터리 테마 그린
-          brightness: Brightness.dark,
-        ),
-        useMaterial3: true,
-      ),
-      home: const MainNavigationScreen(),
-    );
-  }
-}
-
+// Phase 1: 기존 코드는 임시로 주석 처리 (Phase 5-8에서 분리 예정)
+/*
 // Phase 1: 기본 네비게이션 구조 및 3탭 바 구현
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key});
@@ -2067,3 +2050,4 @@ class _SettingsTabState extends State<SettingsTab> {
     );
   }
 }
+*/

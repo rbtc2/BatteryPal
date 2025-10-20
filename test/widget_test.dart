@@ -5,23 +5,20 @@
 
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:batterypal/main.dart';
+import 'package:batterypal/app/battery_pal_app.dart';
 
 void main() {
   testWidgets('BatteryPal app smoke test', (WidgetTester tester) async {
     // Build our app and trigger a frame.
     await tester.pumpWidget(const BatteryPalApp());
 
-    // Verify that the app title is displayed.
-    expect(find.text('BatteryPal'), findsOneWidget);
-
-    // Verify that the home tab is displayed by default.
-    expect(find.text('현재 배터리'), findsOneWidget);
-    expect(find.text('⚡ 배터리 부스트'), findsOneWidget);
-
+    // Phase 1: 기본 구조만 테스트 (Phase 5-8에서 상세 테스트 추가 예정)
     // Verify that bottom navigation is present.
     expect(find.text('홈'), findsOneWidget);
     expect(find.text('분석'), findsOneWidget);
     expect(find.text('설정'), findsOneWidget);
+    
+    // Verify that temporary content is displayed
+    expect(find.text('Home Tab - Phase 5에서 구현'), findsOneWidget);
   });
 }
