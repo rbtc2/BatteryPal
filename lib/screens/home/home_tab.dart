@@ -374,21 +374,21 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
-  /// 충전 분석 카드 (Phase 1: 스켈레톤 UI)
+  /// 충전 분석 카드 (미니멀 디자인)
   Widget _buildChargingAnalysisCard() {
     return CustomCard(
-      elevation: 6, // 다른 카드보다 높은 elevation으로 강조
-      padding: const EdgeInsets.all(20),
+      elevation: 4, // elevation 감소로 미니멀하게
+      padding: const EdgeInsets.all(16), // 패딩 감소
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // 헤더: 충전 속도 분석
           _buildChargingHeader(),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12), // 간격 감소
           
           // 충전 속도 인디케이터 (큰 시각적 요소)
           _buildChargingSpeedIndicator(),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12), // 간격 감소
           
           // 충전 최적화 팁 (접을 수 있는 형태)
           _buildChargingOptimizationTips(),
@@ -397,55 +397,57 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
-  /// 충전 분석 헤더
+  /// 충전 분석 헤더 (미니멀 디자인)
   Widget _buildChargingHeader() {
     return Row(
       children: [
+        // 미니멀 아이콘 컨테이너
         Container(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(8),
+            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(6),
           ),
           child: Icon(
-            Icons.flash_on,
+            Icons.flash_on_outlined,
             color: Theme.of(context).colorScheme.primary,
-            size: 20,
+            size: 16,
           ),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 10),
         Text(
-          '충전 속도 분석',
+          '충전 분석',
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
+            fontWeight: FontWeight.w600,
+            letterSpacing: -0.2,
           ),
         ),
         const Spacer(),
-        // 실시간 업데이트 표시
+        // 미니멀 실시간 표시
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
           decoration: BoxDecoration(
-            color: Colors.green.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12),
+            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                width: 6,
-                height: 6,
-                decoration: const BoxDecoration(
-                  color: Colors.green,
+                width: 4,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primary,
                   shape: BoxShape.circle,
                 ),
               ),
               const SizedBox(width: 4),
-              const Text(
+              Text(
                 '실시간',
                 style: TextStyle(
-                  color: Colors.green,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).colorScheme.primary,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ],
@@ -455,46 +457,38 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
-  /// 충전 속도 인디케이터 (Phase 1: 스켈레톤)
+  /// 충전 속도 인디케이터 (미니멀 디자인)
   Widget _buildChargingSpeedIndicator() {
-    // Phase 1에서는 더미 데이터 사용
     final chargingSpeed = _getDummyChargingSpeed();
     
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            chargingSpeed.color.withValues(alpha: 0.1),
-            chargingSpeed.color.withValues(alpha: 0.05),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
+        color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: chargingSpeed.color.withValues(alpha: 0.3),
-          width: 2,
+          color: chargingSpeed.color.withValues(alpha: 0.2),
+          width: 1,
         ),
       ),
       child: Row(
         children: [
-          // 큰 아이콘
+          // 미니멀 아이콘
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: chargingSpeed.color.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(12),
+              color: chargingSpeed.color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(
               chargingSpeed.icon,
               color: chargingSpeed.color,
-              size: 40,
+              size: 24,
             ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 12),
           
-          // 텍스트 정보
+          // 텍스트 정보 (개선된 타이포그래피)
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -502,21 +496,23 @@ class _HomeTabState extends State<HomeTab> {
                 Text(
                   chargingSpeed.label,
                   style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
                     color: chargingSpeed.color,
+                    letterSpacing: -0.3,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
                 Text(
                   chargingSpeed.description,
                   style: TextStyle(
-                    fontSize: 14,
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                    fontSize: 13,
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                    fontWeight: FontWeight.w400,
                   ),
                 ),
                 const SizedBox(height: 8),
-                // 충전 진행률 바 (Phase 1: 스켈레톤)
+                // 개선된 충전 진행률 바
                 _buildChargingProgressBar(),
               ],
             ),
@@ -526,7 +522,7 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
-  /// 충전 진행률 바 (Phase 1: 스켈레톤)
+  /// 충전 진행률 바 (미니멀 디자인)
   Widget _buildChargingProgressBar() {
     final currentLevel = _batteryInfo?.level ?? 0.0;
     final progress = currentLevel / 100.0;
@@ -538,70 +534,92 @@ class _HomeTabState extends State<HomeTab> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              '충전 진행률',
+              '진행률',
               style: TextStyle(
-                fontSize: 12,
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                fontSize: 11,
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                fontWeight: FontWeight.w500,
               ),
             ),
             Text(
               '${currentLevel.toStringAsFixed(1)}%',
               style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
                 color: Theme.of(context).colorScheme.primary,
               ),
             ),
           ],
         ),
         const SizedBox(height: 4),
-        LinearProgressIndicator(
-          value: progress,
-          backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-          valueColor: AlwaysStoppedAnimation<Color>(
-            Theme.of(context).colorScheme.primary,
+        Container(
+          height: 3,
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(2),
+          ),
+          child: FractionallySizedBox(
+            alignment: Alignment.centerLeft,
+            widthFactor: progress,
+            child: Container(
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primary,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
           ),
         ),
       ],
     );
   }
 
-  /// 충전 최적화 팁 (Phase 1: 스켈레톤)
+  /// 충전 최적화 팁 (미니멀 디자인)
   Widget _buildChargingOptimizationTips() {
-    return ExpansionTile(
-      title: Row(
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: ExpansionTile(
+        tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        childrenPadding: const EdgeInsets.only(bottom: 8),
+        title: Row(
+          children: [
+            Icon(
+              Icons.lightbulb_outline,
+              color: Theme.of(context).colorScheme.secondary,
+              size: 16,
+            ),
+            const SizedBox(width: 6),
+            const Text(
+              '최적화 팁',
+              style: TextStyle(
+                fontWeight: FontWeight.w500,
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ),
         children: [
-          Icon(
-            Icons.lightbulb_outline,
-            color: Theme.of(context).colorScheme.secondary,
-            size: 20,
-          ),
-          const SizedBox(width: 8),
-          const Text(
-            '충전 최적화 팁',
-            style: TextStyle(fontWeight: FontWeight.w600),
-          ),
+          ..._getDummyChargingTips().map((tip) => _buildTipItem(tip)),
         ],
       ),
-      children: [
-        ..._getDummyChargingTips().map((tip) => _buildTipItem(tip)),
-      ],
     );
   }
 
-  /// 팁 아이템 위젯
+  /// 팁 아이템 위젯 (미니멀 디자인)
   Widget _buildTipItem(String tip) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 6,
-            height: 6,
-            margin: const EdgeInsets.only(top: 8, right: 12),
+            width: 3,
+            height: 3,
+            margin: const EdgeInsets.only(top: 6, right: 8),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primary,
+              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.6),
               shape: BoxShape.circle,
             ),
           ),
@@ -609,9 +627,10 @@ class _HomeTabState extends State<HomeTab> {
             child: Text(
               tip,
               style: TextStyle(
-                fontSize: 14,
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
-                height: 1.4,
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                height: 1.3,
+                fontWeight: FontWeight.w400,
               ),
             ),
           ),
@@ -620,28 +639,28 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
-  /// 더미 충전 속도 정보 (Phase 1용)
+  /// 더미 충전 속도 정보 (미니멀 디자인)
   ChargingSpeedInfo _getDummyChargingSpeed() {
     // Phase 1에서는 더미 데이터 사용
     // Phase 2에서 실제 충전 전류 분석으로 교체 예정
     return ChargingSpeedInfo(
       label: '고속 충전',
       description: '1.5A 충전 중',
-      color: Colors.orange,
-      icon: Icons.electric_bolt,
+      color: Theme.of(context).colorScheme.primary, // 메인 강조색과 통일
+      icon: Icons.electric_bolt_outlined, // outlined 스타일로 통일
       tips: [
-        '80% 이상 충전 시 충전 속도가 감소합니다',
-        '충전 완료 후 30분 이내에 분리 권장',
+        '80% 이상 충전 시 속도가 감소합니다',
+        '충전 완료 후 30분 이내 분리 권장',
         '충전 중 고성능 작업은 피하세요',
       ],
     );
   }
 
-  /// 더미 충전 팁 (Phase 1용)
+  /// 더미 충전 팁 (미니멀 디자인)
   List<String> _getDummyChargingTips() {
     return [
-      '80% 이상 충전 시 충전 속도가 감소합니다',
-      '충전 완료 후 30분 이내에 분리 권장',
+      '80% 이상 충전 시 속도가 감소합니다',
+      '충전 완료 후 30분 이내 분리 권장',
       '충전 중 고성능 작업은 피하세요',
       '배터리 온도가 높으면 충전 속도가 느려집니다',
     ];
