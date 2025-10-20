@@ -86,43 +86,6 @@ class InfoItem extends StatelessWidget {
   }
 }
 
-/// 효과 아이템 위젯 (최적화 효과 표시용)
-class EffectItem extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color? valueColor;
-  
-  const EffectItem({
-    super.key,
-    required this.label,
-    required this.value,
-    this.valueColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: TextStyle(
-            fontWeight: AppTextStyles.bold,
-            fontSize: AppTextStyles.bodyLarge,
-            color: valueColor ?? Theme.of(context).colorScheme.primary,
-          ),
-        ),
-        Text(
-          label,
-          style: TextStyle(
-            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: AppColors.alphaHigh),
-            fontSize: AppTextStyles.bodySmall,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 /// 요약 아이템 위젯 (일일 요약용)
 class SummaryItem extends StatelessWidget {
   final String label;
@@ -292,6 +255,49 @@ class EmptyStateWidget extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// 효과 아이템 위젯 (최적화 효과 표시용)
+class EffectItem extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color? valueColor;
+  final double? valueFontSize;
+  final double? labelFontSize;
+  final FontWeight? valueFontWeight;
+  
+  const EffectItem({
+    super.key,
+    required this.label,
+    required this.value,
+    this.valueColor,
+    this.valueFontSize,
+    this.labelFontSize,
+    this.valueFontWeight,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: TextStyle(
+            fontWeight: valueFontWeight ?? AppTextStyles.bold,
+            fontSize: valueFontSize ?? AppTextStyles.titleMedium,
+            color: valueColor ?? Theme.of(context).colorScheme.primary,
+          ),
+        ),
+        Text(
+          label,
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: AppColors.alphaHigh),
+            fontSize: labelFontSize ?? AppTextStyles.bodySmall,
+          ),
+        ),
+      ],
     );
   }
 }

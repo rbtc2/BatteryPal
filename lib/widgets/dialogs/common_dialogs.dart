@@ -173,23 +173,26 @@ class LanguageSelectionDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('언어 선택'),
-      content: RadioGroup<String>(
-        groupValue: currentLanguage,
-        onChanged: (value) {
-          if (value != null) {
-            onLanguageChanged(value);
-            Navigator.pop(context);
-          }
-        },
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: availableLanguages.map((language) {
-            return RadioListTile<String>(
-              title: Text(language),
-              value: language,
-            );
-          }).toList(),
-        ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SegmentedButton<String>(
+            segments: availableLanguages.map((language) {
+              return ButtonSegment<String>(
+                value: language,
+                label: Text(language),
+              );
+            }).toList(),
+            selected: {currentLanguage},
+            onSelectionChanged: (Set<String> selection) {
+              if (selection.isNotEmpty) {
+                final selectedLanguage = selection.first;
+                onLanguageChanged(selectedLanguage);
+                Navigator.pop(context);
+              }
+            },
+          ),
+        ],
       ),
     );
   }
