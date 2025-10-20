@@ -1361,6 +1361,15 @@ class _SettingsTabState extends State<SettingsTab> {
   bool notificationsEnabled = true;
   bool darkModeEnabled = true;
   String selectedLanguage = '한국어';
+  
+  // 배터리 관리 설정
+  bool powerSaveModeEnabled = false;
+  bool batteryNotificationsEnabled = true;
+  bool autoOptimizationEnabled = true;
+  bool batteryProtectionEnabled = true;
+  double batteryThreshold = 20.0; // 배터리 알림 임계값
+  bool smartChargingEnabled = false;
+  bool backgroundAppRestriction = false;
 
   @override
   Widget build(BuildContext context) {
@@ -1400,6 +1409,11 @@ class _SettingsTabState extends State<SettingsTab> {
                 () => _showLanguageDialog(),
               ),
             ]),
+            
+            const SizedBox(height: 24),
+            
+            // 배터리 관리 설정
+            _buildBatteryManagementSection(),
             
             const SizedBox(height: 24),
             
@@ -1690,6 +1704,347 @@ class _SettingsTabState extends State<SettingsTab> {
               widget.onProToggle(); // Pro 모드 토글
             },
             child: const Text('업그레이드'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBatteryManagementSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 섹션 제목
+        Row(
+          children: [
+            Icon(
+              Icons.battery_std,
+              color: Theme.of(context).colorScheme.primary,
+              size: 24,
+            ),
+            const SizedBox(width: 12),
+            Text(
+              '배터리 관리',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        
+        // 절전 모드 설정
+        _buildBatterySettingsCard(
+          '절전 모드',
+          Icons.power_settings_new,
+          '배터리 수명을 연장하기 위한 절전 모드',
+          [
+            _buildSwitchItem(
+              '절전 모드 활성화',
+              powerSaveModeEnabled,
+              (value) => setState(() => powerSaveModeEnabled = value),
+              '화면 밝기 감소, 백그라운드 앱 제한',
+            ),
+            _buildSwitchItem(
+              '백그라운드 앱 제한',
+              backgroundAppRestriction,
+              (value) => setState(() => backgroundAppRestriction = value),
+              '사용하지 않는 앱의 백그라운드 활동 제한',
+            ),
+          ],
+        ),
+        
+        const SizedBox(height: 16),
+        
+        // 배터리 알림 설정
+        _buildBatterySettingsCard(
+          '배터리 알림',
+          Icons.notifications_active,
+          '배터리 상태에 따른 알림 설정',
+          [
+            _buildSwitchItem(
+              '배터리 알림 활성화',
+              batteryNotificationsEnabled,
+              (value) => setState(() => batteryNotificationsEnabled = value),
+              '배터리 부족 시 알림 받기',
+            ),
+            _buildSliderItem(
+              '알림 임계값',
+              batteryThreshold,
+              (value) => setState(() => batteryThreshold = value),
+              '$batteryThreshold%',
+              '배터리가 이 수준 이하로 떨어지면 알림',
+            ),
+          ],
+        ),
+        
+        const SizedBox(height: 16),
+        
+        // 자동 최적화 설정
+        _buildBatterySettingsCard(
+          '자동 최적화',
+          Icons.auto_fix_high,
+          '자동으로 배터리를 최적화하는 기능',
+          [
+            _buildSwitchItem(
+              '자동 최적화 활성화',
+              autoOptimizationEnabled,
+              (value) => setState(() => autoOptimizationEnabled = value),
+              '배터리 사용량이 높은 앱 자동 제한',
+            ),
+            _buildSwitchItem(
+              '스마트 충전',
+              smartChargingEnabled,
+              (value) => setState(() => smartChargingEnabled = value),
+              '배터리 건강도를 고려한 충전 관리',
+            ),
+          ],
+        ),
+        
+        const SizedBox(height: 16),
+        
+        // 배터리 보호 설정
+        _buildBatterySettingsCard(
+          '배터리 보호',
+          Icons.shield,
+          '배터리 건강도를 보호하는 설정',
+          [
+            _buildSwitchItem(
+              '배터리 보호 활성화',
+              batteryProtectionEnabled,
+              (value) => setState(() => batteryProtectionEnabled = value),
+              '과충전 방지 및 온도 모니터링',
+            ),
+            _buildActionItem(
+              '배터리 보정',
+              Icons.refresh,
+              '배터리 수치 보정',
+              () => _showBatteryCalibrationDialog(),
+            ),
+            _buildActionItem(
+              '배터리 진단',
+              Icons.health_and_safety,
+              '배터리 상태 진단',
+              () => _showBatteryDiagnosticDialog(),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBatterySettingsCard(String title, IconData icon, String description, List<Widget> items) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  icon,
+                  color: Theme.of(context).colorScheme.primary,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              description,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(height: 12),
+            ...items,
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSwitchItem(String title, bool value, ValueChanged<bool> onChanged, String subtitle) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w500,
+                    fontSize: 14,
+                  ),
+                ),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Switch(
+            value: value,
+            onChanged: onChanged,
+            activeTrackColor: Theme.of(context).colorScheme.primary,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSliderItem(String title, double value, ValueChanged<double> onChanged, String valueText, String subtitle) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w500,
+                  fontSize: 14,
+                ),
+              ),
+              Text(
+                valueText,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.primary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+          Text(
+            subtitle,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Slider(
+            value: value,
+            min: 5,
+            max: 50,
+            divisions: 9,
+            onChanged: onChanged,
+            activeColor: Theme.of(context).colorScheme.primary,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionItem(String title, IconData icon, String subtitle, VoidCallback onTap) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+          child: Row(
+            children: [
+              Icon(
+                icon,
+                size: 18,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w500,
+                        fontSize: 14,
+                      ),
+                    ),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.chevron_right,
+                size: 18,
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showBatteryCalibrationDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('배터리 보정'),
+        content: const Text('배터리 보정을 시작하시겠습니까?\n\n이 과정은 약 2-3시간 소요되며, 완전 방전 후 완전 충전이 필요합니다.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('취소'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('배터리 보정이 시작되었습니다'),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            },
+            child: const Text('시작'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showBatteryDiagnosticDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('배터리 진단'),
+        content: const Text('배터리 상태를 진단하시겠습니까?\n\n• 배터리 건강도: 양호\n• 충전 성능: 정상\n• 온도 상태: 정상\n• 예상 수명: 2-3년'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('확인'),
           ),
         ],
       ),
