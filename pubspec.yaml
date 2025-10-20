@@ -45,6 +45,9 @@ dependencies:
   
   # JSON 직렬화
   json_annotation: ^4.8.1
+  
+  # 차트 라이브러리
+  fl_chart: ^0.68.0
 
 dev_dependencies:
   flutter_test:

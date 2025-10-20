@@ -83,12 +83,12 @@ class BatteryService {
     try {
       debugPrint('배터리 정보 업데이트 시작...');
       
-      // 기본 배터리 정보 먼저 가져오기
+      // 기본 배터리 정보 먼저 가져오기 (안정적)
       final batteryLevel = await _battery.batteryLevel;
       final batteryState = await _battery.batteryState;
       debugPrint('기본 배터리 레벨: $batteryLevel%, 상태: $batteryState');
       
-      // 네이티브에서 더 정확한 배터리 레벨 가져오기
+      // 네이티브에서 더 정확한 배터리 레벨 가져오기 (선택적)
       double preciseLevel = batteryLevel.toDouble();
       try {
         final nativeLevel = await NativeBatteryService.getBatteryLevel();
@@ -105,7 +105,7 @@ class BatteryService {
         debugPrint('기본 플러그인 레벨 사용: $preciseLevel%');
       }
       
-      // 네이티브 배터리 정보 가져오기 (각각 독립적으로 처리)
+      // 네이티브 배터리 정보 가져오기 (각각 독립적으로 처리, 실패해도 계속 진행)
       debugPrint('네이티브 배터리 정보 수집 시작...');
       
       double temperature = -1.0;
@@ -115,9 +115,10 @@ class BatteryService {
       Map<String, dynamic> chargingInfo = {
         'chargingType': 'Unknown',
         'chargingCurrent': -1,
-        'isCharging': false,
+        'isCharging': batteryState == BatteryState.charging, // 기본 플러그인 정보 사용
       };
       
+      // 온도 정보 (선택적)
       try {
         temperature = await NativeBatteryService.getBatteryTemperature();
         debugPrint('네이티브 온도: $temperature°C');
@@ -125,6 +126,7 @@ class BatteryService {
         debugPrint('온도 가져오기 실패: $e');
       }
       
+      // 전압 정보 (선택적)
       try {
         voltage = await NativeBatteryService.getBatteryVoltage();
         debugPrint('네이티브 전압: $voltage mV');
@@ -132,6 +134,7 @@ class BatteryService {
         debugPrint('전압 가져오기 실패: $e');
       }
       
+      // 용량 정보 (선택적)
       try {
         capacity = await NativeBatteryService.getBatteryCapacity();
         debugPrint('네이티브 용량: $capacity mAh');
@@ -139,6 +142,7 @@ class BatteryService {
         debugPrint('용량 가져오기 실패: $e');
       }
       
+      // 건강도 정보 (선택적)
       try {
         health = await NativeBatteryService.getBatteryHealth();
         debugPrint('네이티브 건강도: $health');
@@ -146,11 +150,18 @@ class BatteryService {
         debugPrint('건강도 가져오기 실패: $e');
       }
       
+      // 충전 정보 (선택적)
       try {
         chargingInfo = await NativeBatteryService.getChargingInfo();
         debugPrint('네이티브 충전 정보: $chargingInfo');
       } catch (e) {
         debugPrint('충전 정보 가져오기 실패: $e');
+        // 기본 플러그인 정보로 폴백
+        chargingInfo = {
+          'chargingType': 'Unknown',
+          'chargingCurrent': -1,
+          'isCharging': batteryState == BatteryState.charging,
+        };
       }
       
       _currentBatteryInfo = BatteryInfo(
@@ -163,7 +174,7 @@ class BatteryService {
         health: health,
         chargingType: chargingInfo['chargingType'] ?? 'Unknown',
         chargingCurrent: chargingInfo['chargingCurrent'] ?? -1,
-        isCharging: chargingInfo['isCharging'] ?? false,
+        isCharging: chargingInfo['isCharging'] ?? (batteryState == BatteryState.charging),
       );
       
       _safeAddEvent(_currentBatteryInfo!);
@@ -187,7 +198,7 @@ class BatteryService {
           health: -1,
           chargingType: 'Unknown',
           chargingCurrent: -1,
-          isCharging: false,
+          isCharging: batteryState == BatteryState.charging,
         );
         
         _safeAddEvent(_currentBatteryInfo!);

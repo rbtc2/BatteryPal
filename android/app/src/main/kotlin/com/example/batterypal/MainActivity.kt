@@ -46,11 +46,19 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    // 공통 배터리 인텐트 가져오기 메서드 (권장 방법)
+    private fun getBatteryIntent(): Intent? {
+        return try {
+            applicationContext.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        } catch (e: Exception) {
+            android.util.Log.e("BatteryPal", "배터리 인텐트 가져오기 실패", e)
+            null
+        }
+    }
+
     private fun getBatteryTemperature(): Double {
         try {
-            val batteryManager = getSystemService(Context.BATTERY_SERVICE) as BatteryManager
-            val batteryIntent = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
-            
+            val batteryIntent = getBatteryIntent()
             if (batteryIntent == null) {
                 android.util.Log.w("BatteryPal", "배터리 인텐트가 null입니다")
                 return -1.0
@@ -68,9 +76,7 @@ class MainActivity : FlutterActivity() {
 
     private fun getBatteryVoltage(): Int {
         try {
-            val batteryManager = getSystemService(Context.BATTERY_SERVICE) as BatteryManager
-            val batteryIntent = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
-            
+            val batteryIntent = getBatteryIntent()
             if (batteryIntent == null) {
                 android.util.Log.w("BatteryPal", "배터리 인텐트가 null입니다")
                 return -1
@@ -88,7 +94,6 @@ class MainActivity : FlutterActivity() {
     private fun getBatteryCapacity(): Int {
         try {
             val batteryManager = getSystemService(Context.BATTERY_SERVICE) as BatteryManager
-            val batteryIntent = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
             
             // BatteryManager를 사용하여 실제 배터리 용량 가져오기 (API 21+)
             val capacity = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
@@ -107,8 +112,7 @@ class MainActivity : FlutterActivity() {
 
     private fun getBatteryHealth(): Int {
         try {
-            val batteryManager = getSystemService(Context.BATTERY_SERVICE) as BatteryManager
-            val batteryIntent = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+            val batteryIntent = getBatteryIntent()
             val health = batteryIntent?.getIntExtra(BatteryManager.EXTRA_HEALTH, -1) ?: -1
             android.util.Log.d("BatteryPal", "배터리 건강도: $health")
             return health
@@ -120,9 +124,7 @@ class MainActivity : FlutterActivity() {
 
     private fun getBatteryLevel(): Double {
         try {
-            val batteryManager = getSystemService(Context.BATTERY_SERVICE) as BatteryManager
-            val batteryIntent = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
-            
+            val batteryIntent = getBatteryIntent()
             if (batteryIntent == null) {
                 android.util.Log.w("BatteryPal", "배터리 인텐트가 null입니다")
                 return -1.0
@@ -146,7 +148,7 @@ class MainActivity : FlutterActivity() {
     private fun getChargingInfo(): Map<String, Any> {
         try {
             val batteryManager = getSystemService(Context.BATTERY_SERVICE) as BatteryManager
-            val batteryIntent = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+            val batteryIntent = getBatteryIntent()
             
             val plugged = batteryIntent?.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1) ?: -1
             
