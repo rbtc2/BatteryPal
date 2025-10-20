@@ -49,27 +49,38 @@ class BatteryService {
   /// 배터리 정보 업데이트
   Future<void> _updateBatteryInfo() async {
     try {
+      debugPrint('배터리 정보 업데이트 시작...');
+      
       final batteryState = await _battery.batteryState;
+      debugPrint('기본 배터리 상태: $batteryState');
       
       // 네이티브에서 더 정확한 배터리 레벨 가져오기
       final nativeLevel = await NativeBatteryService.getBatteryLevel();
+      debugPrint('네이티브 배터리 레벨: $nativeLevel');
+      
       double preciseLevel;
       
       if (nativeLevel >= 0) {
         // 네이티브에서 정확한 레벨을 가져온 경우
         preciseLevel = nativeLevel;
+        debugPrint('네이티브 레벨 사용: $preciseLevel%');
       } else {
         // 네이티브에서 실패한 경우 기본 플러그인 사용
         final batteryLevel = await _battery.batteryLevel;
         preciseLevel = batteryLevel.toDouble();
+        debugPrint('기본 플러그인 레벨 사용: $preciseLevel%');
       }
       
       // 네이티브 배터리 정보 가져오기
+      debugPrint('네이티브 배터리 정보 수집 시작...');
       final temperature = await NativeBatteryService.getBatteryTemperature();
       final voltage = await NativeBatteryService.getBatteryVoltage();
       final capacity = await NativeBatteryService.getBatteryCapacity();
       final health = await NativeBatteryService.getBatteryHealth();
       final chargingInfo = await NativeBatteryService.getChargingInfo();
+      
+      debugPrint('네이티브 정보 - 온도: $temperature, 전압: $voltage, 용량: $capacity, 건강도: $health');
+      debugPrint('충전 정보: $chargingInfo');
       
       _currentBatteryInfo = BatteryInfo(
         level: preciseLevel,
@@ -86,9 +97,34 @@ class BatteryService {
       
       _batteryInfoController.add(_currentBatteryInfo!);
       
-      debugPrint('배터리 정보 업데이트: ${preciseLevel.toStringAsFixed(2)}%, 상태: $batteryState, 온도: ${temperature.toStringAsFixed(1)}°C (네이티브: ${nativeLevel >= 0 ? "사용" : "기본 플러그인 사용"})');
-    } catch (e) {
+      debugPrint('배터리 정보 업데이트 완료: ${preciseLevel.toStringAsFixed(2)}%, 상태: $batteryState, 온도: ${temperature.toStringAsFixed(1)}°C, 전압: ${voltage}mV, 용량: ${capacity}mAh, 건강도: $health');
+    } catch (e, stackTrace) {
       debugPrint('배터리 정보 업데이트 실패: $e');
+      debugPrint('스택 트레이스: $stackTrace');
+      
+      // 오류 발생 시에도 기본 배터리 정보라도 표시
+      try {
+        final batteryLevel = await _battery.batteryLevel;
+        final batteryState = await _battery.batteryState;
+        
+        _currentBatteryInfo = BatteryInfo(
+          level: batteryLevel.toDouble(),
+          state: batteryState,
+          timestamp: DateTime.now(),
+          temperature: -1.0,
+          voltage: -1,
+          capacity: -1,
+          health: -1,
+          chargingType: 'Unknown',
+          chargingCurrent: -1,
+          isCharging: false,
+        );
+        
+        _batteryInfoController.add(_currentBatteryInfo!);
+        debugPrint('기본 배터리 정보로 폴백: $batteryLevel%, 상태: $batteryState');
+      } catch (fallbackError) {
+        debugPrint('폴백 배터리 정보도 실패: $fallbackError');
+      }
     }
   }
 
