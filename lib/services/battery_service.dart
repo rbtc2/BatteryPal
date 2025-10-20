@@ -19,6 +19,7 @@ class BatteryService {
   Stream<BatteryInfo> get batteryInfoStream {
     if (_batteryInfoController == null || _batteryInfoController!.isClosed) {
       _batteryInfoController = StreamController<BatteryInfo>.broadcast();
+      debugPrint('배터리 서비스: 새로운 스트림 컨트롤러 생성');
     }
     return _batteryInfoController!.stream;
   }

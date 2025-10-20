@@ -42,6 +42,23 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 위젯이 다시 활성화될 때 배터리 정보 새로고침
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _refreshBatteryInfoIfNeeded();
+    });
+  }
+
+  /// 필요시 배터리 정보 새로고침
+  void _refreshBatteryInfoIfNeeded() {
+    if (_batteryInfo == null) {
+      debugPrint('홈 탭: 배터리 정보가 없음, 새로고침 시도');
+      _batteryService.refreshBatteryInfo();
+    }
+  }
+
+  @override
   void dispose() {
     _batteryService.stopMonitoring();
     _batteryService.dispose();
@@ -51,6 +68,22 @@ class _HomeTabState extends State<HomeTab> {
   /// 배터리 서비스 초기화
   Future<void> _initializeBatteryService() async {
     debugPrint('홈 탭: 배터리 서비스 초기화 시작');
+    
+    // 배터리 모니터링 시작
+    await _batteryService.startMonitoring();
+    debugPrint('홈 탭: 배터리 모니터링 시작 완료');
+    
+    // 현재 배터리 정보 즉시 가져오기
+    final currentBatteryInfo = _batteryService.currentBatteryInfo;
+    if (currentBatteryInfo != null) {
+      debugPrint('홈 탭: 현재 배터리 정보 설정 - ${currentBatteryInfo.toString()}');
+      if (mounted) {
+        setState(() {
+          _batteryInfo = currentBatteryInfo;
+        });
+        debugPrint('홈 탭: 초기 배터리 정보 UI 업데이트 완료 - 배터리 레벨: ${currentBatteryInfo.formattedLevel}');
+      }
+    }
     
     // 배터리 정보 스트림 구독
     _batteryService.batteryInfoStream.listen((batteryInfo) {
@@ -64,10 +97,6 @@ class _HomeTabState extends State<HomeTab> {
         debugPrint('홈 탭: 위젯이 마운트되지 않음, UI 업데이트 건너뜀');
       }
     });
-    
-    // 배터리 모니터링 시작
-    await _batteryService.startMonitoring();
-    debugPrint('홈 탭: 배터리 모니터링 시작 완료');
   }
 
   @override
