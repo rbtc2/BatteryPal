@@ -276,7 +276,8 @@ class _HomeTabState extends State<HomeTab> {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _buildInfoItem('남은 시간', '$remainingHours시간 $remainingMinutes분'),
-                _buildInfoItem('온도', '$batteryTemp°C'),
+                _buildInfoItem('온도', _batteryInfo?.formattedTemperature ?? '--.-°C', 
+                    valueColor: _batteryInfo?.temperatureColor),
                 _buildInfoItem('상태', _batteryInfo?.stateText ?? '알 수 없음'),
               ],
             ),
@@ -438,14 +439,15 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
-  Widget _buildInfoItem(String label, String value) {
+  Widget _buildInfoItem(String label, String value, {Color? valueColor}) {
     return Column(
       children: [
         Text(
           value,
-          style: const TextStyle(
+          style: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 16,
+            color: valueColor,
           ),
         ),
         Text(
