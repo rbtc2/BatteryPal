@@ -2,6 +2,71 @@ import 'package:flutter/material.dart';
 import '../models/app_models.dart';
 import '../models/charging_models.dart';
 import '../constants/charging_constants.dart';
+import 'battery_service.dart';
+
+/// 충전 예상 시간 안정화 클래스
+/// 충전 예상 시간의 급격한 변화를 방지하여 부드러운 사용자 경험 제공
+class ChargingTimeStabilizer {
+  static final List<Duration> _recentEstimates = [];
+  static Duration? _lastStableEstimate;
+  
+  /// 안정화된 충전 예상 시간 반환
+  static Duration? getStabilizedEstimatedTime(Duration? currentEstimate) {
+    if (currentEstimate == null) return null;
+    
+    // 첫 번째 측정값이거나 충분한 데이터가 없는 경우
+    if (_recentEstimates.isEmpty || _recentEstimates.length < ChargingConstants.minStableMeasurements) {
+      _recentEstimates.add(currentEstimate);
+      _lastStableEstimate = currentEstimate;
+      return currentEstimate;
+    }
+    
+    // 급격한 변화 감지 및 제한
+    final stabilizedEstimate = _applyGradualChange(currentEstimate);
+    
+    // 최근 측정값 목록 업데이트
+    _recentEstimates.add(stabilizedEstimate);
+    if (_recentEstimates.length > ChargingConstants.chargingTimeStabilizationWindow) {
+      _recentEstimates.removeAt(0);
+    }
+    
+    _lastStableEstimate = stabilizedEstimate;
+    return stabilizedEstimate;
+  }
+  
+  /// 급격한 변화를 방지하고 점진적 변화 적용
+  static Duration _applyGradualChange(Duration currentEstimate) {
+    if (_lastStableEstimate == null) return currentEstimate;
+    
+    final currentMinutes = currentEstimate.inMinutes;
+    final lastMinutes = _lastStableEstimate!.inMinutes;
+    
+    // 변화 비율 계산
+    final changeRatio = (currentMinutes - lastMinutes).abs() / lastMinutes;
+    
+    // 급격한 변화인 경우 점진적 변화 적용
+    if (changeRatio > ChargingConstants.maxTimeChangeRatio) {
+      final maxChange = (lastMinutes * ChargingConstants.maxTimeChangeRatio).round();
+      final direction = currentMinutes > lastMinutes ? 1 : -1;
+      final adjustedMinutes = lastMinutes + (maxChange * direction);
+      
+      debugPrint('ChargingTimeStabilizer: 급격한 변화 감지 - '
+          '이전: $lastMinutes분, 현재: $currentMinutes분, '
+          '조정후: $adjustedMinutes분');
+      
+      return Duration(minutes: adjustedMinutes);
+    }
+    
+    return currentEstimate;
+  }
+  
+  /// 안정화 상태 초기화 (충전 시작/종료 시)
+  static void reset() {
+    _recentEstimates.clear();
+    _lastStableEstimate = null;
+    debugPrint('ChargingTimeStabilizer: 안정화 상태 초기화');
+  }
+}
 
 /// 충전 분석 서비스
 /// 충전 속도 분석, 충전 최적화 팁 등의 로직을 관리
@@ -79,6 +144,8 @@ class ChargingAnalysisService {
   /// 충전 상태 분석
   static ChargingStatusAnalysis analyzeChargingStatus(BatteryInfo? batteryInfo) {
     if (batteryInfo == null) {
+      // 충전 상태가 없으면 안정화 상태 초기화
+      ChargingTimeStabilizer.reset();
       return ChargingStatusAnalysis(
         isCharging: false,
         chargingSpeed: ChargingSpeed.unknown,
@@ -116,35 +183,51 @@ class ChargingAnalysisService {
       efficiency = ChargingEfficiency.poor;
     }
 
-    // 예상 충전 완료 시간 계산 (수정된 알고리즘)
+    // 예상 충전 완료 시간 계산 (안정화된 알고리즘)
     Duration? estimatedTimeToFull;
-    if (batteryInfo.isCharging && chargingCurrent > 0) {
+    if (batteryInfo.isCharging) {
       final remainingPercentage = 100.0 - currentLevel;
       
-      // 배터리 용량과 충전 효율성을 고려한 계산
-      const double batteryCapacity = ChargingConstants.defaultBatteryCapacity; // mAh
-      const double chargingEfficiency = ChargingConstants.chargingEfficiency;
+      // 안정화된 충전 전류 사용 (요동 방지)
+      final batteryService = BatteryService();
+      final stableChargingCurrent = batteryService.getStableChargingCurrent();
+      final isStable = batteryService.isChargingCurrentStable();
       
-      // 실제 충전 속도 계산 (시간당 퍼센트)
-      // chargingCurrent(mA) / batteryCapacity(mAh) = 시간당 충전률
-      final chargingRatePerHour = (chargingCurrent * chargingEfficiency) / batteryCapacity;
+      // 안정화된 데이터가 충분하지 않으면 현재 값 사용
+      final effectiveChargingCurrent = stableChargingCurrent > 0 ? stableChargingCurrent : chargingCurrent;
       
-      // 남은 충전 시간 계산 (시간 단위)
-      final estimatedHours = remainingPercentage / (chargingRatePerHour * 100);
-      
-      // 분 단위로 변환하고 제한
-      final estimatedMinutes = estimatedHours * 60;
-      final clampedMinutes = estimatedMinutes.clamp(
-        ChargingConstants.minEstimatedMinutes.toDouble(), 
-        ChargingConstants.maxEstimatedMinutes.toDouble()
-      );
-      
-      estimatedTimeToFull = Duration(minutes: clampedMinutes.round());
-      
-      debugPrint('ChargingAnalysisService: 충전 예상 시간 계산 - '
-          '현재: $currentLevel%, 남은: $remainingPercentage%, '
-          '충전전류: ${chargingCurrent}mA, 충전속도: ${(chargingRatePerHour * 100).toStringAsFixed(1)}%/시간, '
-          '예상시간: ${clampedMinutes.round()}분');
+      if (effectiveChargingCurrent > 0) {
+        // 배터리 용량과 충전 효율성을 고려한 계산
+        const double batteryCapacity = ChargingConstants.defaultBatteryCapacity; // mAh
+        const double chargingEfficiency = ChargingConstants.chargingEfficiency;
+        
+        // 실제 충전 속도 계산 (시간당 퍼센트)
+        final chargingRatePerHour = (effectiveChargingCurrent * chargingEfficiency) / batteryCapacity;
+        
+        // 남은 충전 시간 계산 (시간 단위)
+        final estimatedHours = remainingPercentage / (chargingRatePerHour * 100);
+        
+        // 분 단위로 변환하고 제한
+        final estimatedMinutes = estimatedHours * 60;
+        final clampedMinutes = estimatedMinutes.clamp(
+          ChargingConstants.minEstimatedMinutes.toDouble(), 
+          ChargingConstants.maxEstimatedMinutes.toDouble()
+        );
+        
+        final rawEstimatedTime = Duration(minutes: clampedMinutes.round());
+        
+        // 충전 예상 시간 안정화 적용
+        estimatedTimeToFull = ChargingTimeStabilizer.getStabilizedEstimatedTime(rawEstimatedTime);
+        
+        debugPrint('ChargingAnalysisService: 안정화된 충전 예상 시간 계산 - '
+            '현재: $currentLevel%, 남은: $remainingPercentage%, '
+            '원본전류: ${chargingCurrent}mA, 안정화전류: ${effectiveChargingCurrent}mA, '
+            '안정성: $isStable, 충전속도: ${(chargingRatePerHour * 100).toStringAsFixed(1)}%/시간, '
+            '원본예상시간: ${clampedMinutes.round()}분, 최종예상시간: ${estimatedTimeToFull?.inMinutes}분');
+      }
+    } else {
+      // 충전이 중단되었으면 안정화 상태 초기화
+      ChargingTimeStabilizer.reset();
     }
 
     // 권장사항 생성

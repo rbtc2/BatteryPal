@@ -90,6 +90,11 @@ class ChargingConstants {
   static const int minEstimatedMinutes = 1; // 최소 예상 시간 (분)
   static const int maxEstimatedMinutes = 1440; // 최대 예상 시간 (분, 24시간)
   
+  // 충전 예상 시간 안정화 관련 상수
+  static const int chargingTimeStabilizationWindow = 3; // 최근 3회 측정값으로 안정화
+  static const double maxTimeChangeRatio = 0.3; // 최대 30% 변화 허용 (급격한 변화 방지)
+  static const int minStableMeasurements = 2; // 최소 안정화를 위한 측정값 개수
+  
   // UI 관련 상수
   static const double chargingProgressBarHeight = 3.0;
   static const double chargingIconSize = 24.0;

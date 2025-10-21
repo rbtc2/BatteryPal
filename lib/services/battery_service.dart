@@ -39,6 +39,41 @@ class BatteryService {
   BatteryInfo? _currentBatteryInfo;
   BatteryInfo? get currentBatteryInfo => _currentBatteryInfo;
   
+  /// 안정화된 충전 전류 가져오기 (이동 평균 사용)
+  int getStableChargingCurrent() {
+    if (_recentChargingCurrents.isEmpty) {
+      return _currentBatteryInfo?.chargingCurrent ?? -1;
+    }
+    
+    // 최근 측정값들의 평균 사용 (이동 평균)
+    final average = _recentChargingCurrents.reduce((a, b) => a + b) / _recentChargingCurrents.length;
+    return average.round();
+  }
+  
+  /// 중앙값 충전 전류 가져오기 (극값의 영향을 줄임)
+  int getMedianChargingCurrent() {
+    if (_recentChargingCurrents.isEmpty) {
+      return _currentBatteryInfo?.chargingCurrent ?? -1;
+    }
+    
+    final sorted = List<int>.from(_recentChargingCurrents)..sort();
+    final middle = sorted.length ~/ 2;
+    
+    if (sorted.length % 2 == 1) {
+      return sorted[middle];
+    } else {
+      return ((sorted[middle - 1] + sorted[middle]) / 2).round();
+    }
+  }
+  
+  /// 충전 전류 안정성 상태 확인
+  bool isChargingCurrentStable() {
+    return _isChargingCurrentStable();
+  }
+  
+  /// 최근 충전 전류 측정값 개수
+  int get recentChargingCurrentCount => _recentChargingCurrents.length;
+  
   /// 성능 최적화를 위한 로그 레벨 관리
   static const bool _enableDebugLogs = false; // 릴리즈 빌드에서는 false
   
