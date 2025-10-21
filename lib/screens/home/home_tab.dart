@@ -57,20 +57,33 @@ class _HomeTabState extends State<HomeTab> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // 위젯이 다시 활성화될 때 배터리 정보 새로고침
+    
+    // 탭 복귀 시 배터리 정보 즉시 새로고침
+    debugPrint('홈 탭: didChangeDependencies - 탭 복귀 감지');
+    
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _refreshBatteryInfoIfNeeded();
+      
+      // 현재 배터리 정보가 있다면 즉시 UI 업데이트
+      final currentInfo = _batteryService.currentBatteryInfo;
+      if (currentInfo != null && mounted) {
+        setState(() {
+          _batteryInfo = currentInfo;
+        });
+        debugPrint('홈 탭: 탭 복귀 시 기존 배터리 정보 복원 - ${currentInfo.formattedLevel}');
+      }
     });
   }
 
-  /// 필요시 배터리 정보 새로고침
+  /// 필요시 배터리 정보 새로고침 (탭 복귀 시 강화)
   void _refreshBatteryInfoIfNeeded() {
     if (_batteryInfo == null) {
-      debugPrint('홈 탭: 배터리 정보가 없음, 새로고침 시도');
+      debugPrint('홈 탭: 배터리 정보가 없음, 강제 새로고침 시도');
       _batteryService.refreshBatteryInfo();
     } else {
-      // 배터리 정보가 있더라도 주기적으로 새로고침하여 정확성 보장
-      debugPrint('홈 탭: 배터리 정보 존재, 주기적 새로고침 유지');
+      // 탭 복귀 시에는 항상 최신 정보로 새로고침
+      debugPrint('홈 탭: 탭 복귀 시 최신 정보 새로고침');
+      _batteryService.refreshBatteryInfo();
     }
   }
 
@@ -78,14 +91,15 @@ class _HomeTabState extends State<HomeTab> {
   void dispose() {
     debugPrint('홈 탭: dispose 시작');
     
-    // 주기적 새로고침 중지
+    // 주기적 새로고침만 중지 (배터리 절약)
     _stopPeriodicRefresh();
     
-    // 배터리 서비스 정리
-    _batteryService.stopMonitoring();
-    _batteryService.dispose();
+    // 배터리 서비스는 전역 싱글톤이므로 dispose하지 않음
+    // 탭 전환 시에도 서비스가 계속 작동하도록 유지
+    // _batteryService.stopMonitoring(); // 제거
+    // _batteryService.dispose(); // 제거
     
-    debugPrint('홈 탭: dispose 완료');
+    debugPrint('홈 탭: dispose 완료 (배터리 서비스 유지)');
     super.dispose();
   }
 
@@ -209,14 +223,22 @@ class _HomeTabState extends State<HomeTab> {
     debugPrint('홈 탭: 백그라운드 최적화 완료');
   }
   
-  /// 포그라운드 최적화
+  /// 포그라운드 최적화 (탭 복귀 시 강화)
   void _optimizeForForeground() {
     // 주기적 새로고침 재시작
     _startPeriodicRefresh();
     
-    // 즉시 배터리 정보 새로고침
-    if (_batteryInfo == null) {
-      _batteryService.refreshBatteryInfo();
+    // 탭 복귀 시 항상 배터리 정보 새로고침
+    debugPrint('홈 탭: 포그라운드 복귀 - 배터리 정보 강제 새로고침');
+    _batteryService.refreshBatteryInfo();
+    
+    // 현재 정보가 있다면 즉시 UI 업데이트
+    final currentInfo = _batteryService.currentBatteryInfo;
+    if (currentInfo != null && mounted) {
+      setState(() {
+        _batteryInfo = currentInfo;
+      });
+      debugPrint('홈 탭: 포그라운드 복귀 시 배터리 정보 복원 - ${currentInfo.formattedLevel}');
     }
     
     debugPrint('홈 탭: 포그라운드 최적화 완료');
