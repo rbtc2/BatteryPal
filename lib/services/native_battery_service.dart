@@ -88,4 +88,17 @@ class NativeBatteryService {
       };
     }
   }
+
+  /// 충전 전류만 빠르게 가져오기 (실시간 모니터링용)
+  static Future<int> getChargingCurrentOnly() async {
+    try {
+      debugPrint('네이티브 충전 전류만 요청...');
+      final int chargingCurrent = await _channel.invokeMethod('getChargingCurrentOnly');
+      debugPrint('네이티브 충전 전류만 응답: ${chargingCurrent}mA');
+      return chargingCurrent;
+    } catch (e) {
+      debugPrint('충전 전류만 가져오기 실패: $e');
+      return -1;
+    }
+  }
 }

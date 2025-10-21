@@ -16,6 +16,12 @@ class BatteryService {
   // 배터리 정보 스트림
   StreamController<BatteryInfo>? _batteryInfoController;
   
+  // 충전 전류 전용 모니터링 타이머
+  Timer? _chargingCurrentTimer;
+  
+  // 충전 전류 모니터링 간격 (밀리초)
+  static const int _chargingCurrentInterval = 500; // 0.5초
+  
   Stream<BatteryInfo> get batteryInfoStream {
     if (_batteryInfoController == null || _batteryInfoController!.isClosed) {
       _batteryInfoController = StreamController<BatteryInfo>.broadcast();
@@ -79,6 +85,68 @@ class BatteryService {
     return timeDiff >= _minUpdateInterval;
   }
   
+  /// 충전 전류 전용 모니터링 시작
+  void _startChargingCurrentMonitoring() {
+    if (_chargingCurrentTimer != null) {
+      debugPrint('충전 전류 모니터링이 이미 실행 중입니다');
+      return;
+    }
+    
+    debugPrint('충전 전류 전용 모니터링 시작 (${_chargingCurrentInterval}ms 간격)');
+    
+    _chargingCurrentTimer = Timer.periodic(
+      const Duration(milliseconds: _chargingCurrentInterval),
+      (timer) async {
+        if (!_isDisposed && _currentBatteryInfo?.isCharging == true) {
+          await _updateChargingCurrentOnly();
+        }
+      },
+    );
+  }
+  
+  /// 충전 전류 전용 모니터링 중지
+  void _stopChargingCurrentMonitoring() {
+    debugPrint('충전 전류 전용 모니터링 중지');
+    _chargingCurrentTimer?.cancel();
+    _chargingCurrentTimer = null;
+  }
+  
+  /// 충전 전류만 빠르게 업데이트
+  Future<void> _updateChargingCurrentOnly() async {
+    if (_isDisposed) {
+      debugPrint('서비스가 이미 dispose됨, 충전 전류 업데이트 건너뜀');
+      return;
+    }
+    
+    try {
+      debugPrint('충전 전류만 업데이트 시작...');
+      
+      // 네이티브에서 충전 전류만 빠르게 가져오기
+      final chargingCurrent = await NativeBatteryService.getChargingCurrentOnly();
+      
+      if (chargingCurrent >= 0 && _currentBatteryInfo != null) {
+        // 기존 배터리 정보의 충전 전류만 업데이트
+        final updatedBatteryInfo = _currentBatteryInfo!.copyWith(
+          chargingCurrent: chargingCurrent,
+          timestamp: DateTime.now(),
+        );
+        
+        // 충전 전류가 실제로 변경된 경우에만 업데이트
+        if (_currentBatteryInfo!.chargingCurrent != chargingCurrent) {
+          debugPrint('충전 전류 변화 감지: ${_currentBatteryInfo!.chargingCurrent}mA → ${chargingCurrent}mA');
+          
+          _currentBatteryInfo = updatedBatteryInfo;
+          _safeAddEvent(updatedBatteryInfo);
+          
+          debugPrint('충전 전류 업데이트 완료: ${chargingCurrent}mA');
+        }
+      }
+      
+    } catch (e) {
+      debugPrint('충전 전류 업데이트 실패: $e');
+    }
+  }
+  
   /// 안전하게 스트림에 이벤트 추가
   void _safeAddEvent(BatteryInfo batteryInfo) {
     if (!_isDisposed && _batteryInfoController != null && !_batteryInfoController!.isClosed) {
@@ -116,12 +184,24 @@ class BatteryService {
           if (!_isDisposed && _shouldUpdate()) {
             debugPrint('배터리 상태 변화 감지: $state');
             await _updateBatteryInfo();
+            
+            // 충전 상태 변화 시 충전 전류 모니터링 시작/중지
+            if (state == BatteryState.charging) {
+              _startChargingCurrentMonitoring();
+            } else {
+              _stopChargingCurrentMonitoring();
+            }
           }
         },
         onError: (error) {
           debugPrint('배터리 상태 변화 감지 오류: $error');
         },
       );
+      
+      // 초기 충전 상태 확인하여 충전 전류 모니터링 시작
+      if (_currentBatteryInfo?.isCharging == true) {
+        _startChargingCurrentMonitoring();
+      }
       
       debugPrint('배터리 모니터링 시작 완료');
     } catch (e, stackTrace) {
@@ -135,6 +215,9 @@ class BatteryService {
   void stopMonitoring() {
     _batteryStateSubscription?.cancel();
     _batteryStateSubscription = null;
+    
+    // 충전 전류 모니터링도 중지
+    _stopChargingCurrentMonitoring();
   }
 
   /// 배터리 정보 업데이트
@@ -173,8 +256,17 @@ class BatteryService {
       
       // 최종 검증 및 업데이트
       if (batteryInfo != null && _isValidBatteryInfo(batteryInfo)) {
+        final wasCharging = _currentBatteryInfo?.isCharging ?? false;
         _currentBatteryInfo = batteryInfo;
         _safeAddEvent(batteryInfo);
+        
+        // 충전 상태 변화 감지하여 충전 전류 모니터링 시작/중지
+        if (batteryInfo.isCharging && !wasCharging) {
+          _startChargingCurrentMonitoring();
+        } else if (!batteryInfo.isCharging && wasCharging) {
+          _stopChargingCurrentMonitoring();
+        }
+        
         debugPrint('배터리 정보 업데이트 완료: ${batteryInfo.formattedLevel}');
       } else {
         debugPrint('배터리 정보가 유효하지 않아 업데이트 건너뜀');
@@ -341,6 +433,9 @@ class BatteryService {
     await _batteryStateSubscription?.cancel();
     _batteryStateSubscription = null;
     
+    // 충전 전류 모니터링 중지
+    _stopChargingCurrentMonitoring();
+    
     // 스트림 컨트롤러 재생성
     if (_batteryInfoController != null && !_batteryInfoController!.isClosed) {
       _batteryInfoController!.close();
@@ -355,6 +450,9 @@ class BatteryService {
     debugPrint('배터리 서비스 dispose 시작...');
     _isDisposed = true;
     stopMonitoring();
+    
+    // 충전 전류 모니터링도 중지
+    _stopChargingCurrentMonitoring();
     
     if (_batteryInfoController != null && !_batteryInfoController!.isClosed) {
       _batteryInfoController!.close();

@@ -42,6 +42,9 @@ class _HomeTabState extends State<HomeTab> {
   
   // 주기적 새로고침 간격 (초)
   static const int _refreshIntervalSeconds = 30;
+  
+  // 충전 전류 변화 감지를 위한 이전 값
+  int _previousChargingCurrent = -1;
 
   @override
   void initState() {
@@ -115,9 +118,19 @@ class _HomeTabState extends State<HomeTab> {
         debugPrint('홈 탭: 초기 배터리 정보 UI 업데이트 완료 - 배터리 레벨: ${currentBatteryInfo.formattedLevel}');
       }
       
-      // 배터리 정보 스트림 구독 (기존 이벤트 무시)
+      // 배터리 정보 스트림 구독 (충전 전류 변화 감지 포함)
       _batteryService.batteryInfoStream.listen((batteryInfo) {
         debugPrint('홈 탭: 배터리 정보 수신 - ${batteryInfo.toString()}');
+        
+        // 충전 전류 변화 감지
+        if (_batteryInfo != null && batteryInfo.isCharging) {
+          final currentChargingCurrent = batteryInfo.chargingCurrent;
+          if (_previousChargingCurrent != currentChargingCurrent && currentChargingCurrent >= 0) {
+            debugPrint('홈 탭: 충전 전류 변화 감지 - ${_previousChargingCurrent}mA → ${currentChargingCurrent}mA');
+            _previousChargingCurrent = currentChargingCurrent;
+          }
+        }
+        
         if (mounted) {
           setState(() {
             _batteryInfo = batteryInfo;
@@ -569,7 +582,7 @@ class _HomeTabState extends State<HomeTab> {
           ),
         ),
         const Spacer(),
-        // 미니멀 실시간 표시
+        // 개선된 실시간 표시 (충전 전류 변화 감지)
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
           decoration: BoxDecoration(
@@ -579,17 +592,27 @@ class _HomeTabState extends State<HomeTab> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 4,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary,
-                  shape: BoxShape.circle,
-                ),
+              // 실시간 애니메이션 도트
+              TweenAnimationBuilder<double>(
+                duration: const Duration(milliseconds: 1000),
+                tween: Tween(begin: 0.0, end: 1.0),
+                builder: (context, value, child) {
+                  return Container(
+                    width: 4,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primary.withValues(alpha: value),
+                      shape: BoxShape.circle,
+                    ),
+                  );
+                },
+                onEnd: () {
+                  // 애니메이션 반복
+                },
               ),
               const SizedBox(width: 4),
               Text(
-                '실시간',
+                '실시간 모니터링',
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.primary,
                   fontSize: 11,
@@ -788,11 +811,13 @@ class _HomeTabState extends State<HomeTab> {
   /// 실제 충전 전류값을 사용한 충전 속도 정보
   ChargingSpeedInfo _getRealChargingSpeed() {
     if (_batteryInfo == null) {
+      debugPrint('충전 속도 분석: 배터리 정보가 없음');
       return _getDefaultChargingSpeed();
     }
 
     // 충전 전류값 가져오기 (음수면 절댓값 사용)
     final chargingCurrent = _batteryInfo!.chargingCurrent.abs();
+    debugPrint('충전 속도 분석: 현재 충전 전류 ${chargingCurrent}mA');
     
     // 충전 속도 분류
     String speedLabel;
@@ -851,6 +876,8 @@ class _HomeTabState extends State<HomeTab> {
       ];
     }
 
+    debugPrint('충전 속도 분석 결과: $speedLabel ($description)');
+    
     return ChargingSpeedInfo(
       label: speedLabel,
       description: description,

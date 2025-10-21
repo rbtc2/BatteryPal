@@ -39,6 +39,10 @@ class MainActivity : FlutterActivity() {
                     val chargingInfo = getChargingInfo()
                     result.success(chargingInfo)
                 }
+                "getChargingCurrentOnly" -> {
+                    val chargingCurrent = getChargingCurrentOnly()
+                    result.success(chargingCurrent)
+                }
                 else -> {
                     result.notImplemented()
                 }
@@ -225,6 +229,35 @@ class MainActivity : FlutterActivity() {
                 "currentAverage" to -1,
                 "isCharging" to false
             )
+        }
+    }
+    
+    /// 충전 전류만 빠르게 가져오기 (실시간 모니터링용)
+    private fun getChargingCurrentOnly(): Int {
+        try {
+            val batteryManager = getSystemService(Context.BATTERY_SERVICE) as BatteryManager
+            
+            // BatteryManager를 사용하여 현재 전류만 빠르게 가져오기
+            var currentNow = -1
+            try {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+                    currentNow = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW)
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("BatteryPal", "충전 전류만 가져오기 실패: ${e.message}")
+                return -1
+            }
+            
+            // 충전 전류 (mA) - 절댓값 사용
+            val chargingCurrent = if (currentNow != -1) {
+                kotlin.math.abs(currentNow / 1000)
+            } else -1
+            
+            android.util.Log.d("BatteryPal", "충전 전류만: ${chargingCurrent}mA (원본: $currentNow)")
+            return chargingCurrent
+        } catch (e: Exception) {
+            android.util.Log.e("BatteryPal", "충전 전류만 가져오기 실패", e)
+            return -1
         }
     }
 }
