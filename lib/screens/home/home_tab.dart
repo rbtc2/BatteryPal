@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../services/battery_service.dart';
 import '../../models/app_models.dart';
 import '../../widgets/common/common_widgets.dart';
@@ -50,6 +51,7 @@ class _HomeTabState extends State<HomeTab> {
   void initState() {
     super.initState();
     _initializeBatteryService();
+    _setupAppLifecycleListener();
   }
 
   @override
@@ -178,6 +180,46 @@ class _HomeTabState extends State<HomeTab> {
     debugPrint('홈 탭: 주기적 새로고침 중지');
     _periodicRefreshTimer?.cancel();
     _periodicRefreshTimer = null;
+  }
+  
+  /// 앱 생명주기 리스너 설정
+  void _setupAppLifecycleListener() {
+    SystemChannels.lifecycle.setMessageHandler((message) async {
+      debugPrint('홈 탭: 앱 생명주기 변화 - $message');
+      
+      switch (message) {
+        case 'AppLifecycleState.paused':
+        case 'AppLifecycleState.inactive':
+          debugPrint('홈 탭: 앱이 백그라운드로 이동, 모니터링 최적화');
+          _optimizeForBackground();
+          break;
+        case 'AppLifecycleState.resumed':
+          debugPrint('홈 탭: 앱이 포그라운드로 복귀, 모니터링 재시작');
+          _optimizeForForeground();
+          break;
+      }
+      return null;
+    });
+  }
+  
+  /// 백그라운드 최적화
+  void _optimizeForBackground() {
+    // 주기적 새로고침 중지 (배터리 절약)
+    _stopPeriodicRefresh();
+    debugPrint('홈 탭: 백그라운드 최적화 완료');
+  }
+  
+  /// 포그라운드 최적화
+  void _optimizeForForeground() {
+    // 주기적 새로고침 재시작
+    _startPeriodicRefresh();
+    
+    // 즉시 배터리 정보 새로고침
+    if (_batteryInfo == null) {
+      _batteryService.refreshBatteryInfo();
+    }
+    
+    debugPrint('홈 탭: 포그라운드 최적화 완료');
   }
 
   @override

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:battery_plus/battery_plus.dart';
 import 'package:flutter/material.dart';
 import 'native_battery_service.dart';
@@ -19,8 +20,12 @@ class BatteryService {
   // 충전 전류 전용 모니터링 타이머
   Timer? _chargingCurrentTimer;
   
-  // 충전 전류 모니터링 간격 (밀리초)
-  static const int _chargingCurrentInterval = 500; // 0.5초
+  // 적응형 충전 전류 모니터링 간격 (밀리초)
+  int _chargingCurrentInterval = 1000; // 기본 1초
+  
+  // 충전 전류 안정성 추적
+  final List<int> _recentChargingCurrents = <int>[];
+  static const int _stabilityCheckCount = 5; // 최근 5회 측정값으로 안정성 판단
   
   Stream<BatteryInfo> get batteryInfoStream {
     if (_batteryInfoController == null || _batteryInfoController!.isClosed) {
@@ -85,23 +90,98 @@ class BatteryService {
     return timeDiff >= _minUpdateInterval;
   }
   
-  /// 충전 전류 전용 모니터링 시작
+  /// 배터리 레벨에 따른 적응형 모니터링 간격 계산
+  int _getAdaptiveMonitoringInterval() {
+    if (_currentBatteryInfo == null) return 1000; // 기본 1초
+    
+    final batteryLevel = _currentBatteryInfo!.level;
+    
+    if (batteryLevel >= 80) {
+      return 2000; // 80% 이상: 2초 간격 (충전 속도 감소)
+    } else if (batteryLevel >= 50) {
+      return 1000; // 50-80%: 1초 간격
+    } else {
+      return 500;  // 50% 미만: 0.5초 간격 (빠른 충전)
+    }
+  }
+  
+  /// 충전 전류 안정성 확인
+  bool _isChargingCurrentStable() {
+    if (_recentChargingCurrents.length < _stabilityCheckCount) {
+      return false; // 충분한 데이터가 없으면 불안정으로 간주
+    }
+    
+    // 최근 측정값들의 표준편차 계산
+    final average = _recentChargingCurrents.reduce((a, b) => a + b) / _recentChargingCurrents.length;
+    final variance = _recentChargingCurrents.map((x) => (x - average) * (x - average)).reduce((a, b) => a + b) / _recentChargingCurrents.length;
+    final standardDeviation = sqrt(variance);
+    
+    // 표준편차가 평균의 10% 미만이면 안정적
+    return standardDeviation < (average * 0.1);
+  }
+  
+  /// 충전 전류 안정성에 따른 간격 조정
+  void _adjustMonitoringInterval() {
+    final adaptiveInterval = _getAdaptiveMonitoringInterval();
+    final stabilityFactor = _isChargingCurrentStable() ? 1.5 : 1.0; // 안정적이면 간격 늘리기
+    
+    _chargingCurrentInterval = (adaptiveInterval * stabilityFactor).round();
+    
+    debugPrint('모니터링 간격 조정: ${_chargingCurrentInterval}ms (적응형: ${adaptiveInterval}ms, 안정성: ${_isChargingCurrentStable()})');
+  }
+  
+  /// 충전 전류 전용 모니터링 시작 (적응형 간격)
   void _startChargingCurrentMonitoring() {
     if (_chargingCurrentTimer != null) {
       debugPrint('충전 전류 모니터링이 이미 실행 중입니다');
       return;
     }
     
+    // 초기 간격 설정
+    _adjustMonitoringInterval();
+    
     debugPrint('충전 전류 전용 모니터링 시작 (${_chargingCurrentInterval}ms 간격)');
     
     _chargingCurrentTimer = Timer.periodic(
-      const Duration(milliseconds: _chargingCurrentInterval),
+      Duration(milliseconds: _chargingCurrentInterval),
       (timer) async {
         if (!_isDisposed && _currentBatteryInfo?.isCharging == true) {
           await _updateChargingCurrentOnly();
+          
+          // 간격 동적 조정 (매 5회마다)
+          if (_recentChargingCurrents.length % 5 == 0) {
+            _adjustMonitoringInterval();
+            // 타이머 재시작 (새로운 간격으로)
+            _restartChargingCurrentTimer();
+          }
         }
       },
     );
+  }
+  
+  /// 충전 전류 모니터링 타이머 재시작 (새로운 간격으로)
+  void _restartChargingCurrentTimer() {
+    _chargingCurrentTimer?.cancel();
+    _chargingCurrentTimer = null;
+    
+    if (_currentBatteryInfo?.isCharging == true) {
+      debugPrint('충전 전류 모니터링 재시작 (${_chargingCurrentInterval}ms 간격)');
+      
+      _chargingCurrentTimer = Timer.periodic(
+        Duration(milliseconds: _chargingCurrentInterval),
+        (timer) async {
+          if (!_isDisposed && _currentBatteryInfo?.isCharging == true) {
+            await _updateChargingCurrentOnly();
+            
+            // 간격 동적 조정 (매 5회마다)
+            if (_recentChargingCurrents.length % 5 == 0) {
+              _adjustMonitoringInterval();
+              _restartChargingCurrentTimer();
+            }
+          }
+        },
+      );
+    }
   }
   
   /// 충전 전류 전용 모니터링 중지
@@ -111,7 +191,7 @@ class BatteryService {
     _chargingCurrentTimer = null;
   }
   
-  /// 충전 전류만 빠르게 업데이트
+  /// 충전 전류만 빠르게 업데이트 (안정성 추적 포함)
   Future<void> _updateChargingCurrentOnly() async {
     if (_isDisposed) {
       debugPrint('서비스가 이미 dispose됨, 충전 전류 업데이트 건너뜀');
@@ -125,6 +205,12 @@ class BatteryService {
       final chargingCurrent = await NativeBatteryService.getChargingCurrentOnly();
       
       if (chargingCurrent >= 0 && _currentBatteryInfo != null) {
+        // 충전 전류 안정성 추적을 위한 데이터 수집
+        _recentChargingCurrents.add(chargingCurrent);
+        if (_recentChargingCurrents.length > _stabilityCheckCount) {
+          _recentChargingCurrents.removeAt(0); // 오래된 데이터 제거
+        }
+        
         // 기존 배터리 정보의 충전 전류만 업데이트
         final updatedBatteryInfo = _currentBatteryInfo!.copyWith(
           chargingCurrent: chargingCurrent,
@@ -429,6 +515,10 @@ class BatteryService {
     _lastUpdateTime = null;
     _isUpdating = false;
     
+    // 충전 전류 안정성 추적 데이터 초기화
+    _recentChargingCurrents.clear();
+    _chargingCurrentInterval = 1000; // 기본값으로 리셋
+    
     // 기존 구독 정리
     await _batteryStateSubscription?.cancel();
     _batteryStateSubscription = null;
@@ -462,6 +552,9 @@ class BatteryService {
     _currentBatteryInfo = null;
     _lastUpdateTime = null;
     _isUpdating = false;
+    
+    // 충전 전류 안정성 추적 데이터 정리
+    _recentChargingCurrents.clear();
     
     debugPrint('배터리 서비스 dispose 완료');
   }
