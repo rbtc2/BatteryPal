@@ -17,8 +17,8 @@ enum BatteryAnalysisState {
   analyzing,
   /// 분석 완료
   completed,
-  /// 분석 실패
-  error,
+  /// 데이터 수집 중 (이전 error 상태)
+  collecting,
 }
 
 /// 배터리 분석 결과를 담는 클래스
@@ -62,7 +62,7 @@ class _AnalysisTabState extends State<AnalysisTab> {
   // 배터리 분석 관련 상태 변수들
   BatteryAnalysisState _analysisState = BatteryAnalysisState.idle;
   BatteryAnalysisResult? _analysisResult;
-  String? _analysisErrorMessage;
+  String? _analysisStatusMessage;
   
   // 스켈레톤용 더미 데이터
   List<AppUsageData> appUsageData = [
@@ -145,7 +145,7 @@ class _AnalysisTabState extends State<AnalysisTab> {
 
     setState(() {
       _analysisState = BatteryAnalysisState.analyzing;
-      _analysisErrorMessage = null;
+      _analysisStatusMessage = null;
     });
 
     try {
@@ -164,7 +164,7 @@ class _AnalysisTabState extends State<AnalysisTab> {
       );
       
       if (historyData.isEmpty) {
-        throw Exception('분석할 배터리 히스토리 데이터가 없습니다. 앱을 사용한 후 다시 시도해주세요.');
+        throw Exception('아직 충분한 배터리 사용 데이터가 수집되지 않았습니다.\n\n앱을 설치한 후 24시간이 지나면 정확한 분석 결과를 제공할 수 있습니다.\n현재는 배터리 사용 패턴을 수집하고 있습니다.');
       }
       
       // 실제 분석 수행
@@ -201,8 +201,8 @@ class _AnalysisTabState extends State<AnalysisTab> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _analysisState = BatteryAnalysisState.error;
-          _analysisErrorMessage = '분석 중 오류가 발생했습니다: ${e.toString()}';
+          _analysisState = BatteryAnalysisState.collecting;
+          _analysisStatusMessage = e.toString();
         });
       }
     }
@@ -213,7 +213,7 @@ class _AnalysisTabState extends State<AnalysisTab> {
     setState(() {
       _analysisState = BatteryAnalysisState.idle;
       _analysisResult = null;
-      _analysisErrorMessage = null;
+      _analysisStatusMessage = null;
     });
   }
 
@@ -339,7 +339,7 @@ class _AnalysisTabState extends State<AnalysisTab> {
           ),
         ),
         if (_analysisState == BatteryAnalysisState.completed || 
-            _analysisState == BatteryAnalysisState.error) ...[
+            _analysisState == BatteryAnalysisState.collecting) ...[
           const SizedBox(width: 12),
           IconButton(
             onPressed: _resetAnalysis,
@@ -363,8 +363,8 @@ class _AnalysisTabState extends State<AnalysisTab> {
         return Icons.hourglass_empty;
       case BatteryAnalysisState.completed:
         return Icons.check_circle;
-      case BatteryAnalysisState.error:
-        return Icons.error;
+      case BatteryAnalysisState.collecting:
+        return Icons.hourglass_empty;
     }
   }
 
@@ -377,8 +377,8 @@ class _AnalysisTabState extends State<AnalysisTab> {
         return '분석 중...';
       case BatteryAnalysisState.completed:
         return '분석 완료';
-      case BatteryAnalysisState.error:
-        return '다시 분석하기';
+      case BatteryAnalysisState.collecting:
+        return '상태 확인';
     }
   }
 
@@ -391,7 +391,7 @@ class _AnalysisTabState extends State<AnalysisTab> {
         return _buildAnalysisProgress();
       case BatteryAnalysisState.completed:
         return _buildAnalysisResult();
-      case BatteryAnalysisState.error:
+      case BatteryAnalysisState.collecting:
         return _buildAnalysisError();
     }
   }
@@ -460,44 +460,154 @@ class _AnalysisTabState extends State<AnalysisTab> {
   /// 분석 진행 상태를 표시하는 위젯
   Widget _buildAnalysisProgress() {
     return Container(
-      height: 200,
+      padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(12),
+        gradient: LinearGradient(
+          colors: [
+            Theme.of(context).colorScheme.primary.withValues(alpha: 0.05),
+            Theme.of(context).colorScheme.primary.withValues(alpha: 0.02),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
+          width: 1,
+        ),
       ),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            SizedBox(
-              width: 48,
-              height: 48,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // 분석 진행 애니메이션
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: SizedBox(
+              width: 60,
+              height: 60,
               child: CircularProgressIndicator(
-                strokeWidth: 3,
+                strokeWidth: 4,
                 valueColor: AlwaysStoppedAnimation<Color>(
                   Theme.of(context).colorScheme.primary,
                 ),
               ),
             ),
-            const SizedBox(height: 16),
-            Text(
-              '배터리 데이터 분석 중...',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
+          ),
+          
+          const SizedBox(height: 24),
+          
+          Text(
+            '배터리 데이터 분석 중',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
             ),
-            const SizedBox(height: 8),
-            Text(
-              '잠시만 기다려주세요',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                fontSize: 14,
-              ),
+          ),
+          
+          const SizedBox(height: 12),
+          
+          Text(
+            '최근 24시간의 배터리 사용 패턴을\n종합적으로 분석하고 있습니다',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+              fontSize: 14,
+              height: 1.5,
             ),
-          ],
-        ),
+          ),
+          
+          const SizedBox(height: 24),
+          
+          // 분석 단계 표시
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.analytics,
+                      color: Theme.of(context).colorScheme.primary,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '분석 단계',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                _buildAnalysisStep('데이터 수집', true),
+                _buildAnalysisStep('패턴 분석', true),
+                _buildAnalysisStep('인사이트 생성', false),
+                _buildAnalysisStep('결과 정리', false),
+              ],
+            ),
+          ),
+          
+          const SizedBox(height: 20),
+          
+          Text(
+            '예상 소요 시간: 약 2-3초',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 분석 단계를 표시하는 위젯
+  Widget _buildAnalysisStep(String stepName, bool isCompleted) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Container(
+            width: 16,
+            height: 16,
+            decoration: BoxDecoration(
+              color: isCompleted 
+                ? Theme.of(context).colorScheme.primary
+                : Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
+              shape: BoxShape.circle,
+            ),
+            child: isCompleted 
+              ? Icon(
+                  Icons.check,
+                  color: Theme.of(context).colorScheme.onPrimary,
+                  size: 12,
+                )
+              : null,
+          ),
+          const SizedBox(width: 12),
+          Text(
+            stepName,
+            style: TextStyle(
+              color: isCompleted 
+                ? Theme.of(context).colorScheme.onSurface
+                : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+              fontSize: 13,
+              fontWeight: isCompleted ? FontWeight.w500 : FontWeight.normal,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -506,64 +616,276 @@ class _AnalysisTabState extends State<AnalysisTab> {
   Widget _buildAnalysisResult() {
     if (_analysisResult == null) return const SizedBox.shrink();
     
+    return Column(
+      children: [
+        // 분석 완료 헤더
+        _buildAnalysisCompletionHeader(),
+        
+        const SizedBox(height: 16),
+        
+        // 핵심 지표 대시보드
+        _buildKeyMetricsDashboard(),
+        
+        const SizedBox(height: 16),
+        
+        // 배터리 차트
+        _buildBatteryChartSection(),
+        
+        const SizedBox(height: 16),
+        
+        // 인사이트 및 추천사항
+        _buildInsightsAndRecommendations(),
+        
+        const SizedBox(height: 16),
+        
+        // 상세 분석 정보
+        _buildDetailedAnalysisInfo(),
+      ],
+    );
+  }
+
+  /// 분석 완료 헤더를 구성하는 위젯
+  Widget _buildAnalysisCompletionHeader() {
     return Container(
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(12),
+        gradient: LinearGradient(
+          colors: [
+            Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+            Theme.of(context).colorScheme.primary.withValues(alpha: 0.05),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
+          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
           width: 1,
         ),
       ),
-      child: Column(
+      child: Row(
         children: [
-          // 분석 완료 헤더
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(12),
-                topRight: Radius.circular(12),
-              ),
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: Row(
+            child: Icon(
+              Icons.analytics,
+              color: Theme.of(context).colorScheme.primary,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
-                  Icons.check_circle,
-                  color: Theme.of(context).colorScheme.primary,
-                  size: 20,
-                ),
-                const SizedBox(width: 8),
                 Text(
-                  '분석 완료',
+                  '배터리 분석 완료',
                   style: TextStyle(
-                    color: Theme.of(context).colorScheme.primary,
-                    fontSize: 16,
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const Spacer(),
+                const SizedBox(height: 4),
                 Text(
-                  '${_analysisResult!.analysisDuration.inSeconds}초 소요',
+                  '${_analysisResult!.analysisDuration.inSeconds}초 소요 • ${_analysisResult!.analysis.dataPointCount}개 데이터 분석',
                   style: TextStyle(
-                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.7),
-                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                    fontSize: 14,
                   ),
                 ),
               ],
             ),
           ),
-          
-          // 실제 차트 영역
           Container(
-            height: 400,
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primary,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              _analysisResult!.analysis.batteryEfficiencyGrade,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onPrimary,
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 핵심 지표 대시보드를 구성하는 위젯
+  Widget _buildKeyMetricsDashboard() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.1),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.dashboard,
+                color: Theme.of(context).colorScheme.primary,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '핵심 지표',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _buildMetricCard(
+                  '평균 배터리',
+                  '${_analysisResult!.analysis.averageBatteryLevel.toStringAsFixed(1)}%',
+                  Icons.battery_std,
+                  Theme.of(context).colorScheme.primary,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildMetricCard(
+                  '변동폭',
+                  '${_analysisResult!.analysis.batteryVariation.toStringAsFixed(1)}%',
+                  Icons.trending_up,
+                  Theme.of(context).colorScheme.secondary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _buildMetricCard(
+                  '분석 기간',
+                  '${_analysisResult!.analysis.analysisDurationHours.toStringAsFixed(1)}시간',
+                  Icons.access_time,
+                  Theme.of(context).colorScheme.tertiary,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildMetricCard(
+                  '데이터 품질',
+                  '${(_analysisResult!.analysis.overallDataQuality * 100).toStringAsFixed(0)}%',
+                  Icons.analytics,
+                  Theme.of(context).colorScheme.error,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 메트릭 카드를 구성하는 위젯
+  Widget _buildMetricCard(String title, String value, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: color.withValues(alpha: 0.2),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            icon,
+            color: color,
+            size: 24,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            title,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+              fontSize: 12,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 배터리 차트 섹션을 구성하는 위젯
+  Widget _buildBatteryChartSection() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.1),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.show_chart,
+                color: Theme.of(context).colorScheme.primary,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '배터리 사용 패턴',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 350,
             child: BatteryDashboardChart(
               dataPoints: _analysisResult!.dataPoints,
-              height: 400,
-              title: '배터리 사용량 분석',
-              subtitle: '최근 24시간 배터리 사용 패턴',
+              height: 350,
+              title: '최근 24시간 배터리 분석',
+              subtitle: '레벨, 온도, 전압 변화 추이',
               visibleCharts: const [
                 BatteryDashboardChartType.level,
                 BatteryDashboardChartType.temperature,
@@ -573,32 +895,225 @@ class _AnalysisTabState extends State<AnalysisTab> {
               enableAnimation: true,
             ),
           ),
-          
-          // 분석 요약 정보
-          Container(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '분석 요약',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
+        ],
+      ),
+    );
+  }
+
+  /// 인사이트 및 추천사항을 구성하는 위젯
+  Widget _buildInsightsAndRecommendations() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.1),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.lightbulb_outline,
+                color: Theme.of(context).colorScheme.primary,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '인사이트 & 추천사항',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
                 ),
-                const SizedBox(height: 12),
-                _buildSummaryRow('분석 기간', '${_analysisResult!.analysis.analysisDurationHours.toStringAsFixed(1)}시간'),
-                _buildSummaryRow('데이터 포인트', '${_analysisResult!.analysis.dataPointCount}개'),
-                _buildSummaryRow('평균 배터리 레벨', '${_analysisResult!.analysis.averageBatteryLevel.toStringAsFixed(1)}%'),
-                _buildSummaryRow('배터리 변동폭', '${_analysisResult!.analysis.batteryVariation.toStringAsFixed(1)}%'),
-                _buildSummaryRow('효율성 등급', _analysisResult!.analysis.batteryEfficiencyGrade),
-                const SizedBox(height: 16),
-                _buildInsightsSection(),
-              ],
-            ),
+              ),
+            ],
           ),
+          const SizedBox(height: 16),
+          if (_analysisResult!.analysis.insights.isNotEmpty) ...[
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                  width: 1,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.insights,
+                        color: Theme.of(context).colorScheme.primary,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '주요 인사이트',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.primary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  ...(_analysisResult!.analysis.insights.take(3).map((insight) => 
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 6,
+                            height: 6,
+                            margin: const EdgeInsets.only(top: 6),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.primary,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              insight,
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
+                                fontSize: 14,
+                                height: 1.4,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+          if (_analysisResult!.analysis.recommendations.isNotEmpty) ...[
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.1),
+                  width: 1,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.recommend,
+                        color: Theme.of(context).colorScheme.secondary,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '최적화 추천사항',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.secondary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  ...(_analysisResult!.analysis.recommendations.take(3).map((recommendation) => 
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.check_circle_outline,
+                            color: Theme.of(context).colorScheme.secondary,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              recommendation,
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
+                                fontSize: 14,
+                                height: 1.4,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// 상세 분석 정보를 구성하는 위젯
+  Widget _buildDetailedAnalysisInfo() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.1),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.info_outline,
+                color: Theme.of(context).colorScheme.primary,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '상세 분석 정보',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _buildSummaryRow('분석 기간', '${_analysisResult!.analysis.analysisDurationHours.toStringAsFixed(1)}시간'),
+          _buildSummaryRow('데이터 포인트', '${_analysisResult!.analysis.dataPointCount}개'),
+          _buildSummaryRow('평균 배터리 레벨', '${_analysisResult!.analysis.averageBatteryLevel.toStringAsFixed(1)}%'),
+          _buildSummaryRow('배터리 변동폭', '${_analysisResult!.analysis.batteryVariation.toStringAsFixed(1)}%'),
+          _buildSummaryRow('효율성 등급', _analysisResult!.analysis.batteryEfficiencyGrade),
+          _buildSummaryRow('데이터 품질', '${(_analysisResult!.analysis.overallDataQuality * 100).toStringAsFixed(0)}%'),
+          if (_analysisResult!.analysis.chargingSessions > 0)
+            _buildSummaryRow('충전 세션', '${_analysisResult!.analysis.chargingSessions}회'),
+          if (_analysisResult!.analysis.averageChargingSessionMinutes > 0)
+            _buildSummaryRow('평균 충전 시간', '${_analysisResult!.analysis.averageChargingSessionMinutes.toStringAsFixed(0)}분'),
         ],
       ),
     );
@@ -632,143 +1147,156 @@ class _AnalysisTabState extends State<AnalysisTab> {
   }
 
   /// 인사이트 섹션을 구성하는 위젯
-  Widget _buildInsightsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(
-              Icons.lightbulb_outline,
-              color: Theme.of(context).colorScheme.secondary,
-              size: 18,
-            ),
-            const SizedBox(width: 6),
-            Text(
-              '분석 인사이트',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface,
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        if (_analysisResult!.analysis.recommendations.isNotEmpty) ...[
-          ..._analysisResult!.analysis.recommendations.map((recommendation) => 
-            Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
-                  width: 1,
-                ),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(
-                    Icons.tips_and_updates,
-                    color: Theme.of(context).colorScheme.secondary,
-                    size: 16,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      recommendation,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
-                        fontSize: 13,
-                        height: 1.4,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ] else ...[
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
-                width: 1,
-              ),
-            ),
-            child: Text(
-              '추가적인 최적화 제안이 없습니다. 현재 사용 패턴이 양호합니다.',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
-                fontSize: 13,
-                height: 1.4,
-              ),
-            ),
-          ),
-        ],
-      ],
-    );
-  }
 
   /// 분석 에러를 표시하는 위젯
   Widget _buildAnalysisError() {
     return Container(
-      height: 200,
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.errorContainer.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
+        gradient: LinearGradient(
+          colors: [
+            Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+            Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.1),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Theme.of(context).colorScheme.error.withValues(alpha: 0.3),
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
           width: 1,
         ),
       ),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.error_outline,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(
+              Icons.hourglass_empty,
               size: 48,
-              color: Theme.of(context).colorScheme.error,
+              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.7),
             ),
-            const SizedBox(height: 12),
-            Text(
-              '분석 실패',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.error,
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
+          ),
+          const SizedBox(height: 20),
+          Text(
+            '데이터 수집 중',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            _analysisStatusMessage ?? '배터리 사용 패턴을 분석하기 위해 데이터를 수집하고 있습니다.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+              fontSize: 14,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 24),
+          
+          // 데이터 수집 진행률 표시
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '수집 진행률',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    Text(
+                      '${_calculateDataCollectionProgress()}%',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.primary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                LinearProgressIndicator(
+                  value: _calculateDataCollectionProgress() / 100,
+                  backgroundColor: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  _getDataCollectionStatusText(),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                    fontSize: 12,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+          
+          const SizedBox(height: 24),
+          ElevatedButton.icon(
+            onPressed: _performBatteryAnalysis,
+            icon: const Icon(Icons.refresh),
+            label: const Text('상태 확인'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              _analysisErrorMessage ?? '알 수 없는 오류가 발생했습니다',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onErrorContainer.withValues(alpha: 0.8),
-                fontSize: 14,
-              ),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: _performBatteryAnalysis,
-              icon: const Icon(Icons.refresh),
-              label: const Text('다시 시도'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.error,
-                foregroundColor: Theme.of(context).colorScheme.onError,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
+  }
+
+  /// 데이터 수집 진행률을 계산하는 메서드
+  double _calculateDataCollectionProgress() {
+    // 앱 설치 후 경과 시간을 기반으로 진행률 계산 (최대 24시간)
+    final now = DateTime.now();
+    final appInstallTime = now.subtract(const Duration(hours: 1)); // 임시로 1시간 전으로 설정
+    final elapsed = now.difference(appInstallTime);
+    final progress = (elapsed.inMinutes / (24 * 60)) * 100;
+    return progress.clamp(0.0, 100.0);
+  }
+
+  /// 데이터 수집 상태 텍스트를 반환하는 메서드
+  String _getDataCollectionStatusText() {
+    final progress = _calculateDataCollectionProgress();
+    if (progress < 10) {
+      return '배터리 사용 패턴 수집 시작';
+    } else if (progress < 30) {
+      return '기본 사용 패턴 분석 중';
+    } else if (progress < 60) {
+      return '충전/방전 패턴 수집 중';
+    } else if (progress < 90) {
+      return '상세 분석 데이터 준비 중';
+    } else {
+      return '분석 준비 완료 - 곧 분석 가능';
+    }
   }
 
   Widget _buildAppUsageCard() {
