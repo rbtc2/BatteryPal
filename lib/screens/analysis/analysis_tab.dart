@@ -280,9 +280,9 @@ class _AnalysisTabState extends State<AnalysisTab> {
             children: [
               Expanded(
                 child: Text(
-                  '24시간 배터리 사용량',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
+                '24시간 배터리 사용량',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
@@ -399,22 +399,22 @@ class _AnalysisTabState extends State<AnalysisTab> {
   /// 분석 프롬프트를 표시하는 위젯
   Widget _buildAnalysisPrompt() {
     return Container(
-      height: 200,
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(12),
+            height: 200,
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
           width: 1,
         ),
-      ),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
+            ),
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
               Icons.analytics_outlined,
-              size: 48,
+                    size: 48,
               color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.7),
             ),
             const SizedBox(height: 12),
@@ -425,9 +425,9 @@ class _AnalysisTabState extends State<AnalysisTab> {
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
               '최근 24시간의 배터리 사용량을 분석하여\n최적화 제안을 받아보세요',
               textAlign: TextAlign.center,
               style: TextStyle(
@@ -514,8 +514,8 @@ class _AnalysisTabState extends State<AnalysisTab> {
           Text(
             '최근 24시간의 배터리 사용 패턴을\n종합적으로 분석하고 있습니다',
             textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
               fontSize: 14,
               height: 1.5,
             ),
@@ -688,12 +688,12 @@ class _AnalysisTabState extends State<AnalysisTab> {
                     color: Theme.of(context).colorScheme.onSurface,
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
+                  const SizedBox(height: 4),
+                  Text(
                   '${_analysisResult!.analysisDuration.inSeconds}초 소요 • ${_analysisResult!.analysis.dataPointCount}개 데이터 분석',
-                  style: TextStyle(
+                    style: TextStyle(
                     color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                     fontSize: 14,
                   ),
@@ -803,45 +803,13 @@ class _AnalysisTabState extends State<AnalysisTab> {
     );
   }
 
-  /// 메트릭 카드를 구성하는 위젯
+  /// 메트릭 카드를 구성하는 위젯 (성능 최적화)
   Widget _buildMetricCard(String title, String value, IconData icon, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: color.withValues(alpha: 0.2),
-          width: 1,
-        ),
-      ),
-      child: Column(
-        children: [
-          Icon(
-            icon,
-            color: color,
-            size: 24,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurface,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            title,
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-              fontSize: 12,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
+    return _MetricCard(
+      title: title,
+      value: value,
+      icon: icon,
+      color: color,
     );
   }
 
@@ -1246,8 +1214,8 @@ class _AnalysisTabState extends State<AnalysisTab> {
                   _getDataCollectionStatusText(),
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                    fontSize: 12,
-                  ),
+                      fontSize: 12,
+                    ),
                   textAlign: TextAlign.center,
                 ),
               ],
@@ -1787,6 +1755,63 @@ class _AnalysisTabState extends State<AnalysisTab> {
               suggestion,
               style: const TextStyle(fontSize: 13),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 성능 최적화된 메트릭 카드 위젯
+class _MetricCard extends StatelessWidget {
+  final String title;
+  final String value;
+  final IconData icon;
+  final Color color;
+
+  const _MetricCard({
+    required this.title,
+    required this.value,
+    required this.icon,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: color.withValues(alpha: 0.2),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            icon,
+            color: color,
+            size: 24,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            title,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+              fontSize: 12,
+            ),
+            textAlign: TextAlign.center,
           ),
         ],
       ),

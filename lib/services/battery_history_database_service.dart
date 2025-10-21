@@ -101,7 +101,7 @@ class BatteryHistoryDatabaseService {
       )
     ''');
     
-    // 인덱스 생성
+    // 성능 최적화를 위한 인덱스 생성
     await db.execute('''
       CREATE INDEX idx_timestamp ON ${BatteryHistoryDatabaseConfig.tableName} (timestamp)
     ''');
@@ -116,6 +116,21 @@ class BatteryHistoryDatabaseService {
     
     await db.execute('''
       CREATE INDEX idx_charging ON ${BatteryHistoryDatabaseConfig.tableName} (is_charging)
+    ''');
+    
+    // 복합 인덱스 - 시간 범위 쿼리 최적화
+    await db.execute('''
+      CREATE INDEX idx_timestamp_range ON ${BatteryHistoryDatabaseConfig.tableName} (timestamp, level)
+    ''');
+    
+    // 충전 상태별 시간 인덱스
+    await db.execute('''
+      CREATE INDEX idx_charging_timestamp ON ${BatteryHistoryDatabaseConfig.tableName} (is_charging, timestamp)
+    ''');
+    
+    // 데이터 품질 인덱스
+    await db.execute('''
+      CREATE INDEX idx_data_quality ON ${BatteryHistoryDatabaseConfig.tableName} (data_quality)
     ''');
     
     debugPrint('데이터베이스 테이블 생성 완료');
@@ -176,7 +191,7 @@ class BatteryHistoryDatabaseService {
     }
   }
 
-  /// 여러 배터리 히스토리 데이터 포인트 일괄 저장
+  /// 여러 배터리 히스토리 데이터 포인트 일괄 저장 (성능 최적화)
   Future<List<int>> insertBatteryDataPoints(List<BatteryHistoryDataPoint> dataPoints) async {
     await initialization;
     if (_database == null) throw Exception('데이터베이스가 초기화되지 않았습니다');
@@ -184,23 +199,23 @@ class BatteryHistoryDatabaseService {
     if (dataPoints.isEmpty) return [];
     
     try {
-      final batch = _database!.batch();
-      
-      for (final dataPoint in dataPoints) {
-        batch.insert(
-          BatteryHistoryDatabaseConfig.tableName,
-          _dataPointToMap(dataPoint),
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        );
-      }
-      
-      final results = await batch.commit();
-      debugPrint('${dataPoints.length}개 배터리 데이터 포인트 일괄 저장 완료');
-      
-      // 데이터 압축 체크
-      await _checkAndCompressData();
-      
-      return results.cast<int>();
+      // 트랜잭션을 사용하여 성능 최적화
+      return await _database!.transaction((txn) async {
+        final batch = txn.batch();
+        
+        for (final dataPoint in dataPoints) {
+          batch.insert(
+            BatteryHistoryDatabaseConfig.tableName,
+            _dataPointToMap(dataPoint),
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
+        }
+        
+        final results = await batch.commit();
+        debugPrint('${dataPoints.length}개 배터리 데이터 포인트 일괄 저장 완료 (트랜잭션)');
+        
+        return results.cast<int>();
+      });
     } catch (e, stackTrace) {
       debugPrint('배터리 데이터 포인트 일괄 저장 실패: $e');
       debugPrint('스택 트레이스: $stackTrace');

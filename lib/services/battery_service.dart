@@ -30,7 +30,7 @@ class BatteryService {
   Stream<BatteryInfo> get batteryInfoStream {
     if (_batteryInfoController == null || _batteryInfoController!.isClosed) {
       _batteryInfoController = StreamController<BatteryInfo>.broadcast();
-      debugPrint('배터리 서비스: 새로운 스트림 컨트롤러 생성');
+      _debugLog('배터리 서비스: 새로운 스트림 컨트롤러 생성');
     }
     return _batteryInfoController!.stream;
   }
@@ -38,6 +38,15 @@ class BatteryService {
   /// 배터리 정보 모델
   BatteryInfo? _currentBatteryInfo;
   BatteryInfo? get currentBatteryInfo => _currentBatteryInfo;
+  
+  /// 성능 최적화를 위한 로그 레벨 관리
+  static const bool _enableDebugLogs = false; // 릴리즈 빌드에서는 false
+  
+  void _debugLog(String message) {
+    if (_enableDebugLogs) {
+      debugPrint(message);
+    }
+  }
   
   /// 서비스가 dispose되었는지 확인하는 플래그
   bool _isDisposed = false;
