@@ -25,8 +25,11 @@ class HomeTab extends StatefulWidget {
 }
 
 class _HomeTabState extends State<HomeTab> {
-  // 생명주기 관리 서비스
+  // 싱글톤 생명주기 관리 서비스 사용
   final HomeLifecycleManager _lifecycleManager = HomeLifecycleManager();
+  
+  // 탭 고유 ID (콜백 관리용)
+  static const String _tabId = 'home_tab';
   
   // 스켈레톤용 더미 데이터
   int remainingHours = 4;
@@ -45,37 +48,39 @@ class _HomeTabState extends State<HomeTab> {
     _initializeLifecycleManager();
   }
 
-  /// 생명주기 관리자 초기화
+  /// 생명주기 관리자 초기화 (싱글톤 + 탭별 콜백)
   Future<void> _initializeLifecycleManager() async {
     debugPrint('홈 탭: 생명주기 관리자 초기화 시작');
     
-    // 콜백 함수 설정
-    _lifecycleManager.onBatteryInfoUpdated = (batteryInfo) {
-      if (mounted) {
-        setState(() {
-          _batteryInfo = batteryInfo;
-        });
-        debugPrint('홈 탭: 배터리 정보 업데이트 - ${batteryInfo.formattedLevel}');
-      }
-    };
+    // 탭별 콜백 등록
+    _lifecycleManager.registerTabCallbacks(
+      _tabId,
+      onBatteryInfoUpdated: (batteryInfo) {
+        if (mounted) {
+          setState(() {
+            _batteryInfo = batteryInfo;
+          });
+          debugPrint('홈 탭: 배터리 정보 업데이트 - ${batteryInfo.formattedLevel}');
+        }
+      },
+      onChargingCurrentChanged: () {
+        debugPrint('홈 탭: 충전 전류 변화 감지');
+        // 필요시 추가 처리
+      },
+      onAppPaused: () {
+        debugPrint('홈 탭: 앱이 백그라운드로 이동');
+      },
+      onAppResumed: () {
+        debugPrint('홈 탭: 앱이 포그라운드로 복귀');
+      },
+    );
     
-    _lifecycleManager.onChargingCurrentChanged = () {
-      debugPrint('홈 탭: 충전 전류 변화 감지');
-      // 필요시 추가 처리
-    };
+    // 싱글톤이므로 이미 초기화되었을 수 있음 - 확인 후 필요시만 초기화
+    if (_lifecycleManager.currentBatteryInfo == null) {
+      await _lifecycleManager.initialize();
+    }
     
-    _lifecycleManager.onAppPaused = () {
-      debugPrint('홈 탭: 앱이 백그라운드로 이동');
-    };
-    
-    _lifecycleManager.onAppResumed = () {
-      debugPrint('홈 탭: 앱이 포그라운드로 복귀');
-    };
-    
-    // 생명주기 관리자 초기화
-    await _lifecycleManager.initialize();
-    
-    // 초기 배터리 정보 설정
+    // 즉시 캐시된 정보 또는 현재 정보 설정
     final currentInfo = _lifecycleManager.currentBatteryInfo;
     if (currentInfo != null && mounted) {
       setState(() {
@@ -91,20 +96,21 @@ class _HomeTabState extends State<HomeTab> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     
-    // 탭 복귀 시 배터리 정보 즉시 새로고침
+    // 탭 복귀 시 즉시 복원 + 비동기 업데이트
     debugPrint('홈 탭: didChangeDependencies - 탭 복귀 감지');
     
+    // 1. 즉시 캐시된 정보 복원 (UI 즉시 업데이트)
+    final cachedInfo = _lifecycleManager.getCachedBatteryInfo();
+    if (cachedInfo != null && mounted) {
+        setState(() {
+        _batteryInfo = cachedInfo;
+      });
+      debugPrint('홈 탭: 캐시된 정보로 즉시 복원 - ${cachedInfo.formattedLevel}');
+    }
+    
+    // 2. 비동기로 최신 정보 새로고침
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _lifecycleManager.handleTabReturn();
-      
-      // 현재 배터리 정보가 있다면 즉시 UI 업데이트
-      final currentInfo = _lifecycleManager.currentBatteryInfo;
-      if (currentInfo != null && mounted) {
-        setState(() {
-          _batteryInfo = currentInfo;
-        });
-        debugPrint('홈 탭: 탭 복귀 시 기존 배터리 정보 복원 - ${currentInfo.formattedLevel}');
-      }
     });
   }
 
@@ -112,10 +118,10 @@ class _HomeTabState extends State<HomeTab> {
   void dispose() {
     debugPrint('홈 탭: dispose 시작');
     
-    // 생명주기 관리자 정리
-    _lifecycleManager.dispose();
+    // 탭별 콜백만 해제 (싱글톤은 유지)
+    _lifecycleManager.unregisterTabCallbacks(_tabId);
     
-    debugPrint('홈 탭: dispose 완료');
+    debugPrint('홈 탭: dispose 완료 (싱글톤 유지)');
     super.dispose();
   }
 
