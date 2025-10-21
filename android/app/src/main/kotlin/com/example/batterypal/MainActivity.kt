@@ -49,7 +49,11 @@ class MainActivity : FlutterActivity() {
     // 공통 배터리 인텐트 가져오기 메서드 (권장 방법)
     private fun getBatteryIntent(): Intent? {
         return try {
-            applicationContext.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+            val batteryIntent = applicationContext.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+            if (batteryIntent == null) {
+                android.util.Log.w("BatteryPal", "배터리 인텐트가 null입니다")
+            }
+            batteryIntent
         } catch (e: Exception) {
             android.util.Log.e("BatteryPal", "배터리 인텐트 가져오기 실패", e)
             null
@@ -134,7 +138,10 @@ class MainActivity : FlutterActivity() {
             val scale = batteryIntent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
             
             val result = if (level != -1 && scale != -1 && scale > 0) {
-                (level * 100.0) / scale // 실제 배터리 퍼센트 계산 (소수점 포함)
+                // 더 정확한 배터리 레벨 계산 (소수점 포함)
+                val percentage = (level * 100.0) / scale
+                // 소수점 둘째 자리까지 반올림
+                kotlin.math.round(percentage * 100.0) / 100.0
             } else -1.0
             
             android.util.Log.d("BatteryPal", "배터리 레벨: ${result}% (레벨: $level, 스케일: $scale)")
@@ -150,9 +157,21 @@ class MainActivity : FlutterActivity() {
             val batteryManager = getSystemService(Context.BATTERY_SERVICE) as BatteryManager
             val batteryIntent = getBatteryIntent()
             
-            val plugged = batteryIntent?.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1) ?: -1
+            if (batteryIntent == null) {
+                android.util.Log.w("BatteryPal", "배터리 인텐트가 null입니다")
+                return mapOf(
+                    "chargingType" to "Unknown",
+                    "chargingCurrent" to -1,
+                    "currentNow" to -1,
+                    "currentAverage" to -1,
+                    "isCharging" to false
+                )
+            }
             
-            // 충전 방식 구분
+            val plugged = batteryIntent.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1)
+            val status = batteryIntent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+            
+            // 충전 방식 구분 (더 정확한 감지)
             val chargingType = when (plugged) {
                 BatteryManager.BATTERY_PLUGGED_AC -> "AC"
                 BatteryManager.BATTERY_PLUGGED_USB -> "USB"
@@ -169,20 +188,30 @@ class MainActivity : FlutterActivity() {
                     currentAverage = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_AVERAGE)
                 }
             } catch (e: Exception) {
-                // API가 지원되지 않거나 오류가 발생한 경우
+                android.util.Log.w("BatteryPal", "전류 정보 가져오기 실패: ${e.message}")
                 currentNow = -1
                 currentAverage = -1
             }
             
-            // 충전 전류 (mA)
-            val chargingCurrent = if (currentNow != -1) currentNow / 1000 else -1
+            // 충전 전류 (mA) - 더 정확한 계산
+            val chargingCurrent = if (currentNow != -1) {
+                // 음수는 방전, 양수는 충전을 의미
+                kotlin.math.abs(currentNow / 1000)
+            } else -1
+            
+            // 충전 상태 더 정확히 감지
+            val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING || 
+                            status == BatteryManager.BATTERY_STATUS_FULL ||
+                            plugged != 0
             
             val result = mapOf(
                 "chargingType" to chargingType,
                 "chargingCurrent" to chargingCurrent,
                 "currentNow" to currentNow,
                 "currentAverage" to currentAverage,
-                "isCharging" to (plugged != 0)
+                "isCharging" to isCharging,
+                "plugged" to plugged,
+                "status" to status
             )
             
             android.util.Log.d("BatteryPal", "충전 정보: $result")

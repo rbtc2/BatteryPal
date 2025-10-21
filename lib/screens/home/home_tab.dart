@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../services/battery_service.dart';
 import '../../models/app_models.dart';
@@ -35,6 +36,12 @@ class _HomeTabState extends State<HomeTab> {
   // 실제 배터리 정보
   BatteryInfo? _batteryInfo;
   bool _isRefreshing = false;
+  
+  // 주기적 새로고침 타이머
+  Timer? _periodicRefreshTimer;
+  
+  // 주기적 새로고침 간격 (초)
+  static const int _refreshIntervalSeconds = 30;
 
   @override
   void initState() {
@@ -56,13 +63,24 @@ class _HomeTabState extends State<HomeTab> {
     if (_batteryInfo == null) {
       debugPrint('홈 탭: 배터리 정보가 없음, 새로고침 시도');
       _batteryService.refreshBatteryInfo();
+    } else {
+      // 배터리 정보가 있더라도 주기적으로 새로고침하여 정확성 보장
+      debugPrint('홈 탭: 배터리 정보 존재, 주기적 새로고침 유지');
     }
   }
 
   @override
   void dispose() {
+    debugPrint('홈 탭: dispose 시작');
+    
+    // 주기적 새로고침 중지
+    _stopPeriodicRefresh();
+    
+    // 배터리 서비스 정리
     _batteryService.stopMonitoring();
     _batteryService.dispose();
+    
+    debugPrint('홈 탭: dispose 완료');
     super.dispose();
   }
 
@@ -70,34 +88,83 @@ class _HomeTabState extends State<HomeTab> {
   Future<void> _initializeBatteryService() async {
     debugPrint('홈 탭: 배터리 서비스 초기화 시작');
     
-    // 배터리 모니터링 시작
-    await _batteryService.startMonitoring();
-    debugPrint('홈 탭: 배터리 모니터링 시작 완료');
-    
-    // 현재 배터리 정보 즉시 가져오기
-    final currentBatteryInfo = _batteryService.currentBatteryInfo;
-    if (currentBatteryInfo != null) {
-      debugPrint('홈 탭: 현재 배터리 정보 설정 - ${currentBatteryInfo.toString()}');
+    try {
+      // 기존 배터리 정보 초기화
       if (mounted) {
+        setState(() {
+          _batteryInfo = null;
+        });
+      }
+      
+      // 배터리 서비스 상태 초기화 (앱 시작 시)
+      await _batteryService.resetService();
+      
+      // 배터리 모니터링 시작
+      await _batteryService.startMonitoring();
+      debugPrint('홈 탭: 배터리 모니터링 시작 완료');
+      
+      // 현재 배터리 정보 즉시 가져오기 (강제 새로고침)
+      await _batteryService.refreshBatteryInfo();
+      final currentBatteryInfo = _batteryService.currentBatteryInfo;
+      
+      if (currentBatteryInfo != null && mounted) {
+        debugPrint('홈 탭: 현재 배터리 정보 설정 - ${currentBatteryInfo.toString()}');
         setState(() {
           _batteryInfo = currentBatteryInfo;
         });
         debugPrint('홈 탭: 초기 배터리 정보 UI 업데이트 완료 - 배터리 레벨: ${currentBatteryInfo.formattedLevel}');
       }
-    }
-    
-    // 배터리 정보 스트림 구독
-    _batteryService.batteryInfoStream.listen((batteryInfo) {
-      debugPrint('홈 탭: 배터리 정보 수신 - ${batteryInfo.toString()}');
+      
+      // 배터리 정보 스트림 구독 (기존 이벤트 무시)
+      _batteryService.batteryInfoStream.listen((batteryInfo) {
+        debugPrint('홈 탭: 배터리 정보 수신 - ${batteryInfo.toString()}');
+        if (mounted) {
+          setState(() {
+            _batteryInfo = batteryInfo;
+          });
+          debugPrint('홈 탭: UI 업데이트 완료 - 배터리 레벨: ${batteryInfo.formattedLevel}');
+        } else {
+          debugPrint('홈 탭: 위젯이 마운트되지 않음, UI 업데이트 건너뜀');
+        }
+      });
+      
+      // 주기적 새로고침 시작
+      _startPeriodicRefresh();
+      
+    } catch (e, stackTrace) {
+      debugPrint('홈 탭: 배터리 서비스 초기화 실패: $e');
+      debugPrint('스택 트레이스: $stackTrace');
+      
+      // 초기화 실패 시에도 최소한의 정보라도 표시
       if (mounted) {
         setState(() {
-          _batteryInfo = batteryInfo;
+          _batteryInfo = null;
         });
-        debugPrint('홈 탭: UI 업데이트 완료 - 배터리 레벨: ${batteryInfo.formattedLevel}');
-      } else {
-        debugPrint('홈 탭: 위젯이 마운트되지 않음, UI 업데이트 건너뜀');
       }
-    });
+    }
+  }
+  
+  /// 주기적 새로고침 시작
+  void _startPeriodicRefresh() {
+    debugPrint('홈 탭: 주기적 새로고침 시작 ($_refreshIntervalSeconds초 간격)');
+    
+    _periodicRefreshTimer?.cancel();
+    _periodicRefreshTimer = Timer.periodic(
+      const Duration(seconds: _refreshIntervalSeconds),
+      (timer) {
+        if (mounted && !_isRefreshing) {
+          debugPrint('홈 탭: 주기적 새로고침 실행');
+          _batteryService.refreshBatteryInfo();
+        }
+      },
+    );
+  }
+  
+  /// 주기적 새로고침 중지
+  void _stopPeriodicRefresh() {
+    debugPrint('홈 탭: 주기적 새로고침 중지');
+    _periodicRefreshTimer?.cancel();
+    _periodicRefreshTimer = null;
   }
 
   @override
@@ -116,21 +183,43 @@ class _HomeTabState extends State<HomeTab> {
                     setState(() {
                       _isRefreshing = true;
                     });
+                    
+                    // context를 미리 저장하여 비동기 작업 후에도 안전하게 사용
+                    final scaffoldMessenger = ScaffoldMessenger.of(context);
+                    
                     try {
-                      final scaffoldMessenger = ScaffoldMessenger.of(context);
+                      debugPrint('홈 탭: 수동 새로고침 시작');
+                      
+                      // 강제 새로고침 실행
                       await _batteryService.refreshBatteryInfo();
-                      // 즉시 현재 정보 반영 시도 (스트림 업데이트 전 폴백)
+                      
+                      // 즉시 현재 정보 반영 (스트림 업데이트 전 폴백)
                       final latest = _batteryService.currentBatteryInfo;
                       if (mounted && latest != null) {
                         setState(() {
                           _batteryInfo = latest;
                         });
+                        debugPrint('홈 탭: 수동 새로고침 완료 - ${latest.formattedLevel}');
                       }
+                      
                       if (mounted) {
                         scaffoldMessenger.showSnackBar(
-                          const SnackBar(
-                            content: Text('배터리 정보를 새로고침했습니다'),
-                            duration: Duration(seconds: 1),
+                          SnackBar(
+                            content: Text('배터리 정보를 새로고침했습니다 (${latest?.formattedLevel ?? '--.-%'})'),
+                            duration: const Duration(seconds: 2),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      debugPrint('홈 탭: 수동 새로고침 실패: $e');
+                      if (mounted) {
+                        scaffoldMessenger.showSnackBar(
+                          SnackBar(
+                            content: Text('새로고침 실패: $e'),
+                            duration: const Duration(seconds: 2),
+                            behavior: SnackBarBehavior.floating,
+                            backgroundColor: Colors.red,
                           ),
                         );
                       }
