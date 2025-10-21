@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../models/app_models.dart';
+import '../../models/charging_models.dart';
 import '../../services/charging_analysis_service.dart';
+import '../../constants/charging_constants.dart';
+import '../../constants/home_ui_constants.dart';
 import '../common/common_widgets.dart';
 
 /// 충전 분석 카드 위젯
@@ -16,18 +19,18 @@ class ChargingAnalysisCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return CustomCard(
-      elevation: 4,
-      padding: const EdgeInsets.all(16),
+      elevation: HomeUIConstants.cardElevation,
+      padding: HomeUIConstants.cardPaddingSmall,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // 헤더: 충전 속도 분석
           _buildChargingHeader(context),
-          const SizedBox(height: 12),
+          const SizedBox(height: HomeUIConstants.smallSpacing),
           
           // 충전 속도 인디케이터 (큰 시각적 요소)
           _buildChargingSpeedIndicator(context),
-          const SizedBox(height: 12),
+          const SizedBox(height: HomeUIConstants.smallSpacing),
           
           // 충전 최적화 팁 (접을 수 있는 형태)
           _buildChargingOptimizationTips(context),
@@ -42,20 +45,20 @@ class ChargingAnalysisCard extends StatelessWidget {
       children: [
         // 미니멀 아이콘 컨테이너
         Container(
-          padding: const EdgeInsets.all(6),
+          padding: HomeUIConstants.cardPaddingMicro,
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(6),
+            color: Theme.of(context).colorScheme.primary.withValues(alpha: HomeUIConstants.alphaMicro),
+            borderRadius: BorderRadius.circular(HomeUIConstants.tinyBorderRadius),
           ),
           child: Icon(
             Icons.flash_on_outlined,
             color: Theme.of(context).colorScheme.primary,
-            size: 16,
+            size: ChargingConstants.chargingHeaderIconSize,
           ),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: HomeUIConstants.tinySpacing),
         Text(
-          '충전 분석',
+          ChargingConstants.chargingAnalysisTitle,
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.w600,
             letterSpacing: -0.2,
@@ -66,20 +69,20 @@ class ChargingAnalysisCard extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(8),
+            color: Theme.of(context).colorScheme.primary.withValues(alpha: HomeUIConstants.alphaUltraLow),
+            borderRadius: BorderRadius.circular(HomeUIConstants.smallBorderRadius),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               // 실시간 애니메이션 도트
               TweenAnimationBuilder<double>(
-                duration: const Duration(milliseconds: 1000),
+                duration: ChargingConstants.chargingAnimationDuration,
                 tween: Tween(begin: 0.0, end: 1.0),
                 builder: (context, value, child) {
                   return Container(
-                    width: 4,
-                    height: 4,
+                    width: ChargingConstants.chargingAnimationDotSize,
+                    height: ChargingConstants.chargingAnimationDotSize,
                     decoration: BoxDecoration(
                       color: Theme.of(context).colorScheme.primary.withValues(alpha: value),
                       shape: BoxShape.circle,
@@ -90,12 +93,12 @@ class ChargingAnalysisCard extends StatelessWidget {
                   // 애니메이션 반복
                 },
               ),
-              const SizedBox(width: 4),
+              const SizedBox(width: HomeUIConstants.nanoSpacing),
               Text(
-                '실시간 모니터링',
+                ChargingConstants.realTimeMonitoringText,
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.primary,
-                  fontSize: 11,
+                  fontSize: HomeUIConstants.captionFontSize,
                   fontWeight: FontWeight.w500,
                 ),
               ),

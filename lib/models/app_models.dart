@@ -531,25 +531,3 @@ class OptimizationResult {
     return 'OptimizationResult(powerSaved: $formattedPowerSaved, timeExtended: $formattedTimeExtended, appsOptimized: $appsOptimized)';
   }
 }
-
-/// 충전 속도 정보 모델 (Phase 1: 스켈레톤용)
-class ChargingSpeedInfo {
-  final String label; // 충전 속도 라벨 (예: "초고속 충전", "고속 충전", "저속 충전")
-  final String description; // 충전 속도 설명 (예: "2.1A 충전 중")
-  final Color color; // 충전 속도에 따른 색상
-  final IconData icon; // 충전 속도에 따른 아이콘
-  final List<String> tips; // 충전 최적화 팁 목록
-
-  const ChargingSpeedInfo({
-    required this.label,
-    required this.description,
-    required this.color,
-    required this.icon,
-    required this.tips,
-  });
-
-  @override
-  String toString() {
-    return 'ChargingSpeedInfo(label: $label, description: $description, color: $color, icon: $icon)';
-  }
-}
