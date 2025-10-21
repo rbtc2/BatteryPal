@@ -147,7 +147,7 @@ class ChargingAnalysisCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  chargingSpeed.label,
+                  '${chargingSpeed.label} (${batteryInfo?.chargingTypeText ?? '알 수 없음'})',
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 16,
@@ -157,7 +157,7 @@ class ChargingAnalysisCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${batteryInfo?.chargingTypeText ?? '알 수 없음'}, ${chargingSpeed.description}',
+                  chargingSpeed.description,
                   style: TextStyle(
                     fontSize: 13,
                     color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
