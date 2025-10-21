@@ -4,6 +4,7 @@ import 'widgets/battery_health_tab.dart';
 import 'widgets/charging_patterns_tab.dart';
 import 'widgets/usage_analytics_tab.dart';
 import 'widgets/optimization_tab.dart';
+import '../../utils/dialog_utils.dart';
 
 /// 분석 탭 화면 - 5개의 하위 탭으로 구성된 탭 인터페이스
 class AnalysisTab extends StatefulWidget {
@@ -46,8 +47,10 @@ class _AnalysisTabState extends State<AnalysisTab> with TickerProviderStateMixin
           if (!widget.isProUser)
             TextButton(
               onPressed: () {
-                // TODO: Pro 업그레이드 다이얼로그 표시
-                widget.onProToggle();
+                DialogUtils.showAnalysisProUpgradeDialog(
+                  context,
+                  onUpgrade: widget.onProToggle,
+                );
               },
               child: const Text('Pro로 업그레이드'),
             ),
