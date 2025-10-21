@@ -16,6 +16,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
   
   // Pro 모드 상태 관리 (실제 결제 시스템과 연동 예정)
+  // ignore: prefer_final_fields
   bool _isProUser = false;
 
   // 3개 탭 페이지들 (Pro 상태 전달)
@@ -60,7 +61,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   // Pro 업그레이드 처리 (실제 결제 시스템과 연동 예정)
   void _handleProUpgrade() {
-    // TODO: 실제 결제 시스템과 연동
+    // 실제 결제 시스템과 연동 예정 - 인앱 결제, 구독 관리 등
     // 현재는 개발용으로 간단한 다이얼로그 표시
     showDialog(
       context: context,
@@ -75,7 +76,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           TextButton(
             onPressed: () {
               Navigator.of(context).pop();
-              // TODO: 실제 결제 프로세스 시작
+              // 실제 결제 프로세스 시작 예정 - Google Play Billing, App Store Connect 등
             },
             child: const Text('업그레이드'),
           ),
