@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../models/app_models.dart';
+import '../../services/charging_analysis_service.dart';
 import '../common/common_widgets.dart';
 
 /// 충전 분석 카드 위젯
@@ -289,94 +290,6 @@ class ChargingAnalysisCard extends StatelessWidget {
 
   /// 실제 충전 전류값을 사용한 충전 속도 정보
   ChargingSpeedInfo _getRealChargingSpeed() {
-    if (batteryInfo == null) {
-      debugPrint('충전 속도 분석: 배터리 정보가 없음');
-      return _getDefaultChargingSpeed();
-    }
-
-    // 충전 전류값 가져오기 (음수면 절댓값 사용)
-    final chargingCurrent = batteryInfo!.chargingCurrent.abs();
-    debugPrint('충전 속도 분석: 현재 충전 전류 ${chargingCurrent}mA');
-    
-    // 충전 속도 분류
-    String speedLabel;
-    String description;
-    Color color;
-    IconData icon;
-    List<String> tips;
-
-    if (chargingCurrent >= 2000) {
-      // 초고속 충전 (2A 이상)
-      speedLabel = '초고속 충전';
-      description = '${(chargingCurrent / 1000).toStringAsFixed(1)}A 충전 중';
-      color = Colors.red;
-      icon = Icons.flash_on;
-      tips = [
-        '초고속 충전으로 빠르게 충전 중입니다',
-        '80% 이상 충전 시 속도가 감소합니다',
-        '충전 완료 후 즉시 분리 권장',
-        '충전 중 고성능 작업은 피하세요',
-      ];
-    } else if (chargingCurrent >= 1000) {
-      // 고속 충전 (1A ~ 2A)
-      speedLabel = '고속 충전';
-      description = '${(chargingCurrent / 1000).toStringAsFixed(1)}A 충전 중';
-      color = Colors.orange;
-      icon = Icons.electric_bolt;
-      tips = [
-        '고속 충전으로 충전 중입니다',
-        '80% 이상 충전 시 속도가 감소합니다',
-        '충전 완료 후 30분 이내 분리 권장',
-        '충전 중 고성능 작업은 피하세요',
-      ];
-    } else if (chargingCurrent >= 500) {
-      // 일반 충전 (0.5A ~ 1A)
-      speedLabel = '일반 충전';
-      description = '${(chargingCurrent / 1000).toStringAsFixed(1)}A 충전 중';
-      color = Colors.blue;
-      icon = Icons.battery_charging_full;
-      tips = [
-        '일반 충전으로 충전 중입니다',
-        '충전 속도가 느릴 수 있습니다',
-        '충전 완료 후 분리해주세요',
-        '배터리 온도가 높으면 충전 속도가 느려집니다',
-      ];
-    } else {
-      // 저속 충전 (0.5A 미만)
-      speedLabel = '저속 충전';
-      description = '${chargingCurrent}mA 충전 중';
-      color = Colors.grey;
-      icon = Icons.battery_charging_full;
-      tips = [
-        '저속 충전으로 충전 중입니다',
-        '충전 속도가 매우 느립니다',
-        '고전력 충전기 사용을 권장합니다',
-        '충전 중 사용을 최소화하세요',
-      ];
-    }
-
-    debugPrint('충전 속도 분석 결과: $speedLabel ($description)');
-    
-    return ChargingSpeedInfo(
-      label: speedLabel,
-      description: description,
-      color: color,
-      icon: icon,
-      tips: tips,
-    );
-  }
-
-  /// 기본 충전 속도 정보 (배터리 정보가 없을 때)
-  ChargingSpeedInfo _getDefaultChargingSpeed() {
-    return ChargingSpeedInfo(
-      label: '충전 중',
-      description: '충전 정보 확인 중',
-      color: Colors.grey,
-      icon: Icons.electric_bolt_outlined,
-      tips: [
-        '충전 정보를 확인하고 있습니다',
-        '잠시만 기다려주세요',
-      ],
-    );
+    return ChargingAnalysisService.getChargingSpeedInfo(batteryInfo);
   }
 }

@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import '../../services/battery_service.dart';
+import '../../services/home_lifecycle_manager.dart';
 import '../../models/app_models.dart';
 import '../../widgets/home/battery_status_card.dart';
 import '../../widgets/home/battery_boost_button.dart';
@@ -26,8 +25,8 @@ class HomeTab extends StatefulWidget {
 }
 
 class _HomeTabState extends State<HomeTab> {
-  // 배터리 서비스
-  final BatteryService _batteryService = BatteryService();
+  // 생명주기 관리 서비스
+  final HomeLifecycleManager _lifecycleManager = HomeLifecycleManager();
   
   // 스켈레톤용 더미 데이터
   int remainingHours = 4;
@@ -39,24 +38,53 @@ class _HomeTabState extends State<HomeTab> {
   // 실제 배터리 정보
   BatteryInfo? _batteryInfo;
   bool _isRefreshing = false;
-  
-  // 주기적 새로고침 타이머
-  Timer? _periodicRefreshTimer;
-  
-  // 주기적 새로고침 간격 (초)
-  static const int _refreshIntervalSeconds = 30;
-  
-  // 충전 전류 변화 감지를 위한 이전 값
-  int _previousChargingCurrent = -1;
-  
-  // 배터리 정보 스트림 구독 관리
-  StreamSubscription<BatteryInfo>? _batteryInfoSubscription;
 
   @override
   void initState() {
     super.initState();
-    _initializeBatteryService();
-    _setupAppLifecycleListener();
+    _initializeLifecycleManager();
+  }
+
+  /// 생명주기 관리자 초기화
+  Future<void> _initializeLifecycleManager() async {
+    debugPrint('홈 탭: 생명주기 관리자 초기화 시작');
+    
+    // 콜백 함수 설정
+    _lifecycleManager.onBatteryInfoUpdated = (batteryInfo) {
+      if (mounted) {
+        setState(() {
+          _batteryInfo = batteryInfo;
+        });
+        debugPrint('홈 탭: 배터리 정보 업데이트 - ${batteryInfo.formattedLevel}');
+      }
+    };
+    
+    _lifecycleManager.onChargingCurrentChanged = () {
+      debugPrint('홈 탭: 충전 전류 변화 감지');
+      // 필요시 추가 처리
+    };
+    
+    _lifecycleManager.onAppPaused = () {
+      debugPrint('홈 탭: 앱이 백그라운드로 이동');
+    };
+    
+    _lifecycleManager.onAppResumed = () {
+      debugPrint('홈 탭: 앱이 포그라운드로 복귀');
+    };
+    
+    // 생명주기 관리자 초기화
+    await _lifecycleManager.initialize();
+    
+    // 초기 배터리 정보 설정
+    final currentInfo = _lifecycleManager.currentBatteryInfo;
+    if (currentInfo != null && mounted) {
+      setState(() {
+        _batteryInfo = currentInfo;
+      });
+      debugPrint('홈 탭: 초기 배터리 정보 설정 - ${currentInfo.formattedLevel}');
+    }
+    
+    debugPrint('홈 탭: 생명주기 관리자 초기화 완료');
   }
 
   @override
@@ -66,17 +94,11 @@ class _HomeTabState extends State<HomeTab> {
     // 탭 복귀 시 배터리 정보 즉시 새로고침
     debugPrint('홈 탭: didChangeDependencies - 탭 복귀 감지');
     
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      // 스트림 구독이 없다면 재생성
-      if (_batteryInfoSubscription == null) {
-        debugPrint('홈 탭: 스트림 구독이 없음, 재생성 시도');
-        _setupBatteryInfoStream();
-      }
-      
-      _refreshBatteryInfoIfNeeded();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _lifecycleManager.handleTabReturn();
       
       // 현재 배터리 정보가 있다면 즉시 UI 업데이트
-      final currentInfo = _batteryService.currentBatteryInfo;
+      final currentInfo = _lifecycleManager.currentBatteryInfo;
       if (currentInfo != null && mounted) {
         setState(() {
           _batteryInfo = currentInfo;
@@ -86,197 +108,17 @@ class _HomeTabState extends State<HomeTab> {
     });
   }
 
-  /// 필요시 배터리 정보 새로고침 (탭 복귀 시 강화)
-  void _refreshBatteryInfoIfNeeded() {
-    if (_batteryInfo == null) {
-      debugPrint('홈 탭: 배터리 정보가 없음, 강제 새로고침 시도');
-      _batteryService.refreshBatteryInfo();
-    } else {
-      // 탭 복귀 시에는 항상 최신 정보로 새로고침
-      debugPrint('홈 탭: 탭 복귀 시 최신 정보 새로고침');
-      _batteryService.refreshBatteryInfo();
-    }
-  }
-  
-  /// 배터리 정보 스트림 구독 설정
-  void _setupBatteryInfoStream() {
-    debugPrint('홈 탭: 배터리 정보 스트림 구독 설정');
-    
-    // 기존 구독 정리
-    _batteryInfoSubscription?.cancel();
-    
-    // 새로운 스트림 구독 생성
-    _batteryInfoSubscription = _batteryService.batteryInfoStream.listen((batteryInfo) {
-      debugPrint('홈 탭: 배터리 정보 수신 - ${batteryInfo.toString()}');
-      
-      // 충전 전류 변화 감지
-      if (_batteryInfo != null && batteryInfo.isCharging) {
-        final currentChargingCurrent = batteryInfo.chargingCurrent;
-        if (_previousChargingCurrent != currentChargingCurrent && currentChargingCurrent >= 0) {
-          debugPrint('홈 탭: 충전 전류 변화 감지 - ${_previousChargingCurrent}mA → ${currentChargingCurrent}mA');
-          _previousChargingCurrent = currentChargingCurrent;
-        }
-      }
-      
-      if (mounted) {
-        setState(() {
-          _batteryInfo = batteryInfo;
-        });
-        debugPrint('홈 탭: UI 업데이트 완료 - 배터리 레벨: ${batteryInfo.formattedLevel}');
-      } else {
-        debugPrint('홈 탭: 위젯이 마운트되지 않음, UI 업데이트 건너뜀');
-      }
-    });
-    
-    debugPrint('홈 탭: 배터리 정보 스트림 구독 설정 완료');
-  }
-
   @override
   void dispose() {
     debugPrint('홈 탭: dispose 시작');
     
-    // 스트림 구독 정리
-    _batteryInfoSubscription?.cancel();
-    _batteryInfoSubscription = null;
+    // 생명주기 관리자 정리
+    _lifecycleManager.dispose();
     
-    // 주기적 새로고침만 중지 (배터리 절약)
-    _stopPeriodicRefresh();
-    
-    // 배터리 서비스는 전역 싱글톤이므로 dispose하지 않음
-    // 탭 전환 시에도 서비스가 계속 작동하도록 유지
-    // _batteryService.stopMonitoring(); // 제거
-    // _batteryService.dispose(); // 제거
-    
-    debugPrint('홈 탭: dispose 완료 (배터리 서비스 유지)');
+    debugPrint('홈 탭: dispose 완료');
     super.dispose();
   }
 
-  /// 배터리 서비스 초기화
-  Future<void> _initializeBatteryService() async {
-    debugPrint('홈 탭: 배터리 서비스 초기화 시작');
-    
-    try {
-      // 기존 배터리 정보 초기화
-      if (mounted) {
-        setState(() {
-          _batteryInfo = null;
-        });
-      }
-      
-      // 배터리 서비스 상태 초기화 (앱 시작 시)
-      await _batteryService.resetService();
-      
-      // 배터리 모니터링 시작
-      await _batteryService.startMonitoring();
-      debugPrint('홈 탭: 배터리 모니터링 시작 완료');
-      
-      // 현재 배터리 정보 즉시 가져오기 (강제 새로고침)
-      await _batteryService.refreshBatteryInfo();
-      final currentBatteryInfo = _batteryService.currentBatteryInfo;
-      
-      if (currentBatteryInfo != null && mounted) {
-        debugPrint('홈 탭: 현재 배터리 정보 설정 - ${currentBatteryInfo.toString()}');
-        setState(() {
-          _batteryInfo = currentBatteryInfo;
-        });
-        debugPrint('홈 탭: 초기 배터리 정보 UI 업데이트 완료 - 배터리 레벨: ${currentBatteryInfo.formattedLevel}');
-      }
-      
-      // 배터리 정보 스트림 구독 설정
-      _setupBatteryInfoStream();
-      
-      // 주기적 새로고침 시작
-      _startPeriodicRefresh();
-      
-    } catch (e, stackTrace) {
-      debugPrint('홈 탭: 배터리 서비스 초기화 실패: $e');
-      debugPrint('스택 트레이스: $stackTrace');
-      
-      // 초기화 실패 시에도 최소한의 정보라도 표시
-      if (mounted) {
-        setState(() {
-          _batteryInfo = null;
-        });
-      }
-    }
-  }
-  
-  /// 주기적 새로고침 시작
-  void _startPeriodicRefresh() {
-    debugPrint('홈 탭: 주기적 새로고침 시작 ($_refreshIntervalSeconds초 간격)');
-    
-    _periodicRefreshTimer?.cancel();
-    _periodicRefreshTimer = Timer.periodic(
-      const Duration(seconds: _refreshIntervalSeconds),
-      (timer) {
-        if (mounted && !_isRefreshing) {
-          debugPrint('홈 탭: 주기적 새로고침 실행');
-          _batteryService.refreshBatteryInfo();
-        }
-      },
-    );
-  }
-  
-  /// 주기적 새로고침 중지
-  void _stopPeriodicRefresh() {
-    debugPrint('홈 탭: 주기적 새로고침 중지');
-    _periodicRefreshTimer?.cancel();
-    _periodicRefreshTimer = null;
-  }
-  
-  /// 앱 생명주기 리스너 설정
-  void _setupAppLifecycleListener() {
-    SystemChannels.lifecycle.setMessageHandler((message) async {
-      debugPrint('홈 탭: 앱 생명주기 변화 - $message');
-      
-      switch (message) {
-        case 'AppLifecycleState.paused':
-        case 'AppLifecycleState.inactive':
-          debugPrint('홈 탭: 앱이 백그라운드로 이동, 모니터링 최적화');
-          _optimizeForBackground();
-          break;
-        case 'AppLifecycleState.resumed':
-          debugPrint('홈 탭: 앱이 포그라운드로 복귀, 모니터링 재시작');
-          _optimizeForForeground();
-          break;
-      }
-      return null;
-    });
-  }
-  
-  /// 백그라운드 최적화
-  void _optimizeForBackground() {
-    // 주기적 새로고침 중지 (배터리 절약)
-    _stopPeriodicRefresh();
-    debugPrint('홈 탭: 백그라운드 최적화 완료');
-  }
-  
-  /// 포그라운드 최적화 (탭 복귀 시 강화)
-  void _optimizeForForeground() {
-    // 주기적 새로고침 재시작
-    _startPeriodicRefresh();
-    
-    // 스트림 구독 재생성 (필요시)
-    if (_batteryInfoSubscription == null) {
-      debugPrint('홈 탭: 포그라운드 복귀 - 스트림 구독 재생성');
-      _setupBatteryInfoStream();
-    }
-    
-    // 탭 복귀 시 항상 배터리 정보 새로고침
-    debugPrint('홈 탭: 포그라운드 복귀 - 배터리 정보 강제 새로고침');
-    _batteryService.refreshBatteryInfo();
-    
-    // 현재 정보가 있다면 즉시 UI 업데이트
-    final currentInfo = _batteryService.currentBatteryInfo;
-    if (currentInfo != null && mounted) {
-      setState(() {
-        _batteryInfo = currentInfo;
-      });
-      debugPrint('홈 탭: 포그라운드 복귀 시 배터리 정보 복원 - ${currentInfo.formattedLevel}');
-    }
-    
-    debugPrint('홈 탭: 포그라운드 최적화 완료');
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -301,11 +143,11 @@ class _HomeTabState extends State<HomeTab> {
                     try {
                       debugPrint('홈 탭: 수동 새로고침 시작');
                       
-                      // 강제 새로고침 실행
-                      await _batteryService.refreshBatteryInfo();
+                      // 생명주기 관리자를 통한 새로고침
+                      await _lifecycleManager.refreshBatteryInfo();
                       
-                      // 즉시 현재 정보 반영 (스트림 업데이트 전 폴백)
-                      final latest = _batteryService.currentBatteryInfo;
+                      // 즉시 현재 정보 반영
+                      final latest = _lifecycleManager.currentBatteryInfo;
                       if (mounted && latest != null) {
                         setState(() {
                           _batteryInfo = latest;
