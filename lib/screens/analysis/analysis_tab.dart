@@ -54,27 +54,22 @@ class _AnalysisTabState extends State<AnalysisTab> with TickerProviderStateMixin
         ],
         bottom: TabBar(
           controller: _tabController,
-          isScrollable: true,
+          isScrollable: false,
           tabs: const [
             Tab(
               icon: Icon(Icons.dashboard),
-              text: '개요',
             ),
             Tab(
               icon: Icon(Icons.battery_full),
-              text: '배터리 건강도',
             ),
             Tab(
               icon: Icon(Icons.charging_station),
-              text: '충전 패턴',
             ),
             Tab(
               icon: Icon(Icons.analytics),
-              text: '사용 패턴',
             ),
             Tab(
               icon: Icon(Icons.tune),
-              text: '최적화',
             ),
           ],
         ),
