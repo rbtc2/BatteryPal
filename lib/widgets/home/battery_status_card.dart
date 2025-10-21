@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../models/app_models.dart';
-import '../../services/charging_analysis_service.dart';
-import '../../constants/charging_constants.dart';
 import '../common/common_widgets.dart';
 import '../../utils/app_utils.dart';
 
@@ -34,11 +32,6 @@ class BatteryStatusCard extends StatelessWidget {
           // 배터리 정보 (3개 항목)
           _buildBatteryInfoSection(context),
           
-          // 충전 정보 섹션
-          if (batteryInfo != null && batteryInfo!.isCharging) ...[
-            const SizedBox(height: 16),
-            _buildChargingInfoSection(context),
-          ],
           
           // 마지막 업데이트 시간
           if (batteryInfo != null)
@@ -108,68 +101,6 @@ class BatteryStatusCard extends StatelessWidget {
     );
   }
 
-  /// 충전 정보 섹션 빌드
-  Widget _buildChargingInfoSection(BuildContext context) {
-    final statusAnalysis = ChargingAnalysisService.analyzeChargingStatus(batteryInfo);
-    
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
-          width: 1,
-        ),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.bolt,
-                color: Theme.of(context).colorScheme.primary,
-                size: 20,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  batteryInfo!.chargingStatusText,
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.primary,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          // 🔥 충전 예상 시간 추가
-          if (statusAnalysis.estimatedTimeToFull != null) ...[
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Icon(
-                  Icons.access_time,
-                  color: Theme.of(context).colorScheme.primary,
-                  size: 16,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  '${ChargingConstants.estimatedCompletionPrefix}${_formatDuration(statusAnalysis.estimatedTimeToFull!)}',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.primary,
-                    fontWeight: FontWeight.w500,
-                    fontSize: 13,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ],
-      ),
-    );
-  }
 
   /// 마지막 업데이트 시간 섹션 빌드
   Widget _buildLastUpdateSection(BuildContext context) {
@@ -182,15 +113,4 @@ class BatteryStatusCard extends StatelessWidget {
     );
   }
 
-  /// 시간 포맷팅 헬퍼 메서드
-  String _formatDuration(Duration duration) {
-    final hours = duration.inHours;
-    final minutes = duration.inMinutes.remainder(60);
-    
-    if (hours > 0) {
-      return '$hours시간 $minutes분';
-    } else {
-      return '$minutes분';
-    }
-  }
 }
