@@ -46,6 +46,9 @@ class _HomeTabState extends State<HomeTab> {
   
   // 충전 전류 변화 감지를 위한 이전 값
   int _previousChargingCurrent = -1;
+  
+  // 배터리 정보 스트림 구독 관리
+  StreamSubscription<BatteryInfo>? _batteryInfoSubscription;
 
   @override
   void initState() {
@@ -62,6 +65,12 @@ class _HomeTabState extends State<HomeTab> {
     debugPrint('홈 탭: didChangeDependencies - 탭 복귀 감지');
     
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // 스트림 구독이 없다면 재생성
+      if (_batteryInfoSubscription == null) {
+        debugPrint('홈 탭: 스트림 구독이 없음, 재생성 시도');
+        _setupBatteryInfoStream();
+      }
+      
       _refreshBatteryInfoIfNeeded();
       
       // 현재 배터리 정보가 있다면 즉시 UI 업데이트
@@ -86,10 +95,47 @@ class _HomeTabState extends State<HomeTab> {
       _batteryService.refreshBatteryInfo();
     }
   }
+  
+  /// 배터리 정보 스트림 구독 설정
+  void _setupBatteryInfoStream() {
+    debugPrint('홈 탭: 배터리 정보 스트림 구독 설정');
+    
+    // 기존 구독 정리
+    _batteryInfoSubscription?.cancel();
+    
+    // 새로운 스트림 구독 생성
+    _batteryInfoSubscription = _batteryService.batteryInfoStream.listen((batteryInfo) {
+      debugPrint('홈 탭: 배터리 정보 수신 - ${batteryInfo.toString()}');
+      
+      // 충전 전류 변화 감지
+      if (_batteryInfo != null && batteryInfo.isCharging) {
+        final currentChargingCurrent = batteryInfo.chargingCurrent;
+        if (_previousChargingCurrent != currentChargingCurrent && currentChargingCurrent >= 0) {
+          debugPrint('홈 탭: 충전 전류 변화 감지 - ${_previousChargingCurrent}mA → ${currentChargingCurrent}mA');
+          _previousChargingCurrent = currentChargingCurrent;
+        }
+      }
+      
+      if (mounted) {
+        setState(() {
+          _batteryInfo = batteryInfo;
+        });
+        debugPrint('홈 탭: UI 업데이트 완료 - 배터리 레벨: ${batteryInfo.formattedLevel}');
+      } else {
+        debugPrint('홈 탭: 위젯이 마운트되지 않음, UI 업데이트 건너뜀');
+      }
+    });
+    
+    debugPrint('홈 탭: 배터리 정보 스트림 구독 설정 완료');
+  }
 
   @override
   void dispose() {
     debugPrint('홈 탭: dispose 시작');
+    
+    // 스트림 구독 정리
+    _batteryInfoSubscription?.cancel();
+    _batteryInfoSubscription = null;
     
     // 주기적 새로고침만 중지 (배터리 절약)
     _stopPeriodicRefresh();
@@ -134,28 +180,8 @@ class _HomeTabState extends State<HomeTab> {
         debugPrint('홈 탭: 초기 배터리 정보 UI 업데이트 완료 - 배터리 레벨: ${currentBatteryInfo.formattedLevel}');
       }
       
-      // 배터리 정보 스트림 구독 (충전 전류 변화 감지 포함)
-      _batteryService.batteryInfoStream.listen((batteryInfo) {
-        debugPrint('홈 탭: 배터리 정보 수신 - ${batteryInfo.toString()}');
-        
-        // 충전 전류 변화 감지
-        if (_batteryInfo != null && batteryInfo.isCharging) {
-          final currentChargingCurrent = batteryInfo.chargingCurrent;
-          if (_previousChargingCurrent != currentChargingCurrent && currentChargingCurrent >= 0) {
-            debugPrint('홈 탭: 충전 전류 변화 감지 - ${_previousChargingCurrent}mA → ${currentChargingCurrent}mA');
-            _previousChargingCurrent = currentChargingCurrent;
-          }
-        }
-        
-        if (mounted) {
-          setState(() {
-            _batteryInfo = batteryInfo;
-          });
-          debugPrint('홈 탭: UI 업데이트 완료 - 배터리 레벨: ${batteryInfo.formattedLevel}');
-        } else {
-          debugPrint('홈 탭: 위젯이 마운트되지 않음, UI 업데이트 건너뜀');
-        }
-      });
+      // 배터리 정보 스트림 구독 설정
+      _setupBatteryInfoStream();
       
       // 주기적 새로고침 시작
       _startPeriodicRefresh();
@@ -227,6 +253,12 @@ class _HomeTabState extends State<HomeTab> {
   void _optimizeForForeground() {
     // 주기적 새로고침 재시작
     _startPeriodicRefresh();
+    
+    // 스트림 구독 재생성 (필요시)
+    if (_batteryInfoSubscription == null) {
+      debugPrint('홈 탭: 포그라운드 복귀 - 스트림 구독 재생성');
+      _setupBatteryInfoStream();
+    }
     
     // 탭 복귀 시 항상 배터리 정보 새로고침
     debugPrint('홈 탭: 포그라운드 복귀 - 배터리 정보 강제 새로고침');
