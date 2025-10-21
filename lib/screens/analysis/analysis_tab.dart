@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
-import 'dart:math';
 import '../../models/app_models.dart';
+import '../../models/battery_history_models.dart';
 import '../../widgets/common/common_widgets.dart';
+import '../../widgets/charts/charts.dart';
 import '../../utils/dialog_utils.dart';
 import '../../services/battery_service.dart';
+import '../../services/battery_history_service.dart';
+import '../../services/battery_analysis_engine.dart';
+import '../../services/battery_analysis_chart_service.dart';
 
 /// 배터리 분석 상태를 나타내는 enum
 enum BatteryAnalysisState {
@@ -19,14 +23,16 @@ enum BatteryAnalysisState {
 
 /// 배터리 분석 결과를 담는 클래스
 class BatteryAnalysisResult {
-  final List<Map<String, dynamic>> chartData;
-  final String insights;
+  final BatteryHistoryAnalysis analysis;
+  final Map<String, dynamic> chartData;
+  final List<BatteryHistoryDataPoint> dataPoints;
   final DateTime analysisTime;
   final Duration analysisDuration;
 
   const BatteryAnalysisResult({
+    required this.analysis,
     required this.chartData,
-    required this.insights,
+    required this.dataPoints,
     required this.analysisTime,
     required this.analysisDuration,
   });
@@ -50,6 +56,7 @@ class AnalysisTab extends StatefulWidget {
 
 class _AnalysisTabState extends State<AnalysisTab> {
   final BatteryService _batteryService = BatteryService();
+  final BatteryHistoryService _batteryHistoryService = BatteryHistoryService();
   BatteryInfo? _currentBatteryInfo;
   
   // 배터리 분석 관련 상태 변수들
@@ -115,6 +122,7 @@ class _AnalysisTabState extends State<AnalysisTab> {
   @override
   void dispose() {
     _batteryService.dispose();
+    _batteryHistoryService.dispose();
     super.dispose();
   }
 
@@ -143,15 +151,46 @@ class _AnalysisTabState extends State<AnalysisTab> {
     try {
       final analysisStartTime = DateTime.now();
       
-      // Phase 4에서 실제 분석 로직이 구현될 예정
-      // 현재는 시뮬레이션된 분석 수행
-      await _simulateAnalysisProcess();
+      // 배터리 히스토리 서비스 초기화
+      await _batteryHistoryService.initialize();
+      
+      // 최근 24시간 데이터 조회
+      final endTime = DateTime.now();
+      final startTime = endTime.subtract(const Duration(hours: 24));
+      
+      final historyData = await _batteryHistoryService.getBatteryHistoryData(
+        startTime: startTime,
+        endTime: endTime,
+      );
+      
+      if (historyData.isEmpty) {
+        throw Exception('분석할 배터리 히스토리 데이터가 없습니다. 앱을 사용한 후 다시 시도해주세요.');
+      }
+      
+      // 실제 분석 수행
+      final analysis = await BatteryAnalysisEngine.performComprehensiveAnalysis(
+        historyData,
+        startTime: startTime,
+        endTime: endTime,
+      );
+      
+      // 차트 데이터 생성
+      final chartData = BatteryAnalysisChartService.convertAnalysisToChartData(
+        analysis,
+        historyData,
+      );
       
       final analysisEndTime = DateTime.now();
       final analysisDuration = analysisEndTime.difference(analysisStartTime);
       
-      // 시뮬레이션된 분석 결과 생성
-      final result = _generateSimulatedAnalysisResult(analysisEndTime, analysisDuration);
+      // 분석 결과 생성
+      final result = BatteryAnalysisResult(
+        analysis: analysis,
+        chartData: chartData,
+        dataPoints: historyData,
+        analysisTime: analysisEndTime,
+        analysisDuration: analysisDuration,
+      );
       
       if (mounted) {
         setState(() {
@@ -169,86 +208,7 @@ class _AnalysisTabState extends State<AnalysisTab> {
     }
   }
 
-  /// 분석 프로세스 시뮬레이션 (Phase 4에서 실제 구현으로 교체)
-  Future<void> _simulateAnalysisProcess() async {
-    // 실제 분석 로직을 시뮬레이션하기 위한 지연
-    await Future.delayed(const Duration(seconds: 2));
-  }
-
-  /// 시뮬레이션된 분석 결과 생성 (Phase 4에서 실제 구현으로 교체)
-  BatteryAnalysisResult _generateSimulatedAnalysisResult(
-    DateTime analysisTime,
-    Duration analysisDuration,
-  ) {
-    // 시뮬레이션된 차트 데이터 생성
-    final chartData = <Map<String, dynamic>>[];
-    final now = DateTime.now();
-    
-    // 최근 24시간의 시뮬레이션된 배터리 데이터 생성
-    for (int i = 23; i >= 0; i--) {
-      final timestamp = now.subtract(Duration(hours: i));
-      final hour = timestamp.hour;
-      
-      // 시간대별 배터리 사용 패턴 시뮬레이션
-      double batteryLevel;
-      if (hour >= 6 && hour <= 8) {
-        // 아침 시간대: 빠른 방전
-        batteryLevel = 100 - (i * 2.5) - (Random().nextDouble() * 5);
-      } else if (hour >= 9 && hour <= 17) {
-        // 업무 시간대: 중간 방전
-        batteryLevel = 100 - (i * 1.8) - (Random().nextDouble() * 3);
-      } else if (hour >= 18 && hour <= 22) {
-        // 저녁 시간대: 빠른 방전
-        batteryLevel = 100 - (i * 2.2) - (Random().nextDouble() * 4);
-      } else {
-        // 밤 시간대: 느린 방전
-        batteryLevel = 100 - (i * 1.2) - (Random().nextDouble() * 2);
-      }
-      
-      chartData.add({
-        'timestamp': timestamp,
-        'level': batteryLevel.clamp(0.0, 100.0),
-        'isCharging': hour >= 22 || hour <= 6, // 밤 시간대 충전 시뮬레이션
-      });
-    }
-
-    // 시뮬레이션된 인사이트 생성
-    final insights = _generateSimulatedInsights(chartData);
-
-    return BatteryAnalysisResult(
-      chartData: chartData,
-      insights: insights,
-      analysisTime: analysisTime,
-      analysisDuration: analysisDuration,
-    );
-  }
-
-  /// 시뮬레이션된 인사이트 생성
-  String _generateSimulatedInsights(List<Map<String, dynamic>> chartData) {
-    final avgLevel = chartData.map((e) => e['level'] as double).reduce((a, b) => a + b) / chartData.length;
-    final minLevel = chartData.map((e) => e['level'] as double).reduce((a, b) => a < b ? a : b);
-    final maxLevel = chartData.map((e) => e['level'] as double).reduce((a, b) => a > b ? a : b);
-    
-    final insights = <String>[];
-    
-    if (avgLevel < 30) {
-      insights.add('평균 배터리 레벨이 낮습니다 (${avgLevel.toStringAsFixed(1)}%). 충전 패턴을 개선해보세요.');
-    }
-    
-    if (minLevel < 20) {
-      insights.add('배터리가 20% 이하로 떨어진 적이 있습니다. 저전력 모드 사용을 권장합니다.');
-    }
-    
-    if (maxLevel - minLevel > 80) {
-      insights.add('배터리 변동폭이 큽니다. 사용 패턴을 최적화하면 배터리 수명을 연장할 수 있습니다.');
-    }
-    
-    insights.add('오늘 총 ${chartData.length}개의 데이터 포인트를 분석했습니다.');
-    
-    return insights.join('\n\n');
-  }
-
-  /// 분석 상태를 초기화하는 메서드
+  /// 분석 결과를 리셋하는 메서드
   void _resetAnalysis() {
     setState(() {
       _analysisState = BatteryAnalysisState.idle;
@@ -595,49 +555,135 @@ class _AnalysisTabState extends State<AnalysisTab> {
             ),
           ),
           
-          // 차트 영역 (Phase 3에서 실제 차트로 교체)
+          // 실제 차트 영역
           Container(
-            height: 200,
+            height: 400,
             padding: const EdgeInsets.all(16),
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+            child: BatteryDashboardChart(
+              dataPoints: _analysisResult!.dataPoints,
+              height: 400,
+              title: '배터리 사용량 분석',
+              subtitle: '최근 24시간 배터리 사용 패턴',
+              visibleCharts: const [
+                BatteryDashboardChartType.level,
+                BatteryDashboardChartType.temperature,
+                BatteryDashboardChartType.voltage,
+              ],
+              enableTouchInteraction: true,
+              enableAnimation: true,
+            ),
+          ),
+          
+          // 분석 요약 정보
+          Container(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '분석 요약',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _buildSummaryRow('분석 기간', '${_analysisResult!.analysis.analysisDurationHours.toStringAsFixed(1)}시간'),
+                _buildSummaryRow('데이터 포인트', '${_analysisResult!.analysis.dataPointCount}개'),
+                _buildSummaryRow('평균 배터리 레벨', '${_analysisResult!.analysis.averageBatteryLevel.toStringAsFixed(1)}%'),
+                _buildSummaryRow('배터리 변동폭', '${_analysisResult!.analysis.batteryVariation.toStringAsFixed(1)}%'),
+                _buildSummaryRow('효율성 등급', _analysisResult!.analysis.batteryEfficiencyGrade),
+                const SizedBox(height: 16),
+                _buildInsightsSection(),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 요약 행을 구성하는 위젯
+  Widget _buildSummaryRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+              fontSize: 14,
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 인사이트 섹션을 구성하는 위젯
+  Widget _buildInsightsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              Icons.lightbulb_outline,
+              color: Theme.of(context).colorScheme.secondary,
+              size: 18,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              '분석 인사이트',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (_analysisResult!.analysis.recommendations.isNotEmpty) ...[
+          ..._analysisResult!.analysis.recommendations.map((recommendation) => 
+            Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Icon(
-                    Icons.show_chart,
-                    size: 48,
-                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.7),
+                    Icons.tips_and_updates,
+                    color: Theme.of(context).colorScheme.secondary,
+                    size: 16,
                   ),
-                  const SizedBox(height: 12),
-                  Text(
-                    '배터리 사용량 차트',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Phase 3에서 실제 차트 구현 예정',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                      fontSize: 12,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
+                  const SizedBox(width: 8),
+                  Expanded(
                     child: Text(
-                      '${_analysisResult!.chartData.length}개 데이터 포인트',
+                      recommendation,
                       style: TextStyle(
-                        color: Theme.of(context).colorScheme.secondary,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
+                        fontSize: 13,
+                        height: 1.4,
                       ),
                     ),
                   ),
@@ -645,45 +691,28 @@ class _AnalysisTabState extends State<AnalysisTab> {
               ),
             ),
           ),
-          
-          // 인사이트 영역
+        ] else ...[
           Container(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      Icons.lightbulb_outline,
-                      color: Theme.of(context).colorScheme.secondary,
-                      size: 18,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      '분석 인사이트',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurface,
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  _analysisResult!.insights,
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
-                    fontSize: 13,
-                    height: 1.4,
-                  ),
-                ),
-              ],
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+                width: 1,
+              ),
+            ),
+            child: Text(
+              '추가적인 최적화 제안이 없습니다. 현재 사용 패턴이 양호합니다.',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
+                fontSize: 13,
+                height: 1.4,
+              ),
             ),
           ),
         ],
-      ),
+      ],
     );
   }
 

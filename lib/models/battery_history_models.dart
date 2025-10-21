@@ -317,6 +317,15 @@ class BatteryHistoryAnalysis {
   
   /// 패턴 분석 결과
   final Map<String, dynamic> patternAnalysis;
+  
+  /// 충전 이벤트 목록
+  final List<String> chargingEvents;
+  
+  /// 방전 이벤트 목록
+  final List<String> dischargingEvents;
+  
+  /// 패턴 요약
+  final String patternSummary;
 
   const BatteryHistoryAnalysis({
     required this.analysisStartTime,
@@ -335,6 +344,9 @@ class BatteryHistoryAnalysis {
     required this.insights,
     required this.recommendations,
     required this.patternAnalysis,
+    required this.chargingEvents,
+    required this.dischargingEvents,
+    required this.patternSummary,
   });
 
   /// 분석 소요 시간
@@ -386,7 +398,7 @@ class BatteryHistoryAnalysis {
   }
   
   /// 효율성 등급 반환
-  String get efficiencyGrade {
+  String get batteryEfficiencyGrade {
     final score = batteryEfficiencyScore;
     if (score >= 90) return 'A+';
     if (score >= 80) return 'A';
@@ -405,7 +417,7 @@ class BatteryHistoryAnalysis {
 
   @override
   String toString() {
-    return 'BatteryHistoryAnalysis(duration: $formattedAnalysisDuration, dataPoints: $dataPointCount, avgLevel: ${averageBatteryLevel.toStringAsFixed(1)}%, efficiency: $efficiencyGrade)';
+    return 'BatteryHistoryAnalysis(duration: $formattedAnalysisDuration, dataPoints: $dataPointCount, avgLevel: ${averageBatteryLevel.toStringAsFixed(1)}%, efficiency: $batteryEfficiencyGrade)';
   }
 }
 
