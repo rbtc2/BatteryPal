@@ -75,6 +75,13 @@ BatteryHistoryAnalysis _$BatteryHistoryAnalysisFromJson(
       .map((e) => e as String)
       .toList(),
   patternAnalysis: json['patternAnalysis'] as Map<String, dynamic>,
+  chargingEvents: (json['chargingEvents'] as List<dynamic>)
+      .map((e) => e as String)
+      .toList(),
+  dischargingEvents: (json['dischargingEvents'] as List<dynamic>)
+      .map((e) => e as String)
+      .toList(),
+  patternSummary: json['patternSummary'] as String,
 );
 
 Map<String, dynamic> _$BatteryHistoryAnalysisToJson(
@@ -96,4 +103,7 @@ Map<String, dynamic> _$BatteryHistoryAnalysisToJson(
   'insights': instance.insights,
   'recommendations': instance.recommendations,
   'patternAnalysis': instance.patternAnalysis,
+  'chargingEvents': instance.chargingEvents,
+  'dischargingEvents': instance.dischargingEvents,
+  'patternSummary': instance.patternSummary,
 };

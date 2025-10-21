@@ -358,6 +358,15 @@ class BatteryHistoryService {
     // 패턴 분석
     final patternAnalysis = _analyzePatterns(historyData);
     
+    // 충전 이벤트 생성
+    final chargingEvents = _generateChargingEvents(historyData);
+    
+    // 방전 이벤트 생성
+    final dischargingEvents = _generateDischargingEvents(historyData);
+    
+    // 패턴 요약 생성
+    final patternSummary = _generatePatternSummary(patternAnalysis, avgLevel, batteryVariation);
+    
     final analysisEndTime = DateTime.now();
     
     return BatteryHistoryAnalysis(
@@ -377,6 +386,9 @@ class BatteryHistoryService {
       insights: insights,
       recommendations: recommendations,
       patternAnalysis: patternAnalysis,
+      chargingEvents: chargingEvents,
+      dischargingEvents: dischargingEvents,
+      patternSummary: patternSummary,
     );
   }
 
@@ -580,6 +592,96 @@ class BatteryHistoryService {
       debugPrint('스택 트레이스: $stackTrace');
       rethrow;
     }
+  }
+
+  /// 충전 이벤트 생성
+  List<String> _generateChargingEvents(List<BatteryHistoryDataPoint> historyData) {
+    final events = <String>[];
+    final chargingData = historyData.where((d) => d.isCharging).toList();
+    
+    if (chargingData.isEmpty) {
+      events.add('충전 이벤트가 없습니다');
+      return events;
+    }
+    
+    // 충전 시작 이벤트들
+    for (int i = 0; i < chargingData.length - 1; i++) {
+      final current = chargingData[i];
+      final next = chargingData[i + 1];
+      
+      if (current.timestamp.difference(next.timestamp).inMinutes.abs() > 30) {
+        events.add('${current.timestamp.hour}:${current.timestamp.minute.toString().padLeft(2, '0')} 충전 시작 (${current.level.toStringAsFixed(1)}%)');
+      }
+    }
+    
+    // 마지막 충전 이벤트
+    final lastCharging = chargingData.last;
+    events.add('${lastCharging.timestamp.hour}:${lastCharging.timestamp.minute.toString().padLeft(2, '0')} 충전 중 (${lastCharging.level.toStringAsFixed(1)}%)');
+    
+    return events.take(5).toList(); // 최대 5개 이벤트만 반환
+  }
+
+  /// 방전 이벤트 생성
+  List<String> _generateDischargingEvents(List<BatteryHistoryDataPoint> historyData) {
+    final events = <String>[];
+    final dischargingData = historyData.where((d) => d.state == BatteryState.discharging).toList();
+    
+    if (dischargingData.isEmpty) {
+      events.add('방전 이벤트가 없습니다');
+      return events;
+    }
+    
+    // 방전 속도가 빠른 구간들 찾기
+    for (int i = 0; i < dischargingData.length - 1; i++) {
+      final current = dischargingData[i];
+      final next = dischargingData[i + 1];
+      
+      final timeDiff = next.timestamp.difference(current.timestamp).inMinutes;
+      final levelDiff = current.level - next.level;
+      
+      if (timeDiff > 0 && levelDiff > 0) {
+        final dischargeRate = levelDiff / (timeDiff / 60); // %/시간
+        
+        if (dischargeRate > 3.0) { // 시간당 3% 이상 방전
+          events.add('${current.timestamp.hour}:${current.timestamp.minute.toString().padLeft(2, '0')} 빠른 방전 (${dischargeRate.toStringAsFixed(1)}%/시간)');
+        }
+      }
+    }
+    
+    return events.take(5).toList(); // 최대 5개 이벤트만 반환
+  }
+
+  /// 패턴 요약 생성
+  String _generatePatternSummary(Map<String, dynamic> patternAnalysis, double avgLevel, double batteryVariation) {
+    final chargingPatterns = patternAnalysis['chargingPatterns'] as Map<String, int>?;
+    
+    String summary = '';
+    
+    // 평균 배터리 레벨 기반 요약
+    if (avgLevel > 70) {
+      summary += '배터리 사용 패턴이 양호합니다. ';
+    } else if (avgLevel > 50) {
+      summary += '배터리 사용 패턴이 보통입니다. ';
+    } else {
+      summary += '배터리 사용 패턴을 개선할 필요가 있습니다. ';
+    }
+    
+    // 변동폭 기반 요약
+    if (batteryVariation < 30) {
+      summary += '배터리 레벨이 안정적입니다. ';
+    } else if (batteryVariation < 50) {
+      summary += '배터리 레벨 변동이 보통입니다. ';
+    } else {
+      summary += '배터리 레벨 변동이 큽니다. ';
+    }
+    
+    // 충전 패턴 기반 요약
+    if (chargingPatterns != null && chargingPatterns.isNotEmpty) {
+      final maxChargingTime = chargingPatterns.entries.reduce((a, b) => a.value > b.value ? a : b);
+      summary += '주로 ${maxChargingTime.key}에 충전하는 패턴을 보입니다.';
+    }
+    
+    return summary.isEmpty ? '배터리 사용 패턴을 분석할 수 없습니다.' : summary;
   }
 
   /// 서비스 정리
