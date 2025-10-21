@@ -84,6 +84,12 @@ class ChargingConstants {
   static const Duration chargingUpdateInterval = Duration(seconds: 30);
   static const Duration chargingAnimationDuration = Duration(milliseconds: 1000);
   
+  // 충전 예상 시간 관련 상수
+  static const double defaultBatteryCapacity = 4000.0; // mAh (평균 배터리 용량)
+  static const double chargingEfficiency = 0.85; // 85% 충전 효율성
+  static const int minEstimatedMinutes = 1; // 최소 예상 시간 (분)
+  static const int maxEstimatedMinutes = 1440; // 최대 예상 시간 (분, 24시간)
+  
   // UI 관련 상수
   static const double chargingProgressBarHeight = 3.0;
   static const double chargingIconSize = 24.0;
@@ -96,6 +102,8 @@ class ChargingConstants {
   static const String optimizationTipsTitle = '최적화 팁';
   static const String chargingProgressLabel = '진행률';
   static const String lastUpdatePrefix = '마지막 업데이트: ';
+  static const String estimatedCompletionText = '예상 완료';
+  static const String estimatedCompletionPrefix = '예상 완료: ';
   
   // 충전 방식 텍스트
   static const String acChargingText = 'AC 충전';

@@ -112,6 +112,7 @@ class ChargingAnalysisCard extends StatelessWidget {
   /// 충전 속도 인디케이터 빌드
   Widget _buildChargingSpeedIndicator(BuildContext context) {
     final chargingSpeed = _getRealChargingSpeed();
+    final statusAnalysis = ChargingAnalysisService.analyzeChargingStatus(batteryInfo);
     
     return Container(
       padding: const EdgeInsets.all(16),
@@ -163,6 +164,28 @@ class ChargingAnalysisCard extends StatelessWidget {
                     fontWeight: FontWeight.w400,
                   ),
                 ),
+                // 🔥 충전 예상 시간 추가
+                if (statusAnalysis.estimatedTimeToFull != null) ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.access_time,
+                        size: 12,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${ChargingConstants.estimatedCompletionPrefix}${_formatDuration(statusAnalysis.estimatedTimeToFull!)}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(context).colorScheme.primary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
                 const SizedBox(height: 8),
                 // 개선된 충전 진행률 바
                 _buildChargingProgressBar(context),
@@ -294,5 +317,17 @@ class ChargingAnalysisCard extends StatelessWidget {
   /// 실제 충전 전류값을 사용한 충전 속도 정보
   ChargingSpeedInfo _getRealChargingSpeed() {
     return ChargingAnalysisService.getChargingSpeedInfo(batteryInfo);
+  }
+
+  /// 시간 포맷팅 헬퍼 메서드
+  String _formatDuration(Duration duration) {
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes.remainder(60);
+    
+    if (hours > 0) {
+      return '$hours시간 $minutes분';
+    } else {
+      return '$minutes분';
+    }
   }
 }

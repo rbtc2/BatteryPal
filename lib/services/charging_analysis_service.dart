@@ -116,12 +116,34 @@ class ChargingAnalysisService {
       efficiency = ChargingEfficiency.poor;
     }
 
-    // 예상 충전 완료 시간 계산 (대략적)
+    // 예상 충전 완료 시간 계산 (개선된 알고리즘)
     Duration? estimatedTimeToFull;
     if (batteryInfo.isCharging && chargingCurrent > 0) {
       final remainingPercentage = 100.0 - currentLevel;
-      final estimatedMinutes = (remainingPercentage * 60) / (chargingCurrent / 1000);
-      estimatedTimeToFull = Duration(minutes: estimatedMinutes.round());
+      
+      // 배터리 용량과 충전 효율성을 고려한 계산
+      // 일반적인 스마트폰 배터리 용량: 3000-5000mAh
+      // 충전 효율성: 80-90% (열 손실, 회로 손실 등)
+      const double batteryCapacity = ChargingConstants.defaultBatteryCapacity;
+      const double chargingEfficiency = ChargingConstants.chargingEfficiency;
+      
+      // 실제 충전 속도 계산 (효율성 고려)
+      final effectiveChargingRate = (chargingCurrent * chargingEfficiency) / batteryCapacity;
+      
+      // 남은 충전 시간 계산 (분 단위)
+      final estimatedMinutes = remainingPercentage / (effectiveChargingRate * 100);
+      
+      // 최소 1분, 최대 24시간으로 제한
+      final clampedMinutes = estimatedMinutes.clamp(
+        ChargingConstants.minEstimatedMinutes.toDouble(), 
+        ChargingConstants.maxEstimatedMinutes.toDouble()
+      );
+      
+      estimatedTimeToFull = Duration(minutes: clampedMinutes.round());
+      
+      debugPrint('ChargingAnalysisService: 충전 예상 시간 계산 - '
+          '현재: $currentLevel%, 남은: $remainingPercentage%, '
+          '충전전류: ${chargingCurrent}mA, 예상시간: $clampedMinutes.round()분');
     }
 
     // 권장사항 생성
