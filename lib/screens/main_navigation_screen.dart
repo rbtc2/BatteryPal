@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'home/home_tab.dart';
 import 'analysis/analysis_tab.dart';
 import 'settings/settings_tab.dart';
-import '../utils/app_utils.dart';
 
 /// 메인 네비게이션 화면
 /// Phase 8에서 실제 구현
@@ -16,14 +15,14 @@ class MainNavigationScreen extends StatefulWidget {
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
   
-  // Pro 모드 상태 관리 (Phase 8: 통합)
+  // Pro 모드 상태 관리 (실제 결제 시스템과 연동 예정)
   bool _isProUser = false;
 
   // 3개 탭 페이지들 (Pro 상태 전달)
   List<Widget> get _pages => [
-    HomeTab(isProUser: _isProUser, onProToggle: _toggleProMode),
-    AnalysisTab(isProUser: _isProUser, onProToggle: _toggleProMode),
-    SettingsTab(isProUser: _isProUser, onProToggle: _toggleProMode),
+    HomeTab(isProUser: _isProUser, onProToggle: _handleProUpgrade),
+    AnalysisTab(isProUser: _isProUser, onProToggle: _handleProUpgrade),
+    SettingsTab(isProUser: _isProUser, onProToggle: _handleProUpgrade),
   ];
 
   @override
@@ -56,28 +55,32 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           ),
         ],
       ),
-      // Phase 8: Pro 모드 토글 플로팅 액션 버튼 (개발용)
-      floatingActionButton: FloatingActionButton(
-        onPressed: _toggleProMode,
-        backgroundColor: _isProUser ? Colors.amber : Theme.of(context).colorScheme.primary,
-        child: Icon(
-          _isProUser ? Icons.star : Icons.star_border,
-          color: _isProUser ? Colors.black : Colors.white,
-        ),
-      ),
     );
   }
 
-  // Phase 8: Pro 모드 토글 기능 (개발용)
-  void _toggleProMode() {
-    setState(() {
-      _isProUser = !_isProUser;
-    });
-    
-    // Pro 모드 변경 알림 (Phase 4의 SnackBarUtils 활용)
-    SnackBarUtils.showSuccess(
-      context,
-      _isProUser ? 'Pro 모드 활성화!' : '무료 모드로 전환',
+  // Pro 업그레이드 처리 (실제 결제 시스템과 연동 예정)
+  void _handleProUpgrade() {
+    // TODO: 실제 결제 시스템과 연동
+    // 현재는 개발용으로 간단한 다이얼로그 표시
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Pro 업그레이드'),
+        content: const Text('Pro 기능을 사용하려면 업그레이드가 필요합니다.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              // TODO: 실제 결제 프로세스 시작
+            },
+            child: const Text('업그레이드'),
+          ),
+        ],
+      ),
     );
   }
 }
