@@ -823,8 +823,9 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
-          children: [
-            Expanded(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
                   child: _buildEnhancedStatCard(
                     context,
                     title: '평균속도',
@@ -836,8 +837,8 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
                     icon: Icons.speed,
                   ),
                 ),
-                SizedBox(width: 12),
-            Expanded(
+                SizedBox(width: 8),
+                Expanded(
                   child: _buildEnhancedStatCard(
                     context,
                     title: '충전횟수',
@@ -849,21 +850,21 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
                     icon: Icons.battery_charging_full,
                   ),
                 ),
-                SizedBox(width: 12),
-            Expanded(
+                SizedBox(width: 8),
+                Expanded(
                   child: _buildEnhancedStatCard(
                     context,
                     title: '주시간대',
-                    mainValue: '저녁 9시',
+                    mainValue: '저녁9시',
                     unit: '',
                     subValue: '18-22시',
                     trend: '안정',
                     trendColor: Colors.blue,
                     icon: Icons.access_time,
-              ),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
           ),
           
           SizedBox(height: 16),
@@ -998,7 +999,7 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
     required IconData icon,
   }) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
@@ -1008,7 +1009,7 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
         ),
@@ -1021,66 +1022,74 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
         ],
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
+        children: [
           // 헤더: 아이콘 + 제목
-        Row(
-          children: [
+          Row(
+            children: [
               Container(
-                padding: EdgeInsets.all(8),
+                padding: EdgeInsets.all(6),
                 decoration: BoxDecoration(
                   color: trendColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(6),
                 ),
                 child: Icon(
                   icon,
-                  size: 16,
+                  size: 14,
                   color: trendColor,
                 ),
               ),
-              SizedBox(width: 8),
-            Expanded(
+              SizedBox(width: 6),
+              Expanded(
                 child: Text(
                   title,
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 11,
                     fontWeight: FontWeight.w600,
                     color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                   ),
-              ),
-            ),
-          ],
-        ),
-          
-          SizedBox(height: 12),
-          
-          // 메인 값
-        Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Expanded(
-                child: Text(
-                  mainValue,
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              if (unit.isNotEmpty) ...[
-                Text(
-                  unit,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-              ),
-            ),
-          ],
             ],
           ),
           
           SizedBox(height: 8),
+          
+          // 메인 값 + 단위 (가로로 배치, 줄바꿈 방지)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  mainValue,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (unit.isNotEmpty) ...[
+                SizedBox(width: 4),
+                Text(
+                  unit,
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                  ),
+                  maxLines: 1,
+                ),
+              ],
+            ],
+          ),
+          
+          SizedBox(height: 4),
           
           // 서브 값과 트렌드
           Row(
@@ -1088,40 +1097,42 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
               Expanded(
                 child: Text(
                   subValue,
-                style: TextStyle(
-                    fontSize: 11,
+                  style: TextStyle(
+                    fontSize: 10,
                     color: Theme.of(context).colorScheme.primary,
                     fontWeight: FontWeight.w500,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-        Container(
-                padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-          decoration: BoxDecoration(
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                decoration: BoxDecoration(
                   color: trendColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(6),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
-            children: [
+                  children: [
                     Icon(
                       _getTrendIcon(trend),
-                      size: 10,
+                      size: 8,
                       color: trendColor,
                     ),
                     SizedBox(width: 2),
-              Text(
+                    Text(
                       trend,
-                style: TextStyle(
-                        fontSize: 10,
-                  fontWeight: FontWeight.bold,
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
                         color: trendColor,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
-          ),
-        ),
-      ],
           ),
         ],
       ),
