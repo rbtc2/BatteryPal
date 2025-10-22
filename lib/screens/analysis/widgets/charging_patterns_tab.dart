@@ -301,45 +301,50 @@ class _InsightCardState extends State<InsightCard> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 메인 인사이트
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-                      Text('🌙', style: TextStyle(fontSize: 20)),
-                      SizedBox(width: 8),
-              Expanded(
-                        child: Text(
-                          '밤 10시-새벽 6시에 충전하면\n배터리 건강도가 15% 더 유지돼요',
-                          style: TextStyle(
-                            fontSize: 14,
-                            height: 1.5,
-                            color: Theme.of(context).colorScheme.onSurface,
+                  // 메인 인사이트 (더 강조)
+                  Container(
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: Colors.blue.withValues(alpha: 0.2),
+                      ),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('🌙', style: TextStyle(fontSize: 22)),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            '밤 10시-새벽 6시에 충전하면\n배터리 건강도가 15% 더 유지돼요',
+                            style: TextStyle(
+                              fontSize: 14,
+                              height: 1.5,
+                              fontWeight: FontWeight.w500,
+                              color: Theme.of(context).colorScheme.onSurface,
+                            ),
                           ),
                         ),
-              ),
-            ],
-          ),
-                  SizedBox(height: 16),
-                  
-                  // 구분선
-                  Container(
-                    height: 1,
-                    color: Colors.blue.withValues(alpha: 0.2),
+                      ],
+                    ),
                   ),
+                  
                   SizedBox(height: 16),
                   
-                  // 현재 습관 & 권장사항
+                  // 오늘 충전 현황 & 권장사항
                   _buildInfoRow(
                     context,
-                    '현재 충전 습관',
-                    '⚡급속 충전 3회 (주의!)',
+                    '오늘 충전',
+                    '⚡급속 3회 (주의!)',
                     Colors.orange,
                   ),
-                  SizedBox(height: 8),
+                  SizedBox(height: 10),
                   _buildInfoRow(
                     context,
-                    '권장',
-                    '저속 충전으로 전환 추천',
+                    '권장사항',
+                    '저속 충전 전환 추천',
                     Colors.green,
                   ),
                 ],
@@ -357,30 +362,44 @@ class _InsightCardState extends State<InsightCard> {
     String value,
     Color valueColor,
   ) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 80,
-          child: Text(
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // 라벨 (고정 너비 제거)
+          Text(
             '$label:',
             style: TextStyle(
-              fontSize: 13,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-            ),
-          ),
-        ),
-        Expanded(
-          child: Text(
-          value,
-            style: TextStyle(
-              fontSize: 13,
+              fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: valueColor,
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          
+          SizedBox(width: 8),
+          
+          // 값 (자동 확장)
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: valueColor,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
