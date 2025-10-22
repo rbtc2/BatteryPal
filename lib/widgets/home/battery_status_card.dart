@@ -205,16 +205,6 @@ class BatteryStatusCard extends StatelessWidget {
               ),
             ],
           ),
-          if (isCharging) ...[
-            const SizedBox(height: 8),
-            Text(
-              '예상: 1시간 25분',
-              style: TextStyle(
-                fontSize: 11,
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-              ),
-            ),
-          ],
         ],
       ),
     );

@@ -95,14 +95,6 @@ class ChargingAnalysisCard extends StatelessWidget {
                       color: speedType.color,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '예상 충전 시간: 1시간 25분',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                    ),
-                  ),
                 ],
               ),
             ),
