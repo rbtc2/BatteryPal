@@ -1,13 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../models/app_models.dart';
-import '../../models/charging_models.dart';
-import '../../services/charging_analysis_service.dart';
-import '../../constants/charging_constants.dart';
-import '../../constants/home_ui_constants.dart';
-import '../common/common_widgets.dart';
 
 /// 충전 분석 카드 위젯
-/// 충전 중일 때 충전 속도와 최적화 팁을 표시하는 카드
+/// 충전 중일 때 충전 속도 정보를 표시하는 카드
 class ChargingAnalysisCard extends StatelessWidget {
   final BatteryInfo? batteryInfo;
 
@@ -18,316 +13,138 @@ class ChargingAnalysisCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CustomCard(
-      elevation: HomeUIConstants.cardElevation,
-      padding: HomeUIConstants.cardPaddingSmall,
+    if (batteryInfo == null || !batteryInfo!.isCharging) {
+      return const SizedBox.shrink();
+    }
+    
+    final chargingCurrent = batteryInfo!.chargingCurrent.abs();
+    final speedType = _getChargingSpeedType(chargingCurrent);
+    
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+        ),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 헤더: 충전 속도 분석
-          _buildChargingHeader(context),
-          const SizedBox(height: HomeUIConstants.smallSpacing),
-          
-          // 충전 속도 인디케이터 (큰 시각적 요소)
-          _buildChargingSpeedIndicator(context),
-          const SizedBox(height: HomeUIConstants.smallSpacing),
-          
-          // 충전 최적화 팁 (접을 수 있는 형태)
-          _buildChargingOptimizationTips(context),
-        ],
-      ),
-    );
-  }
-
-  /// 충전 분석 헤더 빌드
-  Widget _buildChargingHeader(BuildContext context) {
-    return Row(
-      children: [
-        // 미니멀 아이콘 컨테이너
-        Container(
-          padding: HomeUIConstants.cardPaddingMicro,
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.primary.withValues(alpha: HomeUIConstants.alphaMicro),
-            borderRadius: BorderRadius.circular(HomeUIConstants.tinyBorderRadius),
-          ),
-          child: Icon(
-            Icons.flash_on_outlined,
-            color: Theme.of(context).colorScheme.primary,
-            size: ChargingConstants.chargingHeaderIconSize,
-          ),
-        ),
-        const SizedBox(width: HomeUIConstants.tinySpacing),
-        Text(
-          ChargingConstants.chargingAnalysisTitle,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-            letterSpacing: -0.2,
-          ),
-        ),
-        const Spacer(),
-        // 개선된 실시간 표시 (충전 전류 변화 감지)
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.primary.withValues(alpha: HomeUIConstants.alphaUltraLow),
-            borderRadius: BorderRadius.circular(HomeUIConstants.smallBorderRadius),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // 실시간 애니메이션 도트
-              TweenAnimationBuilder<double>(
-                duration: ChargingConstants.chargingAnimationDuration,
-                tween: Tween(begin: 0.0, end: 1.0),
-                builder: (context, value, child) {
-                  return Container(
-                    width: ChargingConstants.chargingAnimationDotSize,
-                    height: ChargingConstants.chargingAnimationDotSize,
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primary.withValues(alpha: value),
-                      shape: BoxShape.circle,
-                    ),
-                  );
-                },
-                onEnd: () {
-                  // 애니메이션 반복
-                },
-              ),
-              const SizedBox(width: HomeUIConstants.nanoSpacing),
-              Text(
-                ChargingConstants.realTimeMonitoringText,
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.primary,
-                  fontSize: HomeUIConstants.captionFontSize,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  /// 충전 속도 인디케이터 빌드
-  Widget _buildChargingSpeedIndicator(BuildContext context) {
-    final chargingSpeed = _getRealChargingSpeed();
-    final statusAnalysis = ChargingAnalysisService.analyzeChargingStatus(batteryInfo);
-    
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: chargingSpeed.color.withValues(alpha: 0.2),
-          width: 1,
-        ),
-      ),
-      child: Row(
-        children: [
-          // 미니멀 아이콘
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: chargingSpeed.color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              chargingSpeed.icon,
-              color: chargingSpeed.color,
-              size: 24,
-            ),
-          ),
-          const SizedBox(width: 12),
-          
-          // 텍스트 정보 (개선된 타이포그래피)
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          // 헤더
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
               children: [
+                const Text('🔌', style: TextStyle(fontSize: 24)),
+                const SizedBox(width: 12),
                 Text(
-                  '${chargingSpeed.label} (${batteryInfo?.chargingTypeText ?? '알 수 없음'})',
+                  '충전 정보',
                   style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 16,
-                    color: chargingSpeed.color,
-                    letterSpacing: -0.3,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  chargingSpeed.description,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                    fontWeight: FontWeight.w400,
-                  ),
+              ],
+            ),
+          ),
+          
+          // 충전 속도 정보
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    speedType.color.withValues(alpha: 0.2),
+                    speedType.color.withValues(alpha: 0.1),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
-                // 🔥 충전 예상 시간 추가
-                if (statusAnalysis.estimatedTimeToFull != null) ...[
-                  const SizedBox(height: 4),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: speedType.color.withValues(alpha: 0.3),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Row(
                     children: [
-                      Icon(
-                        Icons.access_time,
-                        size: 12,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                      const SizedBox(width: 4),
+                      Icon(speedType.icon, color: speedType.color, size: 20),
+                      const SizedBox(width: 8),
                       Text(
-                        '${ChargingConstants.estimatedCompletionPrefix}${_formatDuration(statusAnalysis.estimatedTimeToFull!)}',
+                        speedType.label,
                         style: TextStyle(
-                          fontSize: 12,
-                          color: Theme.of(context).colorScheme.primary,
-                          fontWeight: FontWeight.w500,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: speedType.color,
                         ),
                       ),
                     ],
                   ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${chargingCurrent}mA',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: speedType.color,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '예상 충전 시간: 1시간 25분',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                    ),
+                  ),
                 ],
-                const SizedBox(height: 8),
-                // 개선된 충전 진행률 바
-                _buildChargingProgressBar(context),
-              ],
+              ),
             ),
           ),
+          
+          const SizedBox(height: 16),
         ],
       ),
     );
   }
-
-  /// 충전 진행률 바 빌드
-  Widget _buildChargingProgressBar(BuildContext context) {
-    final currentLevel = batteryInfo?.level ?? 0.0;
-    final progress = currentLevel / 100.0;
-    
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              '진행률',
-              style: TextStyle(
-                fontSize: 11,
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            Text(
-              '${currentLevel.toStringAsFixed(1)}%',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Container(
-          height: 3,
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(2),
-          ),
-          child: FractionallySizedBox(
-            alignment: Alignment.centerLeft,
-            widthFactor: progress,
-            child: Container(
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primary,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  /// 충전 최적화 팁 빌드
-  Widget _buildChargingOptimizationTips(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: ExpansionTile(
-        tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        childrenPadding: const EdgeInsets.only(bottom: 8),
-        title: Row(
-          children: [
-            Icon(
-              Icons.lightbulb_outline,
-              color: Theme.of(context).colorScheme.secondary,
-              size: 16,
-            ),
-            const SizedBox(width: 6),
-            const Text(
-              '최적화 팁',
-              style: TextStyle(
-                fontWeight: FontWeight.w500,
-                fontSize: 13,
-              ),
-            ),
-          ],
-        ),
-        children: [
-          ..._getRealChargingSpeed().tips.map((tip) => _buildTipItem(context, tip)),
-        ],
-      ),
-    );
-  }
-
-  /// 팁 아이템 위젯 빌드
-  Widget _buildTipItem(BuildContext context, String tip) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 3,
-            height: 3,
-            margin: const EdgeInsets.only(top: 6, right: 8),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.6),
-              shape: BoxShape.circle,
-            ),
-          ),
-          Expanded(
-            child: Text(
-              tip,
-              style: TextStyle(
-                fontSize: 12,
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                height: 1.3,
-                fontWeight: FontWeight.w400,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// 실제 충전 전류값을 사용한 충전 속도 정보
-  ChargingSpeedInfo _getRealChargingSpeed() {
-    return ChargingAnalysisService.getChargingSpeedInfo(batteryInfo);
-  }
-
-  /// 시간 포맷팅 헬퍼 메서드
-  String _formatDuration(Duration duration) {
-    final hours = duration.inHours;
-    final minutes = duration.inMinutes.remainder(60);
-    
-    if (hours > 0) {
-      return '$hours시간 $minutes분';
+  
+  _ChargingSpeedType _getChargingSpeedType(int current) {
+    if (current >= 2000) {
+      return _ChargingSpeedType(
+        label: '고속 충전',
+        icon: Icons.flash_on,
+        color: Colors.red[400]!,
+      );
+    } else if (current >= 1000) {
+      return _ChargingSpeedType(
+        label: '일반 충전',
+        icon: Icons.battery_charging_full,
+        color: Colors.blue[400]!,
+      );
     } else {
-      return '$minutes분';
+      return _ChargingSpeedType(
+        label: '저속 충전',
+        icon: Icons.battery_6_bar,
+        color: Colors.green[400]!,
+      );
     }
   }
+}
+
+class _ChargingSpeedType {
+  final String label;
+  final IconData icon;
+  final Color color;
+  
+  _ChargingSpeedType({
+    required this.label,
+    required this.icon,
+    required this.color,
+  });
 }

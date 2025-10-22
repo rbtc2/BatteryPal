@@ -3,8 +3,7 @@ import 'package:flutter/material.dart';
 import '../../services/home_lifecycle_manager.dart';
 import '../../models/app_models.dart';
 import '../../widgets/home/battery_status_card.dart';
-import '../../widgets/home/battery_boost_button.dart';
-import '../../widgets/home/usage_limit_card.dart';
+import '../../widgets/home/quick_actions_card.dart';
 import '../../widgets/home/charging_analysis_card.dart';
 import '../../utils/app_utils.dart';
 
@@ -225,40 +224,39 @@ class _HomeTabState extends State<HomeTab> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // 배터리 상태 카드
+            // 섹션 1: 배터리 상태
             BatteryStatusCard(batteryInfo: _batteryInfo),
-            const SizedBox(height: 24),
             
-            // 🔥 충전 중일 때만 표시되는 충전 분석 카드 (Phase 1: 스켈레톤)
-            if (_batteryInfo != null && _batteryInfo!.isCharging) ...[
-              ChargingAnalysisCard(batteryInfo: _batteryInfo),
-              const SizedBox(height: 24),
-            ],
+            const SizedBox(height: 16),
             
-            // 배터리 부스트 버튼
-            BatteryBoostButton(
-              onOptimize: () {
-                // Phase 5에서 실제 최적화 기능 구현 예정
-                SnackBarUtils.showSuccess(context, '배터리 최적화가 완료되었습니다!');
+            // 섹션 2: 빠른 액션
+            QuickActionsCard(
+              onBoost: _handleOptimization,
+              onAnalysis: () {
+                // 분석 탭으로 이동 (추후 구현)
+                SnackBarUtils.showInfo(context, '분석 탭으로 이동합니다');
               },
+              isProUser: widget.isProUser,
+              dailyUsage: dailyUsage,
+              dailyLimit: dailyLimit,
             ),
-            const SizedBox(height: 24),
             
-            // 사용 제한 표시 (무료 사용자용)
-            if (!widget.isProUser) 
-              UsageLimitCard(
-                dailyUsage: dailyUsage,
-                dailyLimit: dailyLimit,
-                onUpgrade: widget.onProToggle,
-              ),
+            const SizedBox(height: 16),
+            
+            // 섹션 3: 충전 분석 (충전 중일 때만)
+            ChargingAnalysisCard(batteryInfo: _batteryInfo),
+            
+            // 하단 여백
+            const SizedBox(height: 32),
           ],
         ),
       ),
     );
   }
 
-
-
-
-
+  /// 배터리 최적화 처리
+  void _handleOptimization() {
+    // Phase 5에서 실제 최적화 기능 구현 예정
+    SnackBarUtils.showSuccess(context, '배터리 최적화가 완료되었습니다!');
+  }
 }
