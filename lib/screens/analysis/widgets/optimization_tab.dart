@@ -55,127 +55,175 @@ class OptimizationTab extends StatelessWidget {
 
   Widget _buildPersonalizedTips() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildTipItem(
-          icon: Icons.brightness_high,
-          title: '화면 밝기 조절',
-          description: '현재 화면 밝기가 평균보다 20% 높습니다. 자동 밝기 조절을 사용하면 배터리를 절약할 수 있습니다.',
-          impact: '15% 절약 가능',
-          color: Colors.orange,
-          isImplemented: false,
-        ),
-        const SizedBox(height: 16),
-        _buildTipItem(
-          icon: Icons.location_on,
-          title: '위치 서비스 최적화',
-          description: '사용하지 않는 앱의 위치 서비스를 비활성화하면 배터리 수명을 연장할 수 있습니다.',
-          impact: '8% 절약 가능',
-          color: Colors.blue,
-          isImplemented: true,
-        ),
-        const SizedBox(height: 16),
-        _buildTipItem(
-          icon: Icons.wifi,
-          title: 'Wi-Fi 자동 연결',
-          description: 'Wi-Fi 자동 연결을 활성화하면 모바일 데이터 사용량을 줄이고 배터리를 절약할 수 있습니다.',
-          impact: '12% 절약 가능',
-          color: Colors.green,
-          isImplemented: false,
-        ),
-        const SizedBox(height: 16),
-        _buildTipItem(
-          icon: Icons.notifications_off,
-          title: '불필요한 알림 비활성화',
-          description: '중요하지 않은 앱의 알림을 비활성화하면 배터리와 성능을 개선할 수 있습니다.',
-          impact: '5% 절약 가능',
-          color: Colors.purple,
-          isImplemented: false,
+        // 현재 절전 레벨
+        Builder(
+          builder: (context) => Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Colors.green.withValues(alpha: 0.1),
+                  Colors.green.withValues(alpha: 0.05),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: Colors.green.withValues(alpha: 0.3),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.battery_saver,
+                      color: Colors.green[700],
+                      size: 24,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '현재 절전 레벨',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green[700],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _buildPowerLevelSelector(),
+                const SizedBox(height: 16),
+                _buildUsageTimeComparison(),
+              ],
+            ),
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildTipItem({
-    required IconData icon,
-    required String title,
-    required String description,
-    required String impact,
-    required Color color,
-    required bool isImplemented,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isImplemented 
-            ? Colors.green.withValues(alpha: 0.1)
-            : color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isImplemented 
-              ? Colors.green.withValues(alpha: 0.3)
-              : color.withValues(alpha: 0.3),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildPowerLevelSelector() {
+    return Builder(
+      builder: (context) => Row(
         children: [
-          Row(
-            children: [
-              Icon(
-                icon,
-                color: isImplemented ? Colors.green : color,
-                size: 24,
+          _buildPowerLevelButton('기본', false, Colors.grey),
+          const SizedBox(width: 8),
+          _buildPowerLevelButton('절전', true, Colors.orange),
+          const SizedBox(width: 8),
+          _buildPowerLevelButton('초절전', false, Colors.red),
+          const SizedBox(width: 8),
+          _buildPowerLevelButton('커스텀', false, Colors.purple),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPowerLevelButton(String label, bool isSelected, Color color) {
+    return Builder(
+      builder: (context) => Expanded(
+        child: GestureDetector(
+          onTap: () {
+            // TODO: 절전 레벨 변경 로직
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            decoration: BoxDecoration(
+              color: isSelected 
+                  ? color.withValues(alpha: 0.2)
+                  : Theme.of(context).colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: isSelected 
+                    ? color
+                    : Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
+                width: isSelected ? 2 : 1,
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  title,
+            ),
+            child: Column(
+              children: [
+                if (isSelected) ...[
+                  Icon(
+                    Icons.keyboard_arrow_up,
+                    color: color,
+                    size: 16,
+                  ),
+                  const SizedBox(height: 4),
+                ],
+                Text(
+                  label,
                   style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: isImplemented ? Colors.green : color,
+                    fontSize: 12,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    color: isSelected ? color : Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
-              ),
-              if (isImplemented)
-                Icon(
-                  Icons.check_circle,
-                  color: Colors.green,
-                  size: 20,
-                ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            description,
-            style: const TextStyle(
-              fontSize: 14,
-              height: 1.4,
+                if (isSelected) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    '현재 설정',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: color,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                impact,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: isImplemented ? Colors.green : color,
-                ),
-              ),
-              if (!isImplemented)
-                TextButton(
-                  onPressed: () {
-                    // TODO: 구현 로직 추가
-                  },
-                  child: const Text('적용하기'),
-                ),
-            ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUsageTimeComparison() {
+    return Builder(
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.blue.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: Colors.blue.withValues(alpha: 0.3),
           ),
-        ],
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '예상 사용 시간:',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '8시간 → 12시간 (+4시간)',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.green[700],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.trending_up,
+              color: Colors.green[700],
+              size: 24,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -183,146 +231,149 @@ class OptimizationTab extends StatelessWidget {
   Widget _buildChargingOptimization() {
     return Column(
       children: [
-        // 충전 패턴 분석
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.blue.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: Colors.blue.withValues(alpha: 0.3),
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.charging_station,
-                    color: Colors.blue[600],
-                    size: 24,
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    '충전 패턴 분석',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.blue[700],
-                    ),
-                  ),
+        // 맞춤 최적화 제안
+        Builder(
+          builder: (context) => Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Colors.purple.withValues(alpha: 0.1),
+                  Colors.purple.withValues(alpha: 0.05),
                 ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
-              const SizedBox(height: 12),
-              Text(
-                '현재 충전 패턴을 분석한 결과, 다음과 같은 최적화를 제안합니다:',
-                style: const TextStyle(fontSize: 14),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: Colors.purple.withValues(alpha: 0.3),
               ),
-              const SizedBox(height: 12),
-              _buildOptimizationSuggestion(
-                '80% 이상 충전을 피하세요',
-                '배터리 수명을 위해 80%까지만 충전하는 것을 권장합니다',
-                Colors.orange,
-              ),
-              _buildOptimizationSuggestion(
-                '야간 충전 시간을 줄이세요',
-                '밤새 충전하는 것보다 낮에 짧게 여러 번 충전하는 것이 좋습니다',
-                Colors.red,
-              ),
-              _buildOptimizationSuggestion(
-                'AC 충전을 더 자주 사용하세요',
-                'USB 충전보다 AC 충전이 효율적입니다',
-                Colors.green,
-              ),
-            ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.auto_fix_high,
+                      color: Colors.purple[700],
+                      size: 24,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '맞춤 최적화 제안',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.purple[700],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                
+                // 즉시 적용 가능
+                Text(
+                  '즉시 적용 가능:',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _buildOptimizationItem('화면 밝기 자동 조절', '+45분', false),
+                _buildOptimizationItem('5G → LTE 전환', '+1시간', false),
+                _buildOptimizationItem('백그라운드 앱 제한', '+30분', false),
+                
+                const SizedBox(height: 16),
+                
+                // 장기 개선
+                Text(
+                  '장기 개선:',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _buildOptimizationItem('충전 상한 80% 설정', '', false),
+                _buildOptimizationItem('야간 자동 절전 모드', '', false),
+                _buildOptimizationItem('위치 서비스 최적화', '', false),
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: 16),
-
-        // 충전 최적화 통계
-        Row(
-          children: [
-            Expanded(
-              child: MetricCard(
-                title: '현재 효율',
-                value: '78%',
-                icon: Icons.analytics,
-                color: Colors.orange,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: MetricCard(
-                title: '최적화 후',
-                value: '92%',
-                icon: Icons.trending_up,
-                color: Colors.green,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: MetricCard(
-                title: '절약 시간',
-                value: '30분/일',
-                icon: Icons.access_time,
-                color: Colors.blue,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: MetricCard(
-                title: '수명 연장',
-                value: '6개월',
-                icon: Icons.schedule,
-                color: Colors.purple,
-              ),
-            ),
-          ],
         ),
       ],
     );
   }
 
-  Widget _buildOptimizationSuggestion(String title, String description, Color color) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            Icons.lightbulb,
-            color: color,
-            size: 16,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: color,
+  Widget _buildOptimizationItem(String title, String benefit, bool isChecked) {
+    return Builder(
+      builder: (context) => Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Row(
+          children: [
+            GestureDetector(
+              onTap: () {
+                // TODO: 체크박스 토글 로직
+              },
+              child: Container(
+                width: 20,
+                height: 20,
+                decoration: BoxDecoration(
+                  color: isChecked 
+                      ? Colors.green
+                      : Theme.of(context).colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(
+                    color: isChecked 
+                        ? Colors.green
+                        : Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
                   ),
                 ),
-                Text(
-                  description,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    height: 1.3,
-                  ),
-                ),
-              ],
+                child: isChecked
+                    ? const Icon(
+                        Icons.check,
+                        color: Colors.white,
+                        size: 14,
+                      )
+                    : null,
+              ),
             ),
-          ),
-        ],
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                title,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+              ),
+            ),
+            if (benefit.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.green.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: Colors.green.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Text(
+                  benefit,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green[700],
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -330,97 +381,103 @@ class OptimizationTab extends StatelessWidget {
   Widget _buildUsagePatternImprovement() {
     return Column(
       children: [
-        Container(
-          height: 200,
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: Colors.grey.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: Colors.grey.withValues(alpha: 0.3),
+        // 절전 시뮬레이터
+        Builder(
+          builder: (context) => Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Colors.blue.withValues(alpha: 0.1),
+                  Colors.blue.withValues(alpha: 0.05),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: Colors.blue.withValues(alpha: 0.3),
+              ),
             ),
-          ),
-          child: Center(
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
-                  Icons.trending_up,
-                  size: 48,
-                  color: Colors.grey[400],
+                Row(
+                  children: [
+                    Icon(
+                      Icons.tune,
+                      color: Colors.blue[700],
+                      size: 24,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '절전 시뮬레이터',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue[700],
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 16),
-                Text(
-                  '사용 패턴 개선 분석',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey[600],
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Pro로 업그레이드하면 상세한 사용 패턴 개선 제안을 확인할 수 있습니다',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[500],
-                  ),
-                  textAlign: TextAlign.center,
-                ),
+                _buildSimulatorSlider('화면 밝기', 70, Colors.yellow),
+                const SizedBox(height: 16),
+                _buildSimulatorSlider('CPU 성능', 85, Colors.orange),
+                const SizedBox(height: 16),
+                _buildSimulatorSlider('네트워크 속도', 60, Colors.green),
+                const SizedBox(height: 16),
+                _buildExpectedTimeDisplay(),
               ],
             ),
           ),
-        ),
-        const SizedBox(height: 16),
-
-        // 기본 개선 제안들
-        _buildImprovementItem(
-          '앱 사용 시간 제한',
-          'YouTube 사용 시간을 하루 2시간으로 제한하면 15% 절약 가능',
-          Colors.red,
-        ),
-        const SizedBox(height: 12),
-        _buildImprovementItem(
-          '배경 앱 새로고침 최적화',
-          '불필요한 배경 새로고침을 비활성화하면 8% 절약 가능',
-          Colors.orange,
-        ),
-        const SizedBox(height: 12),
-        _buildImprovementItem(
-          '다크 모드 활용',
-          '다크 모드를 더 자주 사용하면 12% 절약 가능',
-          Colors.purple,
         ),
       ],
     );
   }
 
-  Widget _buildImprovementItem(String title, String description, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: color.withValues(alpha: 0.3),
-        ),
-      ),
-      child: Column(
+  Widget _buildSimulatorSlider(String label, int value, Color color) {
+    return Builder(
+      builder: (context) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+              ),
+              Text(
+                '$value%',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 4),
-          Text(
-            description,
-            style: const TextStyle(
-              fontSize: 12,
-              height: 1.3,
+          const SizedBox(height: 8),
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              activeTrackColor: color,
+              inactiveTrackColor: color.withValues(alpha: 0.3),
+              thumbColor: color,
+              overlayColor: color.withValues(alpha: 0.2),
+            ),
+            child: Slider(
+              value: value.toDouble(),
+              min: 0,
+              max: 100,
+              divisions: 20,
+              onChanged: (newValue) {
+                // TODO: 슬라이더 값 변경 로직
+              },
             ),
           ),
         ],
@@ -428,96 +485,150 @@ class OptimizationTab extends StatelessWidget {
     );
   }
 
+  Widget _buildExpectedTimeDisplay() {
+    return Builder(
+      builder: (context) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.green.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: Colors.green.withValues(alpha: 0.3),
+          ),
+        ),
+        child: Column(
+          children: [
+            Text(
+              '실시간 예상 사용시간 변화',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '8시간 → 12시간 (+4시간)',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.green[700],
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '현재 설정으로 예상되는 배터리 사용 시간',
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildGoalSetting() {
     return Column(
       children: [
-        Container(
-          height: 200,
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: Colors.grey.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: Colors.grey.withValues(alpha: 0.3),
+        // 실행 기록
+        Builder(
+          builder: (context) => Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Colors.orange.withValues(alpha: 0.1),
+                  Colors.orange.withValues(alpha: 0.05),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: Colors.orange.withValues(alpha: 0.3),
+              ),
             ),
-          ),
-          child: Center(
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
-                  Icons.flag,
-                  size: 48,
-                  color: Colors.grey[400],
+                Row(
+                  children: [
+                    Icon(
+                      Icons.history,
+                      color: Colors.orange[700],
+                      size: 24,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '실행 기록',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.orange[700],
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 16),
+                
                 Text(
-                  '목표 설정 및 추적',
+                  '최근 최적화:',
                   style: TextStyle(
                     fontSize: 16,
-                    color: Colors.grey[600],
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'Pro로 업그레이드하면 개인화된 목표를 설정하고 추적할 수 있습니다',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[500],
-                  ),
-                  textAlign: TextAlign.center,
-                ),
+                const SizedBox(height: 12),
+                _buildOptimizationRecord('3일 전', '백그라운드 제한', '+2시간/일'),
+                const SizedBox(height: 12),
+                _buildOptimizationRecord('1주 전', '다크모드 적용', '+1시간/일'),
               ],
             ),
           ),
         ),
-        const SizedBox(height: 16),
-
-        // 기본 목표들
-        Row(
-          children: [
-            Expanded(
-              child: MetricCard(
-                title: '일일 목표',
-                value: '80% 이하',
-                icon: Icons.today,
-                color: Colors.blue,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: MetricCard(
-                title: '현재 달성률',
-                value: '75%',
-                icon: Icons.check_circle,
-                color: Colors.green,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: MetricCard(
-                title: '주간 목표',
-                value: '5회 이하',
-                icon: Icons.calendar_view_week,
-                color: Colors.orange,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: MetricCard(
-                title: '현재 달성률',
-                value: '80%',
-                icon: Icons.trending_up,
-                color: Colors.purple,
-              ),
-            ),
-          ],
-        ),
       ],
+    );
+  }
+
+  Widget _buildOptimizationRecord(String date, String action, String benefit) {
+    return Builder(
+      builder: (context) => Row(
+        children: [
+          Icon(
+            Icons.check_circle,
+            color: Colors.green,
+            size: 20,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '$date: $action',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+                Text(
+                  '→ $benefit',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.green[700],
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
