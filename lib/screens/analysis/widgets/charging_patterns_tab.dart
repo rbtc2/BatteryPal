@@ -300,7 +300,7 @@ class _InsightCardState extends State<InsightCard> {
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+            children: [
                   // 메인 인사이트 (더 강조)
                   Container(
                     padding: EdgeInsets.all(12),
@@ -316,7 +316,7 @@ class _InsightCardState extends State<InsightCard> {
                       children: [
                         Text('🌙', style: TextStyle(fontSize: 22)),
                         SizedBox(width: 10),
-                        Expanded(
+              Expanded(
                           child: Text(
                             '밤 10시-새벽 6시에 충전하면\n배터리 건강도가 15% 더 유지돼요',
                             style: TextStyle(
@@ -370,12 +370,12 @@ class _InsightCardState extends State<InsightCard> {
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
+      children: [
           // 라벨 (고정 너비 제거)
-          Text(
+        Text(
             '$label:',
             style: TextStyle(
-              fontSize: 12,
+            fontSize: 12,
               fontWeight: FontWeight.w600,
               color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
             ),
@@ -388,7 +388,7 @@ class _InsightCardState extends State<InsightCard> {
           // 값 (자동 확장)
           Expanded(
             child: Text(
-              value,
+          value,
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.bold,
@@ -396,9 +396,9 @@ class _InsightCardState extends State<InsightCard> {
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-            ),
           ),
-        ],
+        ),
+      ],
       ),
     );
   }
@@ -446,31 +446,56 @@ class _ChargingCurrentChartState extends State<ChargingCurrentChart> {
           Padding(
             padding: const EdgeInsets.all(16),
             child: Row(
-            children: [
+              children: [
                 Text('📊', style: TextStyle(fontSize: 24)),
                 SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     '충전 전류 패턴',
-                  style: TextStyle(
+                    style: TextStyle(
                       fontSize: 18,
-                  fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.bold,
                       color: Theme.of(context).colorScheme.onSurface,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                TextButton(
-                  onPressed: () {
-                    if (widget.isProUser) {
-                      // Pro 사용자: 상세 분석 페이지로 이동
-                      _showDetailedAnalysis();
-                    } else {
-                      // 무료 사용자: Pro 업그레이드 다이얼로그
-                      widget.onProUpgrade?.call();
-                    }
-                  },
-                  child: Text(widget.isProUser ? '상세 분석' : 'Pro로 더보기'),
-                ),
+                if (widget.isProUser)
+                  // Pro 사용자: 상세 분석 버튼
+                  TextButton(
+                    onPressed: _showDetailedAnalysis,
+                    child: Text(
+                      '상세 분석',
+                      style: TextStyle(fontSize: 13),
+                      maxLines: 1,
+                    ),
+                  )
+                else
+                  // 무료 사용자: Pro 딱지
+                  InkWell(
+                    onTap: widget.onProUpgrade,
+                    borderRadius: BorderRadius.circular(4),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(
+                          color: Colors.amber.withValues(alpha: 0.5),
+                          width: 1,
+                        ),
+                      ),
+                      child: const Text(
+                        'Pro',
+                        style: TextStyle(
+                          color: Colors.amber,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -590,11 +615,15 @@ class _ChargingCurrentChartState extends State<ChargingCurrentChart> {
           ),
         ),
         SizedBox(width: 6),
-                Text(
-          label,
-          style: TextStyle(fontSize: 12),
-        ),
-      ],
+        Flexible(
+          child: Text(
+            label,
+            style: TextStyle(fontSize: 12),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
     );
   }
   
@@ -690,7 +719,7 @@ class _ChargingCurrentChartState extends State<ChargingCurrentChart> {
       context: context,
       builder: (context) => AlertDialog(
         title: Row(
-          children: [
+      children: [
             Icon(Icons.analytics, color: Colors.purple),
             SizedBox(width: 8),
             Text('상세 충전 분석'),
@@ -832,10 +861,10 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                     color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                ),
-              ],
+              ),
             ),
+          ],
+        ),
           ),
           
           // 통계 카드 3개 (가로 배치)
@@ -843,7 +872,7 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+          children: [
             Expanded(
                   child: _buildEnhancedStatCard(
                     context,
