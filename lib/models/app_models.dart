@@ -154,6 +154,69 @@ class BatteryInfo {
       isCharging: json['isCharging'] ?? false,
     );
   }
+
+  /// 네이티브 충전 정보에서 배터리 정보 생성
+  factory BatteryInfo.fromChargingInfo(Map<String, dynamic> chargingInfo) {
+    final isCharging = chargingInfo['isCharging'] ?? false;
+    final chargingType = chargingInfo['chargingType'] ?? 'Unknown';
+    final chargingCurrent = chargingInfo['chargingCurrent'] ?? -1;
+    
+    // 충전 상태에 따른 BatteryState 결정
+    BatteryState state;
+    if (isCharging) {
+      state = BatteryState.charging;
+    } else {
+      state = BatteryState.discharging;
+    }
+    
+    return BatteryInfo(
+      level: 0.0, // 네이티브에서 레벨 정보가 없으므로 기본값
+      state: state,
+      timestamp: DateTime.now(),
+      temperature: -1.0, // 네이티브에서 온도 정보가 없으므로 기본값
+      voltage: -1, // 네이티브에서 전압 정보가 없으므로 기본값
+      capacity: -1, // 네이티브에서 용량 정보가 없으므로 기본값
+      health: -1, // 네이티브에서 건강도 정보가 없으므로 기본값
+      chargingType: chargingType,
+      chargingCurrent: chargingCurrent,
+      isCharging: isCharging,
+    );
+  }
+
+  /// 네이티브 충전 정보에서 배터리 정보 생성 (기존 데이터 유지)
+  factory BatteryInfo.fromChargingInfoWithExistingData(
+    Map<String, dynamic> chargingInfo, {
+    required double level,
+    required double temperature,
+    required int voltage,
+    required int capacity,
+    required int health,
+  }) {
+    final isCharging = chargingInfo['isCharging'] ?? false;
+    final chargingType = chargingInfo['chargingType'] ?? 'Unknown';
+    final chargingCurrent = chargingInfo['chargingCurrent'] ?? -1;
+    
+    // 충전 상태에 따른 BatteryState 결정
+    BatteryState state;
+    if (isCharging) {
+      state = BatteryState.charging;
+    } else {
+      state = BatteryState.discharging;
+    }
+    
+    return BatteryInfo(
+      level: level, // 기존 레벨 유지
+      state: state,
+      timestamp: DateTime.now(),
+      temperature: temperature, // 기존 온도 유지
+      voltage: voltage, // 기존 전압 유지
+      capacity: capacity, // 기존 용량 유지
+      health: health, // 기존 건강도 유지
+      chargingType: chargingType,
+      chargingCurrent: chargingCurrent,
+      isCharging: isCharging,
+    );
+  }
   
   /// 배터리 정보 복사본 생성 (일부 필드 수정)
   BatteryInfo copyWith({

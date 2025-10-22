@@ -305,6 +305,9 @@ class BatteryService {
       await _batteryStateSubscription?.cancel();
       _batteryStateSubscription = null;
       
+      // 네이티브 배터리 상태 변화 리스너 초기화 (실시간 감지)
+      NativeBatteryService.initializeBatteryStateListener(_handleNativeBatteryStateChange);
+      
       // 초기 배터리 정보 강제 업데이트
       await _updateBatteryInfo(forceUpdate: true);
       
@@ -338,6 +341,59 @@ class BatteryService {
       debugPrint('배터리 모니터링 시작 실패: $e');
       debugPrint('스택 트레이스: $stackTrace');
       rethrow;
+    }
+  }
+
+  /// 네이티브에서 오는 배터리 상태 변화 즉시 처리
+  void _handleNativeBatteryStateChange(Map<String, dynamic> chargingInfo) {
+    if (_isDisposed) {
+      debugPrint('서비스가 이미 dispose됨, 네이티브 배터리 상태 변화 처리 건너뜀');
+      return;
+    }
+    
+    try {
+      debugPrint('네이티브 배터리 상태 변화 즉시 처리: $chargingInfo');
+      
+      // 기존 배터리 정보의 레벨을 유지하면서 충전 정보만 업데이트
+      final wasCharging = _currentBatteryInfo?.isCharging ?? false;
+      final currentLevel = _currentBatteryInfo?.level ?? 0.0;
+      final currentTemperature = _currentBatteryInfo?.temperature ?? -1.0;
+      final currentVoltage = _currentBatteryInfo?.voltage ?? -1;
+      final currentCapacity = _currentBatteryInfo?.capacity ?? -1;
+      final currentHealth = _currentBatteryInfo?.health ?? -1;
+      
+      // 충전 정보를 BatteryInfo로 변환하되 기존 정보 유지
+      final batteryInfo = BatteryInfo.fromChargingInfoWithExistingData(
+        chargingInfo,
+        level: currentLevel,
+        temperature: currentTemperature,
+        voltage: currentVoltage,
+        capacity: currentCapacity,
+        health: currentHealth,
+      );
+      
+      if (_isValidBatteryInfo(batteryInfo)) {
+        _currentBatteryInfo = batteryInfo;
+        
+        // 즉시 스트림에 이벤트 추가 (디바운싱 없이)
+        _safeAddEvent(batteryInfo);
+        
+        // 충전 상태 변화 감지하여 충전 전류 모니터링 시작/중지
+        if (batteryInfo.isCharging && !wasCharging) {
+          debugPrint('충전 시작 감지 - 충전 전류 모니터링 시작');
+          _startChargingCurrentMonitoring();
+        } else if (!batteryInfo.isCharging && wasCharging) {
+          debugPrint('충전 종료 감지 - 충전 전류 모니터링 중지');
+          _stopChargingCurrentMonitoring();
+        }
+        
+        debugPrint('네이티브 배터리 상태 변화 처리 완료: ${batteryInfo.formattedLevel}');
+      } else {
+        debugPrint('네이티브 배터리 정보가 유효하지 않아 처리 건너뜀');
+      }
+    } catch (e, stackTrace) {
+      debugPrint('네이티브 배터리 상태 변화 처리 실패: $e');
+      debugPrint('스택 트레이스: $stackTrace');
     }
   }
 

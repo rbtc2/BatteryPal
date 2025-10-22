@@ -2,10 +2,12 @@ package com.example.batterypal
 
 import android.app.usage.UsageStats
 import android.app.usage.UsageStatsManager
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.BatteryManager
+import android.os.Bundle
 import android.provider.Settings
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -13,10 +15,13 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.example.batterypal/battery"
+    private var batteryReceiver: BroadcastReceiver? = null
+    private var methodChannel: MethodChannel? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
+        methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
+        methodChannel?.setMethodCallHandler { call, result ->
             when (call.method) {
                 "getBatteryTemperature" -> {
                     val temperature = getBatteryTemperature()
@@ -66,6 +71,59 @@ class MainActivity : FlutterActivity() {
                     result.notImplemented()
                 }
             }
+        }
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setupBatteryReceiver()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        unregisterBatteryReceiver()
+    }
+
+    /// 배터리 상태 변화 실시간 감지를 위한 BroadcastReceiver 설정
+    private fun setupBatteryReceiver() {
+        try {
+            batteryReceiver = object : BroadcastReceiver() {
+                override fun onReceive(context: Context?, intent: Intent?) {
+                    if (intent?.action == Intent.ACTION_BATTERY_CHANGED) {
+                        // 즉시 충전 상태 확인 및 Flutter에 알림
+                        val chargingInfo = getChargingInfo()
+                        notifyFlutterBatteryChange(chargingInfo)
+                    }
+                }
+            }
+            
+            val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+            registerReceiver(batteryReceiver, filter)
+            android.util.Log.d("BatteryPal", "배터리 BroadcastReceiver 등록 완료")
+        } catch (e: Exception) {
+            android.util.Log.e("BatteryPal", "배터리 BroadcastReceiver 설정 실패", e)
+        }
+    }
+
+    /// BroadcastReceiver 해제
+    private fun unregisterBatteryReceiver() {
+        try {
+            batteryReceiver?.let { receiver ->
+                unregisterReceiver(receiver)
+                android.util.Log.d("BatteryPal", "배터리 BroadcastReceiver 해제 완료")
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("BatteryPal", "배터리 BroadcastReceiver 해제 실패", e)
+        }
+    }
+
+    /// Flutter에 배터리 상태 변화 즉시 알림
+    private fun notifyFlutterBatteryChange(chargingInfo: Map<String, Any>) {
+        try {
+            methodChannel?.invokeMethod("onBatteryStateChanged", chargingInfo)
+            android.util.Log.d("BatteryPal", "Flutter에 배터리 상태 변화 알림: $chargingInfo")
+        } catch (e: Exception) {
+            android.util.Log.e("BatteryPal", "Flutter 알림 실패", e)
         }
     }
 

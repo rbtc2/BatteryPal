@@ -4,6 +4,25 @@ import 'package:flutter/foundation.dart';
 /// Android 네이티브 배터리 정보를 가져오는 서비스
 class NativeBatteryService {
   static const MethodChannel _channel = MethodChannel('com.example.batterypal/battery');
+  
+  /// 배터리 상태 변화 콜백 함수
+  static Function(Map<String, dynamic>)? _onBatteryStateChanged;
+
+  /// 배터리 상태 변화 실시간 감지 초기화
+  static void initializeBatteryStateListener(Function(Map<String, dynamic>) onBatteryStateChanged) {
+    _onBatteryStateChanged = onBatteryStateChanged;
+    
+    // 네이티브에서 오는 배터리 상태 변화 이벤트 처리
+    _channel.setMethodCallHandler((call) async {
+      if (call.method == 'onBatteryStateChanged') {
+        final chargingInfo = Map<String, dynamic>.from(call.arguments);
+        debugPrint('네이티브에서 배터리 상태 변화 감지: $chargingInfo');
+        _onBatteryStateChanged?.call(chargingInfo);
+      }
+    });
+    
+    debugPrint('네이티브 배터리 상태 변화 리스너 초기화 완료');
+  }
 
   /// 배터리 온도 가져오기 (섭씨)
   static Future<double> getBatteryTemperature() async {
