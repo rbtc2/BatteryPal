@@ -70,8 +70,8 @@ class _ChargingPatternsTabState extends State<ChargingPatternsTab>
       opacity: _fadeAnimation,
       child: SingleChildScrollView(
       padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
+            child: Column(
+              children: [
             // 섹션 1: 인사이트 카드
             SlideTransition(
               position: Tween<Offset>(
@@ -132,9 +132,9 @@ class _ChargingPatternsTabState extends State<ChargingPatternsTab>
             
             // 하단 여백
             SizedBox(height: 32),
-          ],
-        ),
-      ),
+              ],
+            ),
+          ),
     );
   }
 

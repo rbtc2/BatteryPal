@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../../models/app_usage_models.dart';
 
 /// 사용 패턴 탭 - 완전히 새로 구현된 스켈레톤 UI
 /// 
@@ -63,51 +62,8 @@ class UsageAnalyticsTab extends StatelessWidget {
 }
 
 /// 섹션 1: 오늘의 배터리 사용 현황 요약
-class TodaySummaryCard extends StatefulWidget {
+class TodaySummaryCard extends StatelessWidget {
   const TodaySummaryCard({super.key});
-
-  @override
-  State<TodaySummaryCard> createState() => _TodaySummaryCardState();
-}
-
-class _TodaySummaryCardState extends State<TodaySummaryCard> {
-  final AppUsageManager _appUsageManager = AppUsageManager();
-  ScreenTimeSummary? _summary;
-  bool _isLoading = true;
-  bool _hasError = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadScreenTimeData();
-  }
-
-  Future<void> _loadScreenTimeData() async {
-    try {
-      setState(() {
-        _isLoading = true;
-        _hasError = false;
-      });
-
-      final summary = await _appUsageManager.getScreenTimeSummary();
-      
-      setState(() {
-        _summary = summary;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _hasError = true;
-        _isLoading = false;
-      });
-    }
-  }
-
-  Future<void> _handlePermissionRequest() async {
-    await _appUsageManager.openPermissionSettings();
-    // 설정에서 돌아온 후 데이터 새로고침
-    await _loadScreenTimeData();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -155,7 +111,39 @@ class _TodaySummaryCardState extends State<TodaySummaryCard> {
           // 3개 메트릭 (가로 배치)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: _buildMetricsRow(context),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _buildMetricCard(
+                    context,
+                    icon: '📱',
+                    label: '스크린 타임',
+                    value: '4시간 32분',
+                    color: Colors.blue,
+                  ),
+                ),
+                SizedBox(width: 12),
+                Expanded(
+                  child: _buildMetricCard(
+                    context,
+                    icon: '🔋',
+                    label: '백그라운드 소모',
+                    value: '12%',
+                    color: Colors.orange,
+                  ),
+                ),
+                SizedBox(width: 12),
+                Expanded(
+                  child: _buildMetricCard(
+                    context,
+                    icon: '⏱️',
+                    label: '총 사용 시간',
+                    value: '7시간 45분',
+                    color: Colors.purple,
+                  ),
+                ),
+              ],
+            ),
           ),
           
           SizedBox(height: 16),
@@ -194,180 +182,6 @@ class _TodaySummaryCardState extends State<TodaySummaryCard> {
           ),
           
           SizedBox(height: 16),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMetricsRow(BuildContext context) {
-    if (_isLoading) {
-      return Row(
-        children: [
-          Expanded(child: _buildLoadingMetricCard(context)),
-          SizedBox(width: 12),
-          Expanded(child: _buildLoadingMetricCard(context)),
-          SizedBox(width: 12),
-          Expanded(child: _buildLoadingMetricCard(context)),
-        ],
-      );
-    }
-
-    if (_hasError || _summary == null) {
-      return Row(
-        children: [
-          Expanded(child: _buildErrorState(context)),
-          SizedBox(width: 12),
-          Expanded(child: SizedBox()), // 빈 공간
-          SizedBox(width: 12),
-          Expanded(child: SizedBox()), // 빈 공간
-        ],
-      );
-    }
-
-    if (!_summary!.hasPermission) {
-      return Row(
-        children: [
-          Expanded(child: _buildPermissionRequest(context)),
-          SizedBox(width: 12),
-          Expanded(child: SizedBox()), // 빈 공간
-          SizedBox(width: 12),
-          Expanded(child: SizedBox()), // 빈 공간
-        ],
-      );
-    }
-
-    return Row(
-      children: [
-        Expanded(
-          child: _buildMetricCard(
-            context,
-            icon: '📱',
-            label: '스크린 타임',
-            value: _summary!.formattedTotalScreenTime,
-            color: Colors.blue,
-          ),
-        ),
-        SizedBox(width: 12),
-        Expanded(
-          child: _buildMetricCard(
-            context,
-            icon: '🔋',
-            label: '백그라운드 소모',
-            value: _summary!.formattedBackgroundConsumptionPercent,
-            color: Colors.orange,
-          ),
-        ),
-        SizedBox(width: 12),
-        Expanded(
-          child: _buildMetricCard(
-            context,
-            icon: '⏱️',
-            label: '총 사용 시간',
-            value: _summary!.formattedTotalUsageTime,
-            color: Colors.purple,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildLoadingMetricCard(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.grey.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Colors.grey.withValues(alpha: 0.3),
-        ),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          CircularProgressIndicator(strokeWidth: 2),
-          SizedBox(height: 8),
-          Text(
-            '로딩 중...',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[600],
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildErrorState(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.red.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Colors.red.withValues(alpha: 0.3),
-        ),
-      ),
-      child: Column(
-        children: [
-          Icon(Icons.error_outline, color: Colors.red, size: 24),
-          SizedBox(height: 8),
-          Text(
-            '데이터를 불러올 수 없습니다',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.red[700],
-              fontWeight: FontWeight.w500,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          SizedBox(height: 8),
-          ElevatedButton(
-            onPressed: _loadScreenTimeData,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            child: Text('다시 시도'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPermissionRequest(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.orange.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Colors.orange.withValues(alpha: 0.3),
-        ),
-      ),
-      child: Column(
-        children: [
-          Icon(Icons.security, color: Colors.orange, size: 24),
-          SizedBox(height: 8),
-          Text(
-            '사용 통계 권한이 필요합니다',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.orange[700],
-              fontWeight: FontWeight.w500,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          SizedBox(height: 8),
-          ElevatedButton(
-            onPressed: _handlePermissionRequest,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange,
-              foregroundColor: Colors.white,
-            ),
-            child: Text('권한 설정'),
-          ),
         ],
       ),
     );
@@ -422,6 +236,22 @@ class _TodaySummaryCardState extends State<TodaySummaryCard> {
   }
 }
 
+/// 앱 사용 데이터 모델
+class _AppUsageData {
+  final String name;
+  final double batteryPercent;
+  final String screenTime;
+  final String backgroundTime;
+  final Color color;
+  
+  _AppUsageData({
+    required this.name,
+    required this.batteryPercent,
+    required this.screenTime,
+    required this.backgroundTime,
+    required this.color,
+  });
+}
 
 /// 섹션 2: 앱별 배터리 소모 분석 (메인 기능)
 class AppBatteryUsageCard extends StatefulWidget {
@@ -432,56 +262,13 @@ class AppBatteryUsageCard extends StatefulWidget {
 }
 
 class _AppBatteryUsageCardState extends State<AppBatteryUsageCard> {
-  final AppUsageManager _appUsageManager = AppUsageManager();
   bool _showAll = false;
-  ScreenTimeSummary? _summary;
-  bool _isLoading = true;
-  bool _hasError = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadAppUsageData();
-  }
-
-  Future<void> _loadAppUsageData() async {
-    try {
-      setState(() {
-        _isLoading = true;
-        _hasError = false;
-      });
-
-      final summary = await _appUsageManager.getScreenTimeSummary();
-      
-      setState(() {
-        _summary = summary;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _hasError = true;
-        _isLoading = false;
-      });
-    }
-  }
   
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return _buildLoadingState(context);
-    }
-
-    if (_hasError || _summary == null) {
-      return _buildErrorState(context);
-    }
-
-    if (!_summary!.hasPermission) {
-      return _buildPermissionState(context);
-    }
-
-    final apps = _summary!.topApps;
+    final apps = _getDummyAppUsage();
     final displayedApps = _showAll ? apps : apps.take(4).toList();
-    final otherAppsPercent = _showAll ? 0 : _calculateOtherAppsPercent(apps);
+    final otherAppsPercent = _showAll ? 0 : 18; // 기타 앱들의 합
     
     return Container(
       decoration: BoxDecoration(
@@ -531,13 +318,13 @@ class _AppBatteryUsageCardState extends State<AppBatteryUsageCard> {
               children: [
                 ...displayedApps.map((app) => Padding(
                   padding: const EdgeInsets.only(bottom: 12),
-                  child: _buildRealAppItem(context, app),
+                  child: _buildAppItem(context, app),
                 )),
                 
                 // "기타" 또는 "전체 보기" 버튼
-                if (!_showAll && otherAppsPercent > 0)
-                  _buildOtherAppsItem(context, otherAppsPercent.toInt())
-                else if (!_showAll)
+                if (!_showAll)
+                  _buildOtherAppsItem(context, otherAppsPercent)
+                else
                   SizedBox(height: 4),
               ],
             ),
@@ -548,176 +335,8 @@ class _AppBatteryUsageCardState extends State<AppBatteryUsageCard> {
       ),
     );
   }
-
-  double _calculateOtherAppsPercent(List<RealAppUsageData> apps) {
-    if (apps.length <= 4) return 0.0;
-    
-    final remainingTotal = apps.skip(4).fold<double>(0.0, (sum, app) => sum + app.batteryPercent);
-    
-    return remainingTotal;
-  }
-
-  Widget _buildLoadingState(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            Row(
-              children: [
-                Text('📱', style: TextStyle(fontSize: 24)),
-                SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    '앱별 배터리 소모 (오늘)',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 20),
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text(
-              '앱 사용 데이터를 불러오는 중...',
-              style: TextStyle(
-                fontSize: 14,
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildErrorState(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            Row(
-              children: [
-                Text('📱', style: TextStyle(fontSize: 24)),
-                SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    '앱별 배터리 소모 (오늘)',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 20),
-            Icon(Icons.error_outline, color: Colors.red, size: 48),
-            SizedBox(height: 16),
-            Text(
-              '앱 사용 데이터를 불러올 수 없습니다',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.red[700],
-                fontWeight: FontWeight.w500,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _loadAppUsageData,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-              ),
-              child: Text('다시 시도'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPermissionState(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            Row(
-              children: [
-                Text('📱', style: TextStyle(fontSize: 24)),
-                SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    '앱별 배터리 소모 (오늘)',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 20),
-            Icon(Icons.security, color: Colors.orange, size: 48),
-            SizedBox(height: 16),
-            Text(
-              '앱 사용 통계 권한이 필요합니다',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.orange[700],
-                fontWeight: FontWeight.w500,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () async {
-                await _appUsageManager.openPermissionSettings();
-                await _loadAppUsageData();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.orange,
-                foregroundColor: Colors.white,
-              ),
-              child: Text('권한 설정'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRealAppItem(BuildContext context, RealAppUsageData app) {
+  
+  Widget _buildAppItem(BuildContext context, _AppUsageData app) {
     return Container(
       padding: EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -745,7 +364,7 @@ class _AppBatteryUsageCardState extends State<AppBatteryUsageCard> {
               SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  app.appName,
+                  app.name,
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.bold,
@@ -756,7 +375,7 @@ class _AppBatteryUsageCardState extends State<AppBatteryUsageCard> {
                 ),
               ),
               Text(
-                app.formattedBatteryPercent,
+                '${app.batteryPercent.toInt()}%',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
@@ -789,7 +408,7 @@ class _AppBatteryUsageCardState extends State<AppBatteryUsageCard> {
                   context,
                   icon: Icons.phone_android,
                   label: '스크린',
-                  time: app.formattedScreenTime,
+                  time: app.screenTime,
                 ),
               ),
               SizedBox(width: 8),
@@ -798,7 +417,7 @@ class _AppBatteryUsageCardState extends State<AppBatteryUsageCard> {
                   context,
                   icon: Icons.apps,
                   label: '백그라운드',
-                  time: app.formattedBackgroundTime,
+                  time: app.backgroundTime,
                 ),
               ),
             ],
@@ -807,7 +426,6 @@ class _AppBatteryUsageCardState extends State<AppBatteryUsageCard> {
       ),
     );
   }
-  
   
   Widget _buildTimeChip(
     BuildContext context, {
@@ -902,6 +520,46 @@ class _AppBatteryUsageCardState extends State<AppBatteryUsageCard> {
     );
   }
   
+  /// 더미 앱 사용 데이터 생성
+  List<_AppUsageData> _getDummyAppUsage() {
+    return [
+      _AppUsageData(
+        name: 'YouTube',
+        batteryPercent: 35,
+        screenTime: '2시간 30분',
+        backgroundTime: '5분',
+        color: Colors.red[400]!,
+      ),
+      _AppUsageData(
+        name: 'Instagram',
+        batteryPercent: 22,
+        screenTime: '1시간 45분',
+        backgroundTime: '30분',
+        color: Colors.orange[400]!,
+      ),
+      _AppUsageData(
+        name: '카카오톡',
+        batteryPercent: 15,
+        screenTime: '45분',
+        backgroundTime: '1시간',
+        color: Colors.amber[400]!,
+      ),
+      _AppUsageData(
+        name: 'Chrome',
+        batteryPercent: 10,
+        screenTime: '1시간 20분',
+        backgroundTime: '5분',
+        color: Colors.green[400]!,
+      ),
+      _AppUsageData(
+        name: 'Spotify',
+        batteryPercent: 8,
+        screenTime: '20분',
+        backgroundTime: '2시간',
+        color: Colors.teal[400]!,
+      ),
+    ];
+  }
 }
 
 /// 섹션 3: 사용 트렌드 비교
@@ -1214,5 +872,4 @@ class UsageTrendCard extends StatelessWidget {
       ],
     );
   }
-
 }
