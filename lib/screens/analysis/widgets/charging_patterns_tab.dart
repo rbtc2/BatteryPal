@@ -1,8 +1,33 @@
 import 'package:flutter/material.dart';
-import '../widgets/analysis_tab_widgets.dart';
+import 'package:fl_chart/fl_chart.dart';
 
-/// 충전 패턴 탭 - 일일 충전 타임라인, 충전 방식별 통계, 충전 속도 분석
-class ChargingPatternsTab extends StatelessWidget {
+/// 충전 패턴 탭 - 완전히 새로 구현된 스켈레톤 UI
+/// 
+/// 주요 기능:
+/// 1. InsightCard: 접을 수 있는 인사이트 카드
+/// 2. ChargingCurrentChart: fl_chart를 사용한 실시간 충전 전류 그래프
+/// 3. ChargingStatsCard: 향상된 통계 및 세션 기록 카드
+/// 4. Pro 사용자 전용 고급 분석 기능
+/// 
+/// 애니메이션:
+/// - 페이지 로드 시 순차적 슬라이드 애니메이션
+/// - 각 섹션별 독립적인 타이밍으로 부드러운 전환
+/// 
+/// Pro 기능:
+/// - 상세 분석 다이얼로그
+/// - AI 충전 패턴 예측
+/// - 실시간 최적화 제안
+
+/// 충전 데이터 포인트 클래스
+class _ChargingDataPoint {
+  final double hour; // 0.0 ~ 24.0
+  final double currentMa;
+  
+  _ChargingDataPoint(this.hour, this.currentMa);
+}
+
+/// 충전 패턴 탭 - 새로운 스켈레톤 UI 구현
+class ChargingPatternsTab extends StatefulWidget {
   final bool isProUser;
   final VoidCallback? onProUpgrade;
 
@@ -13,881 +38,345 @@ class ChargingPatternsTab extends StatelessWidget {
   });
 
   @override
+  State<ChargingPatternsTab> createState() => _ChargingPatternsTabState();
+}
+
+class _ChargingPatternsTabState extends State<ChargingPatternsTab>
+    with TickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
+  
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeInOut,
+    ));
+    _animationController.forward();
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          // 일일 충전 타임라인 카드
-          AnalysisCard(
-            title: '일일 충전 타임라인',
-            child: _buildChargingTimeline(),
-          ),
-          const SizedBox(height: 24),
-
-          // 충전 방식별 통계 카드
-          AnalysisCard(
-            title: '충전 방식별 통계',
-            showProUpgrade: !isProUser,
-            onProUpgrade: onProUpgrade,
-            child: _buildChargingMethodStats(),
-          ),
-          const SizedBox(height: 24),
-
-          // 충전 속도 분석 카드
-          AnalysisCard(
-            title: '충전 속도 분석',
-            child: _buildChargingSpeedAnalysis(),
-          ),
-          const SizedBox(height: 24),
-
-          // 시간대별 충전 패턴 카드
-          AnalysisCard(
-            title: '시간대별 충전 패턴',
-            showProUpgrade: !isProUser,
-            onProUpgrade: onProUpgrade,
-            child: _buildTimeBasedPatterns(),
-          ),
-          const SizedBox(height: 24),
-
-          // 충전 효율성 인사이트 카드
-          AnalysisCard(
-            title: '충전 효율성 인사이트',
-            showProUpgrade: !isProUser,
-            onProUpgrade: onProUpgrade,
-            child: _buildEfficiencyInsights(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildChargingTimeline() {
-    return Column(
-      children: [
-        // 24시간 타임라인 바 차트
-        Builder(
-          builder: (context) => Container(
-            height: 80,
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+            // 섹션 1: 인사이트 카드
+            SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(-1.0, 0.0),
+                end: Offset.zero,
+              ).animate(CurvedAnimation(
+                parent: _animationController,
+                curve: const Interval(0.0, 0.3, curve: Curves.easeOut),
+              )),
+              child: InsightCard(),
+            ),
+            
+            SizedBox(height: 16),
+            
+            // 섹션 2: 충전 전류 그래프 (메인)
+            SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0.0, 1.0),
+                end: Offset.zero,
+              ).animate(CurvedAnimation(
+                parent: _animationController,
+                curve: const Interval(0.2, 0.6, curve: Curves.easeOut),
+              )),
+              child: ChargingCurrentChart(
+                isProUser: widget.isProUser,
+                onProUpgrade: widget.onProUpgrade,
               ),
             ),
-            child: Column(
-              children: [
-                Text(
-                  '24시간 충전 타임라인',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Expanded(
-                  child: _buildTimelineBar(),
-                ),
-              ],
+            
+            SizedBox(height: 16),
+            
+            // 섹션 3: 통계 + 세션 기록
+            SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(1.0, 0.0),
+                end: Offset.zero,
+              ).animate(CurvedAnimation(
+                parent: _animationController,
+                curve: const Interval(0.4, 0.8, curve: Curves.easeOut),
+              )),
+              child: ChargingStatsCard(),
             ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        
-        // 충전 세션 상세 정보
-        _buildChargingSessionDetail(
-          icon: '🌙',
-          title: '새벽 충전 (02:15 - 07:00)',
-          batteryChange: '15% → 100%',
-          duration: '4시간 45분',
-          speed: '저속(500mA)',
-          color: const Color(0xFF94A3B8), // slate-400
-        ),
-        const SizedBox(height: 12),
-        _buildChargingSessionDetail(
-          icon: '⚡',
-          title: '아침 충전 (09:00 - 10:15)',
-          batteryChange: '25% → 85%',
-          duration: '1시간 15분',
-          speed: '고속(2100mA)',
-          color: const Color(0xFF6366F1), // indigo-600
-        ),
-        const SizedBox(height: 12),
-        _buildChargingSessionDetail(
-          icon: '🔌',
-          title: '저녁 충전 (18:30 - 19:00)',
-          batteryChange: '45% → 75%',
-          duration: '30분',
-          speed: '일반(1000mA)',
-          color: const Color(0xFF3B82F6), // blue-500
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTimelineBar() {
-    return Builder(
-      builder: (context) => Container(
-        height: 20,
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Stack(
-          children: [
-            // 배경 그리드 (시간 표시)
-            _buildTimeGrid(),
-            // 충전 세션 블록들
-            _buildChargingBlocks(),
+            
+            // Pro 사용자 전용 추가 섹션
+            if (widget.isProUser) ...[
+              SizedBox(height: 16),
+              SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0.0, 1.0),
+                  end: Offset.zero,
+                ).animate(CurvedAnimation(
+                  parent: _animationController,
+                  curve: const Interval(0.6, 1.0, curve: Curves.easeOut),
+                )),
+                child: _buildProExclusiveSection(),
+              ),
+            ],
+            
+            // 하단 여백
+            SizedBox(height: 32),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildTimeGrid() {
-    return Builder(
-      builder: (context) => Row(
-        children: List.generate(25, (index) {
-          return Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                border: Border(
-                  right: BorderSide(
-                    color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
-                    width: 0.5,
-                  ),
-                ),
-              ),
-              child: Center(
-                child: Text(
-                  index.toString().padLeft(2, '0'),
-                  style: TextStyle(
-                    fontSize: 8,
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
-                  ),
-                ),
-              ),
-            ),
-          );
-        }),
+  Widget _buildProExclusiveSection() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Colors.purple.withValues(alpha: 0.1),
+            Colors.purple.withValues(alpha: 0.05),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.purple.withValues(alpha: 0.3),
+        ),
       ),
-    );
-  }
-
-  Widget _buildChargingBlocks() {
-    return Builder(
-      builder: (context) => Stack(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 새벽 충전 (02:15 - 07:00)
-          Positioned(
-            left: 2.25 * 4.0, // 2시간 15분 = 2.25시간
-            child: Container(
-              width: (7.0 - 2.25) * 4.0, // 4시간 45분
-              height: 20,
-              decoration: BoxDecoration(
-                color: const Color(0xFF94A3B8), // slate-400
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Center(
-                child: Text(
-                  '02-07시',
-                  style: const TextStyle(
-                    fontSize: 8,
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
+        Row(
+          children: [
+              Container(
+                padding: EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.purple.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.star,
+                color: Colors.purple,
+                  size: 20,
                 ),
               ),
-            ),
-          ),
-          // 아침 충전 (09:00 - 10:15)
-          Positioned(
-            left: 9.0 * 4.0, // 9시간
-            child: Container(
-              width: (10.25 - 9.0) * 4.0, // 1시간 15분
-              height: 20,
-              decoration: BoxDecoration(
-                color: const Color(0xFF6366F1), // indigo-600
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Center(
-                child: Text(
-                  '09-10시',
-                  style: const TextStyle(
-                    fontSize: 8,
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
+              SizedBox(width: 12),
+              Text(
+                'Pro 전용 고급 분석',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.purple[700],
                 ),
               ),
-            ),
+            ],
           ),
-          // 저녁 충전 (18:30 - 19:00)
-          Positioned(
-            left: 18.5 * 4.0, // 18시간 30분
-            child: Container(
-              width: (19.0 - 18.5) * 4.0, // 30분
-              height: 20,
-              decoration: BoxDecoration(
-                color: const Color(0xFF3B82F6), // blue-500
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Center(
-                child: Text(
-                  '18-19시',
-                  style: const TextStyle(
-                    fontSize: 8,
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
-          ),
+          SizedBox(height: 16),
+          _buildProFeature('🔮 AI 충전 패턴 예측', '다음 주 충전 패턴을 예측합니다'),
+          SizedBox(height: 8),
+          _buildProFeature('📊 상세 효율성 분석', '충전 효율을 시간대별로 분석합니다'),
+          SizedBox(height: 8),
+          _buildProFeature('⚡ 실시간 최적화 제안', '현재 상황에 맞는 충전 최적화를 제안합니다'),
         ],
       ),
     );
   }
-
-  Widget _buildChargingSessionDetail({
-    required String icon,
-    required String title,
-    required String batteryChange,
-    required String duration,
-    required String speed,
-    required Color color,
-  }) {
-    return Builder(
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border(
-            left: BorderSide(
-              color: color,
-              width: 4,
-            ),
-          ),
-        ),
-        child: Row(
-          children: [
-            Text(
-              icon,
-              style: const TextStyle(fontSize: 24),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '배터리 변화: $batteryChange',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '충전 시간: $duration',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '충전 속도: $speed',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-
-  Widget _buildChargingMethodStats() {
-    return Column(
+  
+  Widget _buildProFeature(String title, String description) {
+    return Row(
       children: [
-        Container(
-          height: 200,
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: Colors.grey.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: Colors.grey.withValues(alpha: 0.3),
-            ),
-          ),
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.pie_chart,
-                  size: 48,
-                  color: Colors.grey[400],
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  '충전 방식별 통계 차트',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey[600],
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Pro로 업그레이드하면 상세한 통계를 확인할 수 있습니다',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[500],
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
             Expanded(
-              child: MetricCard(
-                title: 'USB 충전',
-                value: '45%',
-                icon: Icons.usb,
-                color: Colors.blue,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: MetricCard(
-                title: 'AC 충전',
-                value: '35%',
-                icon: Icons.power,
-                color: Colors.green,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: MetricCard(
-                title: '무선 충전',
-                value: '20%',
-                icon: Icons.wifi,
-                color: Colors.orange,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: MetricCard(
-                title: '빠른 충전',
-                value: '60%',
-                icon: Icons.flash_on,
-                color: Colors.red,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildChargingSpeedAnalysis() {
-    return Column(
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: MetricCard(
-                title: '초고속 충전',
-                value: '2회',
-                icon: Icons.flash_on,
-                color: Colors.red,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: MetricCard(
-                title: '고속 충전',
-                value: '5회',
-                icon: Icons.speed,
-                color: Colors.orange,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: MetricCard(
-                title: '정상 충전',
-                value: '8회',
-                icon: Icons.battery_charging_full,
-                color: Colors.green,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: MetricCard(
-                title: '저속 충전',
-                value: '3회',
-                icon: Icons.battery_6_bar,
-                color: Colors.blue,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        
-        // 충전 속도별 평균 시간
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.blue.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: Colors.blue.withValues(alpha: 0.3),
-            ),
-          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '충전 속도별 평균 시간',
+                title,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+              ),
+              Text(
+                description,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+              ),
+            ),
+          ],
+          ),
+        ),
+        Icon(
+          Icons.check_circle,
+          color: Colors.green,
+          size: 16,
+        ),
+      ],
+    );
+  }
+}
+
+/// 섹션 1: 오늘의 인사이트 카드 (접을 수 있음)
+class InsightCard extends StatefulWidget {
+  @override
+  State<InsightCard> createState() => _InsightCardState();
+}
+
+class _InsightCardState extends State<InsightCard> {
+  bool _isExpanded = true; // 기본값: 펼쳐진 상태
+  
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.blue.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.blue.withValues(alpha: 0.3),
+          width: 1.5,
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 헤더 (항상 표시, 탭하면 접기/펼치기)
+          InkWell(
+            onTap: () {
+              setState(() {
+                _isExpanded = !_isExpanded;
+              });
+            },
+            borderRadius: BorderRadius.circular(16),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+            children: [
+                  Text('💡', style: TextStyle(fontSize: 24)),
+                  SizedBox(width: 12),
+            Expanded(
+                    child: Text(
+                      '배터리 수명을 위한 오늘의 팁',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: Colors.blue[700],
-                ),
-              ),
-              const SizedBox(height: 12),
-              _buildSpeedTimeItem('초고속 충전', '25분', Colors.red),
-              _buildSpeedTimeItem('고속 충전', '45분', Colors.orange),
-              _buildSpeedTimeItem('정상 충전', '90분', Colors.green),
-              _buildSpeedTimeItem('저속 충전', '180분', Colors.blue),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSpeedTimeItem(String speed, String time, Color color) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            speed,
-            style: const TextStyle(fontSize: 14),
-          ),
-          Text(
-            time,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTimeBasedPatterns() {
-    return Column(
-      children: [
-        // 충전 습관 히트맵
-        Builder(
-          builder: (context) => Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '충전 습관 히트맵 (주간)',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                _buildHeatmapGrid(),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        
-        // 충전 통계
-        _buildChargingStats(),
-      ],
-    );
-  }
-
-  Widget _buildHeatmapGrid() {
-    return Builder(
-      builder: (context) => Column(
-        children: [
-          // 요일 헤더
-          Row(
-            children: [
-              const SizedBox(width: 60), // 시간 라벨 공간
-              ...['월', '화', '수', '목', '금', '토', '일'].map((day) => 
-                Expanded(
-                  child: Center(
-                    child: Text(
-                      day,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
                         color: Theme.of(context).colorScheme.onSurface,
-                      ),
-                    ),
-                  ),
                 ),
+              ),
+                ),
+                  Icon(
+                    _isExpanded 
+                        ? Icons.keyboard_arrow_up 
+                        : Icons.keyboard_arrow_down,
+                    color: Colors.blue,
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          // 히트맵 그리드
-          ..._buildHeatmapRows(context),
-        ],
-      ),
-    );
-  }
-
-  List<Widget> _buildHeatmapRows(BuildContext context) {
-    final timeLabels = ['06시', '09시', '12시', '18시', '23시'];
-    final timeDescriptions = ['← 출근 전', '← 출근 중', '← 점심', '← 퇴근 후', '← 취침 전'];
-    
-    // 샘플 데이터: 각 시간대별로 충전한 요일들
-    final heatmapData = [
-      [false, false, false, false, false, false, false], // 06시
-      [true, true, false, true, true, false, false],     // 09시
-      [false, false, true, false, false, false, false],  // 12시
-      [true, true, true, true, true, true, true],        // 18시
-      [false, false, false, false, false, false, true],  // 23시
-    ];
-
-    return List.generate(5, (rowIndex) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 2),
-        child: Row(
-          children: [
-            // 시간 라벨
-            SizedBox(
-              width: 60,
+            ),
+          ),
+          
+          // 내용 (접혔을 때 숨김)
+          if (_isExpanded) ...[
+            Divider(height: 1, color: Colors.blue.withValues(alpha: 0.3)),
+            Padding(
+              padding: const EdgeInsets.all(16),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    timeLabels[rowIndex],
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
+                  // 메인 인사이트
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+                      Text('🌙', style: TextStyle(fontSize: 20)),
+                      SizedBox(width: 8),
+              Expanded(
+                        child: Text(
+                          '밤 10시-새벽 6시에 충전하면\n배터리 건강도가 15% 더 유지돼요',
+                          style: TextStyle(
+                            fontSize: 14,
+                            height: 1.5,
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
+                        ),
+              ),
+            ],
+          ),
+                  SizedBox(height: 16),
+                  
+                  // 구분선
+                  Container(
+                    height: 1,
+                    color: Colors.blue.withValues(alpha: 0.2),
                   ),
-                  Text(
-                    timeDescriptions[rowIndex],
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                    ),
+                  SizedBox(height: 16),
+                  
+                  // 현재 습관 & 권장사항
+                  _buildInfoRow(
+                    context,
+                    '현재 충전 습관',
+                    '⚡급속 충전 3회 (주의!)',
+                    Colors.orange,
+                  ),
+                  SizedBox(height: 8),
+                  _buildInfoRow(
+                    context,
+                    '권장',
+                    '저속 충전으로 전환 추천',
+                    Colors.green,
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 8),
-            // 히트맵 셀들
-            ...List.generate(7, (colIndex) {
-              final isCharged = heatmapData[rowIndex][colIndex];
-              return Expanded(
-                child: Container(
-                  height: 24,
-                  margin: const EdgeInsets.symmetric(horizontal: 1),
-                  decoration: BoxDecoration(
-                    color: isCharged 
-                        ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.8)
-                        : Theme.of(context).colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(
-                      color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
-                      width: 0.5,
-                    ),
-                  ),
-                  child: Center(
-                    child: Text(
-                      isCharged ? '■' : '□',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isCharged 
-                            ? Colors.white
-                            : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            }),
           ],
-        ),
-      );
-    });
-  }
-
-  Widget _buildChargingStats() {
-    return Builder(
-      builder: (context) => Column(
-        children: [
-          // 평균 시작/종료
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.blue.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: Colors.blue.withValues(alpha: 0.3),
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '평균 시작/종료',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '평균 시작: 28% | 평균 종료: 87%',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          
-          // 충전 빈도와 타입 비율
-          Row(
-            children: [
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.green.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: Colors.green.withValues(alpha: 0.3),
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '충전 빈도',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.onSurface,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '일 평균: 2.3회',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                        ),
-                      ),
-                      Text(
-                        '주 평균: 16회',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: Colors.orange.withValues(alpha: 0.3),
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '충전 타입 비율',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.onSurface,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '고속:일반:저속',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                        ),
-                      ),
-                      Text(
-                        '= 45:35:20',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.onSurface,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
         ],
       ),
     );
   }
 
-  Widget _buildEfficiencyInsights() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildInsightItem(
-          icon: Icons.trending_up,
-          title: 'AC 충전의 효율성이 무선 충전보다 15% 높습니다',
-          color: Colors.green,
-        ),
-        const SizedBox(height: 12),
-        _buildInsightItem(
-          icon: Icons.schedule,
-          title: '오후 2-4시 충전이 가장 효율적입니다',
-          color: Colors.blue,
-        ),
-        const SizedBox(height: 12),
-        _buildInsightItem(
-          icon: Icons.warning,
-          title: '야간 충전은 배터리 수명에 영향을 줄 수 있습니다',
-          color: Colors.orange,
-        ),
-        const SizedBox(height: 12),
-        _buildInsightItem(
-          icon: Icons.lightbulb,
-          title: '80% 이상 충전 시 효율성이 크게 감소합니다',
-          color: Colors.red,
-        ),
-        if (!isProUser) ...[
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.blue.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: Colors.blue.withValues(alpha: 0.3),
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.info_outline,
-                  color: Colors.blue,
-                  size: 20,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Pro로 업그레이드하면 더 자세한 효율성 분석을 확인할 수 있습니다',
-                    style: TextStyle(
-                      color: Colors.blue[700],
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildInsightItem({
-    required IconData icon,
-    required String title,
-    required Color color,
-  }) {
+  Widget _buildInfoRow(
+    BuildContext context,
+    String label,
+    String value,
+    Color valueColor,
+  ) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(
-          icon,
-          color: color,
-          size: 20,
+        SizedBox(
+          width: 80,
+          child: Text(
+            '$label:',
+            style: TextStyle(
+              fontSize: 13,
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+            ),
+          ),
         ),
-        const SizedBox(width: 12),
         Expanded(
           child: Text(
-            title,
-            style: const TextStyle(
-              fontSize: 14,
-              height: 1.4,
+          value,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: valueColor,
             ),
           ),
         ),
@@ -895,3 +384,1009 @@ class ChargingPatternsTab extends StatelessWidget {
     );
   }
 }
+
+/// 섹션 2: 충전 전류 그래프 (메인)
+class ChargingCurrentChart extends StatefulWidget {
+  final bool isProUser;
+  final VoidCallback? onProUpgrade;
+
+  const ChargingCurrentChart({
+    super.key,
+    this.isProUser = false,
+    this.onProUpgrade,
+  });
+
+  @override
+  State<ChargingCurrentChart> createState() => _ChargingCurrentChartState();
+}
+
+class _ChargingCurrentChartState extends State<ChargingCurrentChart> {
+  String _selectedTab = '오늘'; // '오늘', '어제', '이번 주'
+  
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+          decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+            ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+            child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+          // 헤더
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+            children: [
+                Text('📊', style: TextStyle(fontSize: 24)),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    '충전 전류 패턴',
+                style: TextStyle(
+                      fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () {
+                    if (widget.isProUser) {
+                      // Pro 사용자: 상세 분석 페이지로 이동
+                      _showDetailedAnalysis();
+                    } else {
+                      // 무료 사용자: Pro 업그레이드 다이얼로그
+                      widget.onProUpgrade?.call();
+                    }
+                  },
+                  child: Text(widget.isProUser ? '상세 분석' : 'Pro로 더보기'),
+                ),
+              ],
+            ),
+          ),
+          
+          // 탭 선택 + 날짜
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                _buildTabButton('오늘'),
+                SizedBox(width: 8),
+                _buildTabButton('어제'),
+                SizedBox(width: 8),
+                _buildTabButton('이번 주'),
+                Spacer(),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+            children: [
+                      Icon(Icons.calendar_today, size: 14),
+                      SizedBox(width: 6),
+                Text(
+                        '2024.01.15',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          SizedBox(height: 24),
+          
+          // 그래프 영역
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: SizedBox(
+              height: 250,
+              child: _buildChart(),
+            ),
+          ),
+          
+          SizedBox(height: 16),
+          
+          // 범례
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Wrap(
+              spacing: 16,
+              runSpacing: 8,
+              children: [
+                _buildLegendItem('저속 (0-500mA)', Colors.blue[400]!),
+                _buildLegendItem('일반 (500-1500mA)', Colors.orange[400]!),
+                _buildLegendItem('급속 (1500mA+)', Colors.red[400]!),
+              ],
+            ),
+          ),
+          
+          SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTabButton(String label) {
+    final isSelected = _selectedTab == label;
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _selectedTab = label;
+        });
+      },
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected 
+              ? Theme.of(context).colorScheme.primaryContainer
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isSelected
+                ? Theme.of(context).colorScheme.primary
+                : Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
+          ),
+        ),
+        child: Text(
+          label,
+                  style: TextStyle(
+            fontSize: 13,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            color: isSelected
+                ? Theme.of(context).colorScheme.primary
+                : Theme.of(context).colorScheme.onSurface,
+          ),
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildLegendItem(String label, Color color) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 16,
+          height: 16,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+        SizedBox(width: 6),
+                Text(
+          label,
+          style: TextStyle(fontSize: 12),
+        ),
+      ],
+    );
+  }
+  
+  Widget _buildChart() {
+    final data = _generateDummyData();
+    
+    return LineChart(
+      LineChartData(
+        gridData: FlGridData(
+          show: true,
+          drawVerticalLine: true,
+          horizontalInterval: 500,
+          verticalInterval: 4,
+          getDrawingHorizontalLine: (value) {
+            return FlLine(
+              color: Colors.grey.withValues(alpha: 0.2),
+              strokeWidth: 1,
+            );
+          },
+          getDrawingVerticalLine: (value) {
+            return FlLine(
+              color: Colors.grey.withValues(alpha: 0.2),
+              strokeWidth: 1,
+            );
+          },
+        ),
+        titlesData: FlTitlesData(
+          show: true,
+          rightTitles: AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          topTitles: AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          bottomTitles: AxisTitles(
+            axisNameWidget: Text(
+              '시간 (Hour)',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 30,
+              interval: 4,
+              getTitlesWidget: (value, meta) {
+                return Text(
+                  value.toInt().toString(),
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Colors.grey,
+                  ),
+                );
+              },
+            ),
+          ),
+          leftTitles: AxisTitles(
+            axisNameWidget: Text(
+              'mA',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 45,
+              interval: 500,
+              getTitlesWidget: (value, meta) {
+                return Text(
+                  value.toInt().toString(),
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Colors.grey,
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+        borderData: FlBorderData(
+          show: true,
+          border: Border.all(
+            color: Colors.grey.withValues(alpha: 0.3),
+          ),
+        ),
+        minX: 0,
+        maxX: 24,
+        minY: 0,
+        maxY: 2500,
+        lineBarsData: _buildLineChartBars(data),
+      ),
+    );
+  }
+  
+  void _showDetailedAnalysis() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.analytics, color: Colors.purple),
+            SizedBox(width: 8),
+            Text('상세 충전 분석'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('🔍 고급 분석 기능:'),
+            SizedBox(height: 8),
+            Text('• 시간대별 충전 효율 분석'),
+            Text('• 온도 변화 패턴 추적'),
+            Text('• 충전 속도 최적화 제안'),
+            Text('• 배터리 수명 예측'),
+            SizedBox(height: 16),
+            Text('이 기능은 Pro 사용자 전용입니다.', 
+                 style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text('확인'),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  /// 더미 데이터 생성 함수
+  List<_ChargingDataPoint> _generateDummyData() {
+    return [
+      _ChargingDataPoint(0, 0),
+      _ChargingDataPoint(2, 0),
+      _ChargingDataPoint(2.25, 500),  // 02:15 충전 시작
+      _ChargingDataPoint(4.5, 500),
+      _ChargingDataPoint(4.5, 2100),  // 04:30 급속 전환
+      _ChargingDataPoint(6, 2100),
+      _ChargingDataPoint(6, 500),     // 06:00 저속 전환
+      _ChargingDataPoint(7, 500),
+      _ChargingDataPoint(7, 0),       // 07:00 충전 종료
+      _ChargingDataPoint(9, 0),
+      _ChargingDataPoint(9, 2100),    // 09:00 급속 충전
+      _ChargingDataPoint(10.25, 2100),
+      _ChargingDataPoint(10.25, 0),   // 10:15 종료
+      _ChargingDataPoint(18.5, 0),
+      _ChargingDataPoint(18.5, 1000), // 18:30 일반 충전
+      _ChargingDataPoint(19, 1000),
+      _ChargingDataPoint(19, 0),      // 19:00 종료
+      _ChargingDataPoint(24, 0),
+    ];
+  }
+  
+  List<LineChartBarData> _buildLineChartBars(List<_ChargingDataPoint> data) {
+    // 속도별로 분리된 세그먼트 생성
+    List<LineChartBarData> bars = [];
+    
+    // 저속 세그먼트 (파란색)
+    bars.add(_createSegment(data, 0, 500, Colors.blue[400]!));
+    
+    // 일반 세그먼트 (주황색)
+    bars.add(_createSegment(data, 500, 1500, Colors.orange[400]!));
+    
+    // 급속 세그먼트 (빨간색)
+    bars.add(_createSegment(data, 1500, 2500, Colors.red[400]!));
+    
+    return bars;
+  }
+  
+  LineChartBarData _createSegment(
+    List<_ChargingDataPoint> data,
+    double minCurrent,
+    double maxCurrent,
+    Color color,
+  ) {
+    final spots = <FlSpot>[];
+    
+    for (var point in data) {
+      if (point.currentMa >= minCurrent && point.currentMa < maxCurrent) {
+        spots.add(FlSpot(point.hour, point.currentMa));
+      }
+    }
+    
+    return LineChartBarData(
+      spots: spots.isEmpty ? [FlSpot(0, 0)] : spots,
+      isCurved: true,
+      color: color,
+      barWidth: 3,
+      isStrokeCapRound: true,
+      dotData: FlDotData(show: false),
+      belowBarData: BarAreaData(
+        show: true,
+        gradient: LinearGradient(
+          colors: [
+            color.withValues(alpha: 0.3),
+            color.withValues(alpha: 0.0),
+          ],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+      ),
+    );
+  }
+}
+
+/// 섹션 3: 통계 + 세션 기록 카드
+class ChargingStatsCard extends StatefulWidget {
+  @override
+  State<ChargingStatsCard> createState() => _ChargingStatsCardState();
+}
+
+class _ChargingStatsCardState extends State<ChargingStatsCard> {
+  bool _isSessionsExpanded = false;
+  
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 헤더
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Text('📈', style: TextStyle(fontSize: 24)),
+                SizedBox(width: 12),
+                Text(
+                  '주간 충전 분석',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          // 통계 카드 3개 (가로 배치)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+          children: [
+            Expanded(
+                  child: _buildEnhancedStatCard(
+                    context,
+                    title: '평균속도',
+                    mainValue: '1,350',
+                    unit: 'mA',
+                    subValue: '🟧 일반',
+                    trend: '+12%',
+                    trendColor: Colors.green,
+                    icon: Icons.speed,
+                  ),
+                ),
+                SizedBox(width: 12),
+            Expanded(
+                  child: _buildEnhancedStatCard(
+                    context,
+                    title: '충전횟수',
+                    mainValue: '16회',
+                    unit: '(주간)',
+                    subValue: '일 2.3회',
+                    trend: '-2회',
+                    trendColor: Colors.red,
+                    icon: Icons.battery_charging_full,
+                  ),
+                ),
+                SizedBox(width: 12),
+            Expanded(
+                  child: _buildEnhancedStatCard(
+                    context,
+                    title: '주시간대',
+                    mainValue: '저녁 9시',
+                    unit: '',
+                    subValue: '18-22시',
+                    trend: '안정',
+                    trendColor: Colors.blue,
+                    icon: Icons.access_time,
+              ),
+            ),
+          ],
+        ),
+          ),
+          
+          SizedBox(height: 16),
+          
+          // 세션 기록 펼치기 버튼
+          InkWell(
+            onTap: () {
+              setState(() {
+                _isSessionsExpanded = !_isSessionsExpanded;
+              });
+            },
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.only(
+                  bottomLeft: Radius.circular(16),
+                  bottomRight: Radius.circular(16),
+                ),
+              ),
+              child: Row(
+          children: [
+                  Icon(
+                    _isSessionsExpanded
+                        ? Icons.keyboard_arrow_up
+                        : Icons.keyboard_arrow_down,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  SizedBox(width: 8),
+            Expanded(
+                    child: Text(
+                      '충전 세션 기록 (오늘) ${_isSessionsExpanded ? '' : '보기'}',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                  if (!_isSessionsExpanded)
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '3건',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+              ),
+            ),
+          ],
+        ),
+            ),
+          ),
+          
+          // 세션 기록 리스트 (펼쳤을 때만 표시)
+          if (_isSessionsExpanded) ...[
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  _buildEnhancedSessionItem(
+                    context,
+                    icon: '🌙',
+                    title: '새벽 충전',
+                    timeRange: '02:15 - 07:00',
+                    batteryChange: '15% → 100%',
+                    duration: '4시간 45분',
+                    avgCurrent: '650mA',
+                    efficiency: '85%',
+                    temperature: '28°C',
+                    speedChanges: [
+                      '02:15 저속 시작',
+                      '04:30 급속 전환 ⚡',
+                      '06:00 트리클 모드',
+                    ],
+                    color: Colors.blue[400]!,
+                    isExpanded: false,
+                  ),
+                  SizedBox(height: 12),
+                  _buildEnhancedSessionItem(
+                    context,
+                    icon: '⚡',
+                    title: '아침 급속 충전',
+                    timeRange: '09:00 - 10:15',
+                    batteryChange: '25% → 85%',
+                    duration: '1시간 15분',
+                    avgCurrent: '2,100mA',
+                    efficiency: '92%',
+                    temperature: '32°C',
+                    speedChanges: [],
+                    color: Colors.red[400]!,
+                    isExpanded: false,
+                  ),
+                  SizedBox(height: 12),
+                  _buildEnhancedSessionItem(
+                    context,
+                    icon: '🔌',
+                    title: '저녁 보충 충전',
+                    timeRange: '18:30 - 19:00',
+                    batteryChange: '45% → 75%',
+                    duration: '30분',
+                    avgCurrent: '1,000mA',
+                    efficiency: '88%',
+                    temperature: '26°C',
+                    speedChanges: [],
+                    color: Colors.orange[400]!,
+                    isExpanded: false,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildEnhancedStatCard(
+    BuildContext context, {
+    required String title,
+    required String mainValue,
+    required String unit,
+    required String subValue,
+    required String trend,
+    required Color trendColor,
+    required IconData icon,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Theme.of(context).colorScheme.surfaceContainerHighest,
+            Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.7),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+          // 헤더: 아이콘 + 제목
+        Row(
+          children: [
+              Container(
+                padding: EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: trendColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  icon,
+                  size: 16,
+                  color: trendColor,
+                ),
+              ),
+              SizedBox(width: 8),
+            Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                  ),
+              ),
+            ),
+          ],
+        ),
+          
+          SizedBox(height: 12),
+          
+          // 메인 값
+        Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Expanded(
+                child: Text(
+                  mainValue,
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+              ),
+              if (unit.isNotEmpty) ...[
+                Text(
+                  unit,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+              ),
+            ),
+          ],
+            ],
+          ),
+          
+          SizedBox(height: 8),
+          
+          // 서브 값과 트렌드
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  subValue,
+                style: TextStyle(
+                    fontSize: 11,
+                    color: Theme.of(context).colorScheme.primary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+        Container(
+                padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+                  color: trendColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+            children: [
+                    Icon(
+                      _getTrendIcon(trend),
+                      size: 10,
+                      color: trendColor,
+                    ),
+                    SizedBox(width: 2),
+              Text(
+                      trend,
+                style: TextStyle(
+                        fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                        color: trendColor,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  IconData _getTrendIcon(String trend) {
+    if (trend.startsWith('+')) return Icons.trending_up;
+    if (trend.startsWith('-')) return Icons.trending_down;
+    return Icons.trending_flat;
+  }
+
+  Widget _buildEnhancedSessionItem(
+    BuildContext context, {
+    required String icon,
+    required String title,
+    required String timeRange,
+    required String batteryChange,
+    required String duration,
+    required String avgCurrent,
+    required String efficiency,
+    required String temperature,
+    required List<String> speedChanges,
+    required Color color,
+    required bool isExpanded,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            color.withValues(alpha: 0.1),
+            color.withValues(alpha: 0.05),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border(
+          left: BorderSide(
+              color: color,
+            width: 4,
+          ),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.1),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 헤더: 아이콘 + 제목 + 시간 + 효율성
+          Row(
+      children: [
+        Container(
+                padding: EdgeInsets.all(8),
+          decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(icon, style: TextStyle(fontSize: 20)),
+              ),
+              SizedBox(width: 12),
+              Expanded(
+            child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                      title,
+                  style: TextStyle(
+                    fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+                    SizedBox(height: 4),
+                Text(
+                      timeRange,
+                  style: TextStyle(
+                    fontSize: 12,
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                  ),
+                ),
+              ],
+            ),
+          ),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _getEfficiencyColor(efficiency).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '효율 $efficiency',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: _getEfficiencyColor(efficiency),
+                  ),
+              ),
+            ),
+          ],
+        ),
+          
+          SizedBox(height: 16),
+          
+          // 주요 정보 그리드
+        Row(
+          children: [
+            Expanded(
+                child: _buildEnhancedInfoItem(context, batteryChange, '배터리 변화', Colors.green),
+              ),
+              SizedBox(width: 8),
+              Expanded(
+                child: _buildEnhancedInfoItem(context, duration, '충전 시간', Colors.blue),
+              ),
+              SizedBox(width: 8),
+            Expanded(
+                child: _buildEnhancedInfoItem(context, avgCurrent, '평균 전류', color),
+            ),
+          ],
+        ),
+          
+          SizedBox(height: 12),
+          
+          // 온도 정보
+          Row(
+      children: [
+              Icon(Icons.thermostat, size: 16, color: Colors.orange),
+              SizedBox(width: 4),
+              Text(
+                '평균 온도: $temperature',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                ),
+              ),
+              Spacer(),
+              if (speedChanges.isNotEmpty)
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    '${speedChanges.length}회 변경',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: color,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          
+          // 속도 변경 이력 (있을 경우)
+          if (speedChanges.isNotEmpty) ...[
+            SizedBox(height: 12),
+          Container(
+              padding: EdgeInsets.all(12),
+            decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                  color: color.withValues(alpha: 0.3),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.timeline, size: 14, color: color),
+                      SizedBox(width: 6),
+                      Text(
+                        '속도 변경 이력',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 8),
+                  ...speedChanges.map((change) => Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+            child: Row(
+              children: [
+                        Container(
+                          width: 4,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: color,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                            change,
+                    style: TextStyle(
+                      fontSize: 12,
+                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                    ),
+                  ),
+                ),
+                      ],
+                    ),
+                  )),
+              ],
+            ),
+          ),
+        ],
+      ],
+      ),
+    );
+  }
+  
+  Color _getEfficiencyColor(String efficiency) {
+    final value = int.parse(efficiency.replaceAll('%', ''));
+    if (value >= 90) return Colors.green;
+    if (value >= 80) return Colors.orange;
+    return Colors.red;
+  }
+  
+  Widget _buildEnhancedInfoItem(BuildContext context, String value, String label, Color color) {
+    return Container(
+      padding: EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: color.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Column(
+      children: [
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+          color: color,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
