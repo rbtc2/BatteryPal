@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 /// 섹션 3: 통계 + 세션 기록 카드
 class ChargingStatsCard extends StatefulWidget {
+  const ChargingStatsCard({super.key});
+
   @override
   State<ChargingStatsCard> createState() => _ChargingStatsCardState();
 }

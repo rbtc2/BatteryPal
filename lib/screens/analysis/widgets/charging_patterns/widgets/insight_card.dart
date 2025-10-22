@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 /// 섹션 1: 오늘의 인사이트 카드 (접을 수 있음)
 class InsightCard extends StatefulWidget {
+  const InsightCard({super.key});
+
   @override
   State<InsightCard> createState() => _InsightCardState();
 }
