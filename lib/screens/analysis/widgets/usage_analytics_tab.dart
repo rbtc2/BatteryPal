@@ -213,11 +213,27 @@ class _TodaySummaryCardState extends State<TodaySummaryCard> {
     }
 
     if (_hasError || _summary == null) {
-      return _buildErrorState(context);
+      return Row(
+        children: [
+          Expanded(child: _buildErrorState(context)),
+          SizedBox(width: 12),
+          Expanded(child: SizedBox()), // 빈 공간
+          SizedBox(width: 12),
+          Expanded(child: SizedBox()), // 빈 공간
+        ],
+      );
     }
 
     if (!_summary!.hasPermission) {
-      return _buildPermissionRequest(context);
+      return Row(
+        children: [
+          Expanded(child: _buildPermissionRequest(context)),
+          SizedBox(width: 12),
+          Expanded(child: SizedBox()), // 빈 공간
+          SizedBox(width: 12),
+          Expanded(child: SizedBox()), // 빈 공간
+        ],
+      );
     }
 
     return Row(
