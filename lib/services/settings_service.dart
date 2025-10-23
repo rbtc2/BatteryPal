@@ -15,6 +15,14 @@ class SettingsService extends ChangeNotifier {
     smartChargingEnabled: false,
     backgroundAppRestriction: false,
     chargingCompleteNotificationEnabled: false,
+    
+    // 화면 표시 설정 기본값
+    batteryDisplayCycleSpeed: BatteryDisplayCycleSpeed.normal,
+    showChargingCurrent: true,
+    showBatteryPercentage: true,
+    enableTapToSwitch: true,
+    enableSwipeToSwitch: true,
+    
     lastUpdated: DateTime.now(),
   );
 
@@ -119,6 +127,63 @@ class SettingsService extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 배터리 표시 순환 속도 설정 변경
+  void updateBatteryDisplayCycleSpeed(BatteryDisplayCycleSpeed speed) {
+    _appSettings = _appSettings.copyWith(
+      batteryDisplayCycleSpeed: speed,
+      lastUpdated: DateTime.now(),
+    );
+    
+    // 자동 순환이 꺼지면 모든 관련 설정도 비활성화
+    if (speed == BatteryDisplayCycleSpeed.off) {
+      _appSettings = _appSettings.copyWith(
+        showChargingCurrent: false,
+        showBatteryPercentage: false,
+        enableTapToSwitch: false,
+        enableSwipeToSwitch: false,
+        lastUpdated: DateTime.now(),
+      );
+    }
+    
+    notifyListeners();
+  }
+
+  /// 충전 전류 표시 설정 변경
+  void updateShowChargingCurrent(bool enabled) {
+    _appSettings = _appSettings.copyWith(
+      showChargingCurrent: enabled,
+      lastUpdated: DateTime.now(),
+    );
+    notifyListeners();
+  }
+
+  /// 배터리 퍼센트 표시 설정 변경
+  void updateShowBatteryPercentage(bool enabled) {
+    _appSettings = _appSettings.copyWith(
+      showBatteryPercentage: enabled,
+      lastUpdated: DateTime.now(),
+    );
+    notifyListeners();
+  }
+
+  /// 탭으로 전환 설정 변경
+  void updateEnableTapToSwitch(bool enabled) {
+    _appSettings = _appSettings.copyWith(
+      enableTapToSwitch: enabled,
+      lastUpdated: DateTime.now(),
+    );
+    notifyListeners();
+  }
+
+  /// 스와이프로 전환 설정 변경
+  void updateEnableSwipeToSwitch(bool enabled) {
+    _appSettings = _appSettings.copyWith(
+      enableSwipeToSwitch: enabled,
+      lastUpdated: DateTime.now(),
+    );
+    notifyListeners();
+  }
+
   /// 설정 초기화
   void resetToDefaults() {
     _appSettings = AppSettings(
@@ -133,6 +198,14 @@ class SettingsService extends ChangeNotifier {
       smartChargingEnabled: false,
       backgroundAppRestriction: false,
       chargingCompleteNotificationEnabled: false,
+      
+      // 화면 표시 설정 기본값
+      batteryDisplayCycleSpeed: BatteryDisplayCycleSpeed.normal,
+      showChargingCurrent: true,
+      showBatteryPercentage: true,
+      enableTapToSwitch: true,
+      enableSwipeToSwitch: true,
+      
       lastUpdated: DateTime.now(),
     );
     notifyListeners();

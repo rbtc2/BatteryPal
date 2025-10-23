@@ -400,6 +400,19 @@ class AppUsageData {
   }
 }
 
+/// 배터리 정보 표시 설정
+enum BatteryDisplayCycleSpeed {
+  off('끄기', 0),
+  fast('빠름', 2),
+  normal('보통', 3),
+  slow('느림', 5);
+
+  const BatteryDisplayCycleSpeed(this.displayName, this.durationSeconds);
+  
+  final String displayName;
+  final int durationSeconds;
+}
+
 /// 설정 데이터 모델
 class AppSettings {
   final bool notificationsEnabled;
@@ -413,6 +426,14 @@ class AppSettings {
   final bool smartChargingEnabled;
   final bool backgroundAppRestriction;
   final bool chargingCompleteNotificationEnabled; // 충전 완료 알림 활성화
+  
+  // 화면 표시 설정
+  final BatteryDisplayCycleSpeed batteryDisplayCycleSpeed; // 자동 순환 속도
+  final bool showChargingCurrent; // 충전 전류 표시 여부
+  final bool showBatteryPercentage; // 배터리 퍼센트 표시 여부
+  final bool enableTapToSwitch; // 탭으로 전환 여부
+  final bool enableSwipeToSwitch; // 스와이프로 전환 여부
+  
   final DateTime lastUpdated;
   
   const AppSettings({
@@ -427,6 +448,14 @@ class AppSettings {
     this.smartChargingEnabled = false,
     this.backgroundAppRestriction = false,
     this.chargingCompleteNotificationEnabled = false, // 기본값: false (Pro 기능)
+    
+    // 화면 표시 설정 기본값
+    this.batteryDisplayCycleSpeed = BatteryDisplayCycleSpeed.normal,
+    this.showChargingCurrent = true,
+    this.showBatteryPercentage = true,
+    this.enableTapToSwitch = true,
+    this.enableSwipeToSwitch = true,
+    
     required this.lastUpdated,
   });
   
@@ -447,6 +476,14 @@ class AppSettings {
       'smartChargingEnabled': smartChargingEnabled,
       'backgroundAppRestriction': backgroundAppRestriction,
       'chargingCompleteNotificationEnabled': chargingCompleteNotificationEnabled,
+      
+      // 화면 표시 설정
+      'batteryDisplayCycleSpeed': batteryDisplayCycleSpeed.name,
+      'showChargingCurrent': showChargingCurrent,
+      'showBatteryPercentage': showBatteryPercentage,
+      'enableTapToSwitch': enableTapToSwitch,
+      'enableSwipeToSwitch': enableSwipeToSwitch,
+      
       'lastUpdated': lastUpdated.toIso8601String(),
     };
   }
@@ -465,6 +502,17 @@ class AppSettings {
       smartChargingEnabled: json['smartChargingEnabled'] ?? false,
       backgroundAppRestriction: json['backgroundAppRestriction'] ?? false,
       chargingCompleteNotificationEnabled: json['chargingCompleteNotificationEnabled'] ?? false,
+      
+      // 화면 표시 설정
+      batteryDisplayCycleSpeed: BatteryDisplayCycleSpeed.values.firstWhere(
+        (e) => e.name == json['batteryDisplayCycleSpeed'],
+        orElse: () => BatteryDisplayCycleSpeed.normal,
+      ),
+      showChargingCurrent: json['showChargingCurrent'] ?? true,
+      showBatteryPercentage: json['showBatteryPercentage'] ?? true,
+      enableTapToSwitch: json['enableTapToSwitch'] ?? true,
+      enableSwipeToSwitch: json['enableSwipeToSwitch'] ?? true,
+      
       lastUpdated: DateTime.parse(json['lastUpdated']),
     );
   }
@@ -482,6 +530,14 @@ class AppSettings {
     bool? smartChargingEnabled,
     bool? backgroundAppRestriction,
     bool? chargingCompleteNotificationEnabled,
+    
+    // 화면 표시 설정
+    BatteryDisplayCycleSpeed? batteryDisplayCycleSpeed,
+    bool? showChargingCurrent,
+    bool? showBatteryPercentage,
+    bool? enableTapToSwitch,
+    bool? enableSwipeToSwitch,
+    
     DateTime? lastUpdated,
   }) {
     return AppSettings(
@@ -496,6 +552,14 @@ class AppSettings {
       smartChargingEnabled: smartChargingEnabled ?? this.smartChargingEnabled,
       backgroundAppRestriction: backgroundAppRestriction ?? this.backgroundAppRestriction,
       chargingCompleteNotificationEnabled: chargingCompleteNotificationEnabled ?? this.chargingCompleteNotificationEnabled,
+      
+      // 화면 표시 설정
+      batteryDisplayCycleSpeed: batteryDisplayCycleSpeed ?? this.batteryDisplayCycleSpeed,
+      showChargingCurrent: showChargingCurrent ?? this.showChargingCurrent,
+      showBatteryPercentage: showBatteryPercentage ?? this.showBatteryPercentage,
+      enableTapToSwitch: enableTapToSwitch ?? this.enableTapToSwitch,
+      enableSwipeToSwitch: enableSwipeToSwitch ?? this.enableSwipeToSwitch,
+      
       lastUpdated: lastUpdated ?? this.lastUpdated,
     );
   }
@@ -520,6 +584,11 @@ class AppSettings {
         other.smartChargingEnabled == smartChargingEnabled &&
         other.backgroundAppRestriction == backgroundAppRestriction &&
         other.chargingCompleteNotificationEnabled == chargingCompleteNotificationEnabled &&
+        other.batteryDisplayCycleSpeed == batteryDisplayCycleSpeed &&
+        other.showChargingCurrent == showChargingCurrent &&
+        other.showBatteryPercentage == showBatteryPercentage &&
+        other.enableTapToSwitch == enableTapToSwitch &&
+        other.enableSwipeToSwitch == enableSwipeToSwitch &&
         other.lastUpdated == lastUpdated;
   }
   
@@ -537,6 +606,11 @@ class AppSettings {
       smartChargingEnabled,
       backgroundAppRestriction,
       chargingCompleteNotificationEnabled,
+      batteryDisplayCycleSpeed,
+      showChargingCurrent,
+      showBatteryPercentage,
+      enableTapToSwitch,
+      enableSwipeToSwitch,
       lastUpdated,
     );
   }

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../services/home_lifecycle_manager.dart';
+import '../../services/settings_service.dart';
 import '../../models/app_models.dart';
 import '../../widgets/home/battery_status_card.dart';
 import '../../widgets/home/quick_actions_card.dart';
@@ -26,6 +27,9 @@ class _HomeTabState extends State<HomeTab> {
   // 싱글톤 생명주기 관리 서비스 사용
   final HomeLifecycleManager _lifecycleManager = HomeLifecycleManager();
   
+  // 설정 서비스
+  late final SettingsService _settingsService;
+  
   // 탭 고유 ID (콜백 관리용)
   static const String _tabId = 'home_tab';
   
@@ -43,6 +47,7 @@ class _HomeTabState extends State<HomeTab> {
   @override
   void initState() {
     super.initState();
+    _settingsService = SettingsService();
     _initializeLifecycleManager();
   }
 
@@ -118,6 +123,9 @@ class _HomeTabState extends State<HomeTab> {
     
     // 탭별 콜백만 해제 (싱글톤은 유지)
     _lifecycleManager.unregisterTabCallbacks(_tabId);
+    
+    // 설정 서비스 해제
+    _settingsService.dispose();
     
     debugPrint('홈 탭: dispose 완료 (싱글톤 유지)');
     super.dispose();
@@ -224,7 +232,10 @@ class _HomeTabState extends State<HomeTab> {
         child: Column(
           children: [
             // 섹션 1: 배터리 상태 (상단 고정)
-            BatteryStatusCard(batteryInfo: _batteryInfo),
+            BatteryStatusCard(
+              batteryInfo: _batteryInfo,
+              settingsService: _settingsService,
+            ),
             
             const SizedBox(height: 16),
             

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:math' as math;
 import 'dart:async';
 import '../../models/app_models.dart';
+import '../../services/settings_service.dart';
 
 /// 표시할 정보 타입 열거형
 enum DisplayInfoType {
@@ -44,10 +45,12 @@ class _ChargingSpeedType {
 /// 홈 탭에서 배터리 정보를 표시하는 카드 (원형 게이지 디자인)
 class BatteryStatusCard extends StatefulWidget {
   final BatteryInfo? batteryInfo;
+  final SettingsService? settingsService;
 
   const BatteryStatusCard({
     super.key,
     this.batteryInfo,
+    this.settingsService,
   });
 
   @override
@@ -95,8 +98,10 @@ class _BatteryStatusCardState extends State<BatteryStatusCard>
     if (widget.batteryInfo?.isCharging == true) {
       _rotationController.repeat();
       _pulseController.repeat(reverse: true);
-      _startAutoCycle();
     }
+    
+    // 설정에 따라 자동 순환 시작
+    _updateAutoCycleFromSettings();
   }
   
   @override
@@ -108,13 +113,18 @@ class _BatteryStatusCardState extends State<BatteryStatusCard>
       if (widget.batteryInfo?.isCharging == true) {
         _rotationController.repeat();
         _pulseController.repeat(reverse: true);
-        _startAutoCycle();
+        _updateAutoCycleFromSettings();
       } else {
         _rotationController.stop();
         _pulseController.stop();
         _stopAutoCycle();
         _currentDisplayIndex = 0; // 기본 배터리 정보로 리셋
       }
+    }
+    
+    // 설정이 변경될 때 자동 순환 업데이트
+    if (widget.settingsService != oldWidget.settingsService) {
+      _updateAutoCycleFromSettings();
     }
   }
   
@@ -127,6 +137,33 @@ class _BatteryStatusCardState extends State<BatteryStatusCard>
     super.dispose();
   }
   
+  /// 설정에 따라 자동 순환 업데이트
+  void _updateAutoCycleFromSettings() {
+    final settings = widget.settingsService?.appSettings;
+    if (settings == null) {
+      // 설정이 없으면 기본값으로 자동 순환 시작
+      if (widget.batteryInfo?.isCharging == true) {
+        _startAutoCycle();
+      }
+      return;
+    }
+    
+    // 자동 순환이 꺼져있으면 중지
+    if (settings.batteryDisplayCycleSpeed == BatteryDisplayCycleSpeed.off) {
+      _stopAutoCycle();
+      _isAutoCycleEnabled = false;
+      return;
+    }
+    
+    // 자동 순환 활성화
+    _isAutoCycleEnabled = true;
+    
+    // 충전 중일 때만 자동 순환 시작
+    if (widget.batteryInfo?.isCharging == true) {
+      _startAutoCycle();
+    }
+  }
+  
   /// 자동 순환 시작
   void _startAutoCycle() {
     if (_isAutoCycleEnabled) {
@@ -137,7 +174,10 @@ class _BatteryStatusCardState extends State<BatteryStatusCard>
   
   /// 순환 타이머 시작
   void _startCycleTimer() {
-    Timer.periodic(const Duration(seconds: 5), (timer) {
+    final settings = widget.settingsService?.appSettings;
+    final durationSeconds = settings?.batteryDisplayCycleSpeed.durationSeconds ?? 5;
+    
+    Timer.periodic(Duration(seconds: durationSeconds), (timer) {
       if (mounted && widget.batteryInfo?.isCharging == true) {
         _nextDisplayInfo();
       } else {
@@ -175,6 +215,8 @@ class _BatteryStatusCardState extends State<BatteryStatusCard>
   /// 현재 표시할 정보 가져오기
   DisplayInfo _getCurrentDisplayInfo() {
     final batteryInfo = widget.batteryInfo;
+    final settings = widget.settingsService?.appSettings;
+    
     if (batteryInfo == null) {
       return DisplayInfo(
         title: '배터리',
@@ -184,8 +226,25 @@ class _BatteryStatusCardState extends State<BatteryStatusCard>
       );
     }
     
-    switch (_currentDisplayIndex) {
-      case 0: // 배터리 레벨
+    // 설정에 따라 표시할 정보 필터링
+    final availableInfoTypes = _getAvailableInfoTypes(settings);
+    if (availableInfoTypes.isEmpty) {
+      // 표시할 정보가 없으면 기본 배터리 정보
+      return DisplayInfo(
+        title: '배터리',
+        value: '${batteryInfo.level.toInt()}%',
+        subtitle: batteryInfo.isCharging ? '충전 중' : '방전 중',
+        color: _getLevelColor(batteryInfo.level),
+        icon: batteryInfo.isCharging ? Icons.bolt : Icons.battery_std,
+      );
+    }
+    
+    // 현재 인덱스를 사용 가능한 정보 범위로 조정
+    final adjustedIndex = _currentDisplayIndex % availableInfoTypes.length;
+    final infoType = availableInfoTypes[adjustedIndex];
+    
+    switch (infoType) {
+      case DisplayInfoType.batteryLevel:
         return DisplayInfo(
           title: '배터리',
           value: '${batteryInfo.level.toInt()}%',
@@ -194,7 +253,7 @@ class _BatteryStatusCardState extends State<BatteryStatusCard>
           icon: batteryInfo.isCharging ? Icons.bolt : Icons.battery_std,
         );
         
-      case 1: // 충전 전류 (충전 중일 때만)
+      case DisplayInfoType.chargingCurrent:
         if (batteryInfo.isCharging) {
           final current = batteryInfo.chargingCurrent.abs();
           final speedType = _getChargingSpeedType(current);
@@ -215,7 +274,7 @@ class _BatteryStatusCardState extends State<BatteryStatusCard>
           );
         }
         
-      case 2: // 배터리 온도
+      case DisplayInfoType.batteryTemp:
         return DisplayInfo(
           title: '배터리 온도',
           value: batteryInfo.formattedTemperature,
@@ -223,15 +282,27 @@ class _BatteryStatusCardState extends State<BatteryStatusCard>
           color: _getTemperatureColor(batteryInfo.temperature),
           icon: Icons.thermostat,
         );
-        
-      default:
-        return DisplayInfo(
-          title: '배터리',
-          value: '${batteryInfo.level.toInt()}%',
-          subtitle: '정보 없음',
-          color: Colors.grey,
-        );
     }
+  }
+  
+  /// 설정에 따라 사용 가능한 정보 타입 목록 반환
+  List<DisplayInfoType> _getAvailableInfoTypes(AppSettings? settings) {
+    final List<DisplayInfoType> availableTypes = [];
+    
+    // 배터리 퍼센트 표시 설정 확인
+    if (settings?.showBatteryPercentage != false) {
+      availableTypes.add(DisplayInfoType.batteryLevel);
+    }
+    
+    // 충전 전류 표시 설정 확인 (충전 중일 때만)
+    if (settings?.showChargingCurrent != false && widget.batteryInfo?.isCharging == true) {
+      availableTypes.add(DisplayInfoType.chargingCurrent);
+    }
+    
+    // 배터리 온도는 항상 표시
+    availableTypes.add(DisplayInfoType.batteryTemp);
+    
+    return availableTypes;
   }
   
   /// 충전 속도 타입 정보
@@ -328,7 +399,7 @@ class _BatteryStatusCardState extends State<BatteryStatusCard>
           const SizedBox(height: 16),
           
           // 3개 메트릭 (온도/전압/건강도)
-          Padding(
+            Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               children: [
@@ -370,7 +441,7 @@ class _BatteryStatusCardState extends State<BatteryStatusCard>
       ),
     );
   }
-  
+
   Widget _buildCircularGauge(BuildContext context, double level) {
     final color = _getLevelColor(level);
     final isCharging = widget.batteryInfo?.isCharging ?? false;
@@ -381,8 +452,11 @@ class _BatteryStatusCardState extends State<BatteryStatusCard>
         // 배경 원
         GestureDetector(
           onTap: () {
-            _nextDisplayInfo();
-            _pauseAutoCycle();
+            final settings = widget.settingsService?.appSettings;
+            if (settings?.enableTapToSwitch == true) {
+              _nextDisplayInfo();
+              _pauseAutoCycle();
+            }
           },
           child: SizedBox(
             width: double.infinity,
@@ -404,7 +478,7 @@ class _BatteryStatusCardState extends State<BatteryStatusCard>
             final displayInfo = _getCurrentDisplayInfo();
             return Column(
               mainAxisSize: MainAxisSize.min,
-              children: [
+          children: [
                 AnimatedSwitcher(
                   duration: const Duration(milliseconds: 500),
                   child: Text(
@@ -440,9 +514,9 @@ class _BatteryStatusCardState extends State<BatteryStatusCard>
                         fontSize: 10,
                         color: displayInfo.color.withValues(alpha: 0.8),
                       ),
-                    ),
-                  ),
-                ],
+              ),
+            ),
+          ],
               ],
             );
           },
@@ -450,7 +524,7 @@ class _BatteryStatusCardState extends State<BatteryStatusCard>
       ],
     );
   }
-  
+
   /// 충전 중일 때 애니메이션이 적용된 게이지
   Widget _buildAnimatedChargingGauge(BuildContext context, double level) {
     return AnimatedBuilder(
@@ -559,7 +633,7 @@ class _BatteryStatusCardState extends State<BatteryStatusCard>
           const SizedBox(height: 2),
           Text(
             label,
-            style: TextStyle(
+      style: TextStyle(
               fontSize: 10,
               color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
             ),
@@ -570,7 +644,7 @@ class _BatteryStatusCardState extends State<BatteryStatusCard>
       ),
     );
   }
-  
+
   Color _getLevelColor(double level) {
     if (level > 50) return Colors.green;
     if (level > 20) return Colors.orange;
