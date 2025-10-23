@@ -241,15 +241,17 @@ class _HomeTabState extends State<HomeTab> {
             
             // 섹션 2: 빠른 액션 (하단 확장)
             Expanded(
-              child: QuickActionsCard(
-                onBoost: _handleOptimization,
-                onAnalysis: () {
-                  // 분석 탭으로 이동 (추후 구현)
-                  SnackBarUtils.showInfo(context, '분석 탭으로 이동합니다');
-                },
-                isProUser: widget.isProUser,
-                dailyUsage: dailyUsage,
-                dailyLimit: dailyLimit,
+              child: SingleChildScrollView(
+                child: QuickActionsCard(
+                  onBoost: _handleOptimization,
+                  onAnalysis: () {
+                    // 분석 탭으로 이동 (추후 구현)
+                    SnackBarUtils.showInfo(context, '분석 탭으로 이동합니다');
+                  },
+                  isProUser: widget.isProUser,
+                  dailyUsage: dailyUsage,
+                  dailyLimit: dailyLimit,
+                ),
               ),
             ),
           ],
