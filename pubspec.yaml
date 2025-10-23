@@ -48,6 +48,9 @@ dependencies:
   
   # 차트 라이브러리
   fl_chart: ^0.68.0
+  
+  # Google Fonts (Pretendard 폰트 사용)
+  google_fonts: ^6.1.0
 
 dev_dependencies:
   flutter_test:
