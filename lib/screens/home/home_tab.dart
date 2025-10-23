@@ -4,7 +4,6 @@ import '../../services/home_lifecycle_manager.dart';
 import '../../models/app_models.dart';
 import '../../widgets/home/battery_status_card.dart';
 import '../../widgets/home/quick_actions_card.dart';
-import '../../widgets/home/charging_analysis_card.dart';
 import '../../utils/app_utils.dart';
 
 /// 홈 탭 화면
@@ -220,34 +219,28 @@ class _HomeTabState extends State<HomeTab> {
             ),
         ],
       ),
-      body: SingleChildScrollView(
+      body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // 섹션 1: 배터리 상태
+            // 섹션 1: 배터리 상태 (상단 고정)
             BatteryStatusCard(batteryInfo: _batteryInfo),
             
             const SizedBox(height: 16),
             
-            // 섹션 2: 빠른 액션
-            QuickActionsCard(
-              onBoost: _handleOptimization,
-              onAnalysis: () {
-                // 분석 탭으로 이동 (추후 구현)
-                SnackBarUtils.showInfo(context, '분석 탭으로 이동합니다');
-              },
-              isProUser: widget.isProUser,
-              dailyUsage: dailyUsage,
-              dailyLimit: dailyLimit,
+            // 섹션 2: 빠른 액션 (하단 확장)
+            Expanded(
+              child: QuickActionsCard(
+                onBoost: _handleOptimization,
+                onAnalysis: () {
+                  // 분석 탭으로 이동 (추후 구현)
+                  SnackBarUtils.showInfo(context, '분석 탭으로 이동합니다');
+                },
+                isProUser: widget.isProUser,
+                dailyUsage: dailyUsage,
+                dailyLimit: dailyLimit,
+              ),
             ),
-            
-            const SizedBox(height: 16),
-            
-            // 섹션 3: 충전 분석 (충전 중일 때만)
-            ChargingAnalysisCard(batteryInfo: _batteryInfo),
-            
-            // 하단 여백
-            const SizedBox(height: 32),
           ],
         ),
       ),

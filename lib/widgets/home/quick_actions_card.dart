@@ -50,7 +50,7 @@ class QuickActionsCard extends StatelessWidget {
             ),
           ),
           
-          // 2개 액션 버튼
+          // 2개 액션 버튼 (가로 배치)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
@@ -80,9 +80,9 @@ class QuickActionsCard extends StatelessWidget {
             ),
           ),
           
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           
-          // 사용 제한 정보 (무료 사용자)
+          // 사용 제한 정보 (무료 사용자) - 하단 고정
           if (!isProUser)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -135,7 +135,7 @@ class QuickActionsCard extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        constraints: const BoxConstraints(minHeight: 100),
+        height: 100,
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           gradient: LinearGradient(

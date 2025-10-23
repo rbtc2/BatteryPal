@@ -1,6 +1,44 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
+import 'dart:async';
 import '../../models/app_models.dart';
+
+/// 표시할 정보 타입 열거형
+enum DisplayInfoType {
+  batteryLevel,    // 배터리 레벨
+  chargingCurrent, // 충전 전류
+  batteryTemp,     // 배터리 온도
+}
+
+/// 표시 정보 데이터 모델
+class DisplayInfo {
+  final String title;
+  final String value;
+  final String subtitle;
+  final Color color;
+  final IconData? icon;
+  
+  DisplayInfo({
+    required this.title,
+    required this.value,
+    required this.subtitle,
+    required this.color,
+    this.icon,
+  });
+}
+
+/// 충전 속도 타입 정보
+class _ChargingSpeedType {
+  final String label;
+  final IconData icon;
+  final Color color;
+  
+  _ChargingSpeedType({
+    required this.label,
+    required this.icon,
+    required this.color,
+  });
+}
 
 /// 배터리 상태 카드 위젯
 /// 홈 탭에서 배터리 정보를 표시하는 카드 (원형 게이지 디자인)
@@ -20,6 +58,16 @@ class _BatteryStatusCardState extends State<BatteryStatusCard>
     with TickerProviderStateMixin {
   late AnimationController _rotationController;
   late AnimationController _pulseController;
+  late AnimationController _cycleController; // 순환 표시용
+  
+  // 현재 표시 중인 정보 인덱스
+  int _currentDisplayIndex = 0;
+  
+  // 자동 순환 활성화 여부
+  bool _isAutoCycleEnabled = true;
+  
+  // 사용자 상호작용 후 일시정지 시간
+  Timer? _pauseTimer;
   
   @override
   void initState() {
@@ -37,10 +85,17 @@ class _BatteryStatusCardState extends State<BatteryStatusCard>
       vsync: this,
     );
     
+    // 순환 표시 애니메이션 컨트롤러 (5초 주기)
+    _cycleController = AnimationController(
+      duration: const Duration(seconds: 5),
+      vsync: this,
+    );
+    
     // 충전 중일 때만 애니메이션 시작
     if (widget.batteryInfo?.isCharging == true) {
       _rotationController.repeat();
       _pulseController.repeat(reverse: true);
+      _startAutoCycle();
     }
   }
   
@@ -53,9 +108,12 @@ class _BatteryStatusCardState extends State<BatteryStatusCard>
       if (widget.batteryInfo?.isCharging == true) {
         _rotationController.repeat();
         _pulseController.repeat(reverse: true);
+        _startAutoCycle();
       } else {
         _rotationController.stop();
         _pulseController.stop();
+        _stopAutoCycle();
+        _currentDisplayIndex = 0; // 기본 배터리 정보로 리셋
       }
     }
   }
@@ -64,7 +122,147 @@ class _BatteryStatusCardState extends State<BatteryStatusCard>
   void dispose() {
     _rotationController.dispose();
     _pulseController.dispose();
+    _cycleController.dispose();
+    _pauseTimer?.cancel();
     super.dispose();
+  }
+  
+  /// 자동 순환 시작
+  void _startAutoCycle() {
+    if (_isAutoCycleEnabled) {
+      _cycleController.repeat();
+      _startCycleTimer();
+    }
+  }
+  
+  /// 순환 타이머 시작
+  void _startCycleTimer() {
+    Timer.periodic(const Duration(seconds: 5), (timer) {
+      if (mounted && widget.batteryInfo?.isCharging == true) {
+        _nextDisplayInfo();
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+  
+  /// 자동 순환 중지
+  void _stopAutoCycle() {
+    _cycleController.stop();
+    _pauseTimer?.cancel();
+  }
+  
+  /// 다음 정보로 전환
+  void _nextDisplayInfo() {
+    if (widget.batteryInfo?.isCharging == true) {
+      setState(() {
+        _currentDisplayIndex = (_currentDisplayIndex + 1) % 3; // 3가지 정보 순환
+      });
+    }
+  }
+  
+  /// 사용자 상호작용 후 일시정지
+  void _pauseAutoCycle() {
+    _stopAutoCycle();
+    _pauseTimer?.cancel();
+    _pauseTimer = Timer(const Duration(seconds: 10), () {
+      if (mounted && widget.batteryInfo?.isCharging == true) {
+        _startAutoCycle();
+      }
+    });
+  }
+  
+  /// 현재 표시할 정보 가져오기
+  DisplayInfo _getCurrentDisplayInfo() {
+    final batteryInfo = widget.batteryInfo;
+    if (batteryInfo == null) {
+      return DisplayInfo(
+        title: '배터리',
+        value: '--%',
+        subtitle: '정보 없음',
+        color: Colors.grey,
+      );
+    }
+    
+    switch (_currentDisplayIndex) {
+      case 0: // 배터리 레벨
+        return DisplayInfo(
+          title: '배터리',
+          value: '${batteryInfo.level.toInt()}%',
+          subtitle: batteryInfo.isCharging ? '충전 중' : '방전 중',
+          color: _getLevelColor(batteryInfo.level),
+          icon: batteryInfo.isCharging ? Icons.bolt : Icons.battery_std,
+        );
+        
+      case 1: // 충전 전류 (충전 중일 때만)
+        if (batteryInfo.isCharging) {
+          final current = batteryInfo.chargingCurrent.abs();
+          final speedType = _getChargingSpeedType(current);
+          return DisplayInfo(
+            title: '충전 속도',
+            value: '${current}mA',
+            subtitle: speedType.label,
+            color: speedType.color,
+            icon: speedType.icon,
+          );
+        } else {
+          return DisplayInfo(
+            title: '배터리',
+            value: '${batteryInfo.level.toInt()}%',
+            subtitle: '방전 중',
+            color: _getLevelColor(batteryInfo.level),
+            icon: Icons.battery_std,
+          );
+        }
+        
+      case 2: // 배터리 온도
+        return DisplayInfo(
+          title: '배터리 온도',
+          value: batteryInfo.formattedTemperature,
+          subtitle: _getTemperatureStatus(batteryInfo.temperature),
+          color: _getTemperatureColor(batteryInfo.temperature),
+          icon: Icons.thermostat,
+        );
+        
+      default:
+        return DisplayInfo(
+          title: '배터리',
+          value: '${batteryInfo.level.toInt()}%',
+          subtitle: '정보 없음',
+          color: Colors.grey,
+        );
+    }
+  }
+  
+  /// 충전 속도 타입 정보
+  _ChargingSpeedType _getChargingSpeedType(int current) {
+    if (current >= 2000) {
+      return _ChargingSpeedType(
+        label: '고속 충전',
+        icon: Icons.flash_on,
+        color: Colors.red[400]!,
+      );
+    } else if (current >= 1000) {
+      return _ChargingSpeedType(
+        label: '일반 충전',
+        icon: Icons.battery_charging_full,
+        color: Colors.blue[400]!,
+      );
+    } else {
+      return _ChargingSpeedType(
+        label: '저속 충전',
+        icon: Icons.battery_6_bar,
+        color: Colors.green[400]!,
+      );
+    }
+  }
+  
+  /// 온도 상태 텍스트
+  String _getTemperatureStatus(double temp) {
+    if (temp < 30) return '냉각 상태';
+    if (temp < 40) return '정상 온도';
+    if (temp < 45) return '약간 높음';
+    return '고온 주의';
   }
 
   @override
@@ -181,38 +379,73 @@ class _BatteryStatusCardState extends State<BatteryStatusCard>
       alignment: Alignment.center,
       children: [
         // 배경 원
-        SizedBox(
-          width: double.infinity,
-          height: double.infinity,
-          child: isCharging 
-              ? _buildAnimatedChargingGauge(context, level)
-              : CircularProgressIndicator(
-                  value: level / 100,
-                  strokeWidth: 12,
-                  backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-                  valueColor: AlwaysStoppedAnimation<Color>(color),
-                ),
+        GestureDetector(
+          onTap: () {
+            _nextDisplayInfo();
+            _pauseAutoCycle();
+          },
+          child: SizedBox(
+            width: double.infinity,
+            height: double.infinity,
+            child: isCharging 
+                ? _buildAnimatedChargingGauge(context, level)
+                : CircularProgressIndicator(
+                    value: level / 100,
+                    strokeWidth: 12,
+                    backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    valueColor: AlwaysStoppedAnimation<Color>(color),
+                  ),
+          ),
         ),
-        // 중앙 텍스트
-        Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              '${level.toInt()}%',
-              style: TextStyle(
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
-            ),
-            Text(
-              '배터리',
-              style: TextStyle(
-                fontSize: 12,
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-              ),
-            ),
-          ],
+        // 중앙 텍스트 (동적 표시)
+        AnimatedBuilder(
+          animation: _cycleController,
+          builder: (context, child) {
+            final displayInfo = _getCurrentDisplayInfo();
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 500),
+                  child: Text(
+                    displayInfo.value,
+                    key: ValueKey(displayInfo.value),
+                    style: TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                      color: displayInfo.color,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 500),
+                  child: Text(
+                    displayInfo.title,
+                    key: ValueKey(displayInfo.title),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                    ),
+                  ),
+                ),
+                if (displayInfo.subtitle.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 500),
+                    child: Text(
+                      displayInfo.subtitle,
+                      key: ValueKey(displayInfo.subtitle),
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: displayInfo.color.withValues(alpha: 0.8),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            );
+          },
         ),
       ],
     );
