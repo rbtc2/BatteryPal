@@ -75,6 +75,9 @@ class _BatteryStatusCardState extends State<BatteryStatusCard>
   // 자동 순환 타이머
   Timer? _cycleTimer;
   
+  // 스와이프 시작 위치
+  double _swipeStartX = 0;
+  
   @override
   void initState() {
     super.initState();
@@ -204,10 +207,35 @@ class _BatteryStatusCardState extends State<BatteryStatusCard>
   
   /// 다음 정보로 전환
   void _nextDisplayInfo() {
-    if (widget.batteryInfo?.isCharging == true) {
-      setState(() {
-        _currentDisplayIndex = (_currentDisplayIndex + 1) % 3; // 3가지 정보 순환
-      });
+    final settings = widget.settingsService?.appSettings;
+    
+    setState(() {
+      final availableInfoTypes = _getAvailableInfoTypes(settings);
+      if (availableInfoTypes.isNotEmpty) {
+        _currentDisplayIndex = (_currentDisplayIndex + 1) % availableInfoTypes.length;
+      }
+    });
+    
+    // 자동 순환이 활성화되어 있으면 일시정지
+    if (_isAutoCycleEnabled) {
+      _pauseAutoCycle();
+    }
+  }
+  
+  /// 이전 정보로 전환
+  void _previousDisplayInfo() {
+    final settings = widget.settingsService?.appSettings;
+    
+    setState(() {
+      final availableInfoTypes = _getAvailableInfoTypes(settings);
+      if (availableInfoTypes.isNotEmpty) {
+        _currentDisplayIndex = (_currentDisplayIndex - 1 + availableInfoTypes.length) % availableInfoTypes.length;
+      }
+    });
+    
+    // 자동 순환이 활성화되어 있으면 일시정지
+    if (_isAutoCycleEnabled) {
+      _pauseAutoCycle();
     }
   }
   
@@ -467,7 +495,30 @@ class _BatteryStatusCardState extends State<BatteryStatusCard>
             final settings = widget.settingsService?.appSettings;
             if (settings?.enableTapToSwitch == true) {
               _nextDisplayInfo();
-              _pauseAutoCycle();
+            }
+          },
+          onHorizontalDragStart: (details) {
+            final settings = widget.settingsService?.appSettings;
+            if (settings?.enableSwipeToSwitch == true) {
+              _swipeStartX = details.globalPosition.dx;
+            }
+          },
+          onHorizontalDragEnd: (details) {
+            final settings = widget.settingsService?.appSettings;
+            if (settings?.enableSwipeToSwitch == true) {
+              final swipeEndX = details.globalPosition.dx;
+              final swipeDistance = swipeEndX - _swipeStartX;
+              
+              // 최소 스와이프 거리 (50px)
+              if (swipeDistance.abs() > 50) {
+                if (swipeDistance > 0) {
+                  // 오른쪽으로 스와이프 -> 이전 정보
+                  _previousDisplayInfo();
+                } else {
+                  // 왼쪽으로 스와이프 -> 다음 정보
+                  _nextDisplayInfo();
+                }
+              }
             }
           },
           child: SizedBox(
