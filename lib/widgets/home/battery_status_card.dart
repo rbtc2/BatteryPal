@@ -205,36 +205,30 @@ class _BatteryStatusCardState extends State<BatteryStatusCard>
     _cycleTimer = null;
   }
   
-  /// 다음 정보로 전환
+  /// 다음 정보로 전환 (자동 순환용)
   void _nextDisplayInfo() {
-    final settings = widget.settingsService?.appSettings;
-    
-    setState(() {
-      final availableInfoTypes = _getAvailableInfoTypes(settings);
-      if (availableInfoTypes.isNotEmpty) {
-        _currentDisplayIndex = (_currentDisplayIndex + 1) % availableInfoTypes.length;
-      }
-    });
-    
-    // 자동 순환이 활성화되어 있으면 일시정지
-    if (_isAutoCycleEnabled) {
-      _pauseAutoCycle();
-    }
+    _changeDisplayIndex(1, pauseAutoCycle: true);
   }
   
-  /// 이전 정보로 전환
-  void _previousDisplayInfo() {
+  /// 표시 정보 전환 (공통 로직)
+  /// [increment] 1: 다음, -1: 이전
+  /// [pauseAutoCycle] 자동 순환 일시정지 여부
+  void _changeDisplayIndex(int increment, {bool pauseAutoCycle = false}) {
     final settings = widget.settingsService?.appSettings;
     
     setState(() {
       final availableInfoTypes = _getAvailableInfoTypes(settings);
       if (availableInfoTypes.isNotEmpty) {
-        _currentDisplayIndex = (_currentDisplayIndex - 1 + availableInfoTypes.length) % availableInfoTypes.length;
+        if (increment > 0) {
+          _currentDisplayIndex = (_currentDisplayIndex + 1) % availableInfoTypes.length;
+        } else {
+          _currentDisplayIndex = (_currentDisplayIndex - 1 + availableInfoTypes.length) % availableInfoTypes.length;
+        }
       }
     });
     
-    // 자동 순환이 활성화되어 있으면 일시정지
-    if (_isAutoCycleEnabled) {
+    // 자동 순환이 활성화되어 있고 일시정지가 요청되면 일시정지
+    if (pauseAutoCycle && _isAutoCycleEnabled) {
       _pauseAutoCycle();
     }
   }
@@ -490,11 +484,25 @@ class _BatteryStatusCardState extends State<BatteryStatusCard>
       alignment: Alignment.center,
       children: [
         // 배경 원
+        SizedBox(
+          width: double.infinity,
+          height: double.infinity,
+          child: isCharging 
+              ? _buildAnimatedChargingGauge(context, level)
+              : CircularProgressIndicator(
+                  value: level / 100,
+                  strokeWidth: 12,
+                  backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  valueColor: AlwaysStoppedAnimation<Color>(color),
+                ),
+        ),
+        // 중앙 텍스트 (동적 표시) + 제스처 감지
         GestureDetector(
           onTap: () {
             final settings = widget.settingsService?.appSettings;
             if (settings?.enableTapToSwitch == true) {
-              _nextDisplayInfo();
+              // 수동 탭은 자동 순환 일시정지 없이 작동
+              _changeDisplayIndex(1);
             }
           },
           onHorizontalDragStart: (details) {
@@ -511,78 +519,73 @@ class _BatteryStatusCardState extends State<BatteryStatusCard>
               
               // 최소 스와이프 거리 (50px)
               if (swipeDistance.abs() > 50) {
+                // 수동 스와이프는 자동 순환 일시정지 없이 작동
                 if (swipeDistance > 0) {
                   // 오른쪽으로 스와이프 -> 이전 정보
-                  _previousDisplayInfo();
+                  _changeDisplayIndex(-1);
                 } else {
                   // 왼쪽으로 스와이프 -> 다음 정보
-                  _nextDisplayInfo();
+                  _changeDisplayIndex(1);
                 }
               }
             }
           },
-          child: SizedBox(
-            width: double.infinity,
-            height: double.infinity,
-            child: isCharging 
-                ? _buildAnimatedChargingGauge(context, level)
-                : CircularProgressIndicator(
-                    value: level / 100,
-                    strokeWidth: 12,
-                    backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-                    valueColor: AlwaysStoppedAnimation<Color>(color),
-                  ),
-          ),
-        ),
-        // 중앙 텍스트 (동적 표시)
-        AnimatedBuilder(
-          animation: _cycleController,
-          builder: (context, child) {
-            final displayInfo = _getCurrentDisplayInfo();
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-          children: [
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 500),
-                  child: Text(
-                    displayInfo.value,
-                    key: ValueKey(displayInfo.value),
-                    style: TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      color: displayInfo.color,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 500),
-                  child: Text(
-                    displayInfo.title,
-                    key: ValueKey(displayInfo.title),
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                    ),
-                  ),
-                ),
-                if (displayInfo.subtitle.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 500),
-                    child: Text(
-                      displayInfo.subtitle,
-                      key: ValueKey(displayInfo.subtitle),
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: displayInfo.color.withValues(alpha: 0.8),
+          behavior: HitTestBehavior.opaque, // 전체 영역을 터치 가능하게
+          child: AnimatedBuilder(
+            animation: _cycleController,
+            builder: (context, child) {
+              final displayInfo = _getCurrentDisplayInfo();
+              return Container(
+                width: double.infinity,
+                height: double.infinity,
+                alignment: Alignment.center,
+                color: Colors.transparent, // 투명하지만 hit test 가능
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 500),
+                      child: Text(
+                        displayInfo.value,
+                        key: ValueKey(displayInfo.value),
+                        style: TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                          color: displayInfo.color,
+                        ),
                       ),
-              ),
-            ),
-          ],
-              ],
-            );
-          },
+                    ),
+                    const SizedBox(height: 4),
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 500),
+                      child: Text(
+                        displayInfo.title,
+                        key: ValueKey(displayInfo.title),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                        ),
+                      ),
+                    ),
+                    if (displayInfo.subtitle.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 500),
+                        child: Text(
+                          displayInfo.subtitle,
+                          key: ValueKey(displayInfo.subtitle),
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: displayInfo.color.withValues(alpha: 0.8),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              );
+            },
+          ),
         ),
       ],
     );
