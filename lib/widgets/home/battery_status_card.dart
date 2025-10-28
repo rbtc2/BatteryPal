@@ -544,7 +544,21 @@ class _BatteryStatusCardState extends State<BatteryStatusCard>
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 500),
+                      duration: const Duration(milliseconds: 300),
+                      switchInCurve: Curves.easeOut,
+                      switchOutCurve: Curves.easeIn,
+                      transitionBuilder: (child, animation) {
+                        return SlideTransition(
+                          position: Tween<Offset>(
+                            begin: const Offset(0.3, 0.0), // 오른쪽에서 시작 (일부만 슬라이드)
+                            end: Offset.zero,
+                          ).animate(animation),
+                          child: FadeTransition(
+                            opacity: animation,
+                            child: child,
+                          ),
+                        );
+                      },
                       child: Text(
                         displayInfo.value,
                         key: ValueKey(displayInfo.value),
@@ -557,7 +571,21 @@ class _BatteryStatusCardState extends State<BatteryStatusCard>
                     ),
                     const SizedBox(height: 4),
                     AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 500),
+                      duration: const Duration(milliseconds: 300),
+                      switchInCurve: Curves.easeOut,
+                      switchOutCurve: Curves.easeIn,
+                      transitionBuilder: (child, animation) {
+                        return SlideTransition(
+                          position: Tween<Offset>(
+                            begin: const Offset(0.3, 0.0),
+                            end: Offset.zero,
+                          ).animate(animation),
+                          child: FadeTransition(
+                            opacity: animation,
+                            child: child,
+                          ),
+                        );
+                      },
                       child: Text(
                         displayInfo.title,
                         key: ValueKey(displayInfo.title),
@@ -570,7 +598,21 @@ class _BatteryStatusCardState extends State<BatteryStatusCard>
                     if (displayInfo.subtitle.isNotEmpty) ...[
                       const SizedBox(height: 2),
                       AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 500),
+                        duration: const Duration(milliseconds: 300),
+                        switchInCurve: Curves.easeOut,
+                        switchOutCurve: Curves.easeIn,
+                        transitionBuilder: (child, animation) {
+                          return SlideTransition(
+                            position: Tween<Offset>(
+                              begin: const Offset(0.3, 0.0),
+                              end: Offset.zero,
+                            ).animate(animation),
+                            child: FadeTransition(
+                              opacity: animation,
+                              child: child,
+                            ),
+                          );
+                        },
                         child: Text(
                           displayInfo.subtitle,
                           key: ValueKey(displayInfo.subtitle),
