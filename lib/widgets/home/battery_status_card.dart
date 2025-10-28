@@ -561,7 +561,7 @@ class _BatteryStatusCardState extends State<BatteryStatusCard>
                       },
                       child: Text(
                         displayInfo.value,
-                        key: ValueKey(displayInfo.value),
+                        key: ValueKey(displayInfo.title),
                         style: TextStyle(
                           fontSize: 32,
                           fontWeight: FontWeight.bold,
