@@ -321,6 +321,12 @@ class _BatteryStatusCardState extends State<BatteryStatusCard>
   List<DisplayInfoType> _getAvailableInfoTypes(AppSettings? settings) {
     final List<DisplayInfoType> availableTypes = [];
     
+    // 자동 순환이 꺼져 있으면 항상 배터리 퍼센트만 표시
+    if (settings?.batteryDisplayCycleSpeed == BatteryDisplayCycleSpeed.off) {
+      availableTypes.add(DisplayInfoType.batteryLevel);
+      return availableTypes;
+    }
+    
     // 배터리 퍼센트 표시 설정 확인
     if (settings?.showBatteryPercentage != false) {
       availableTypes.add(DisplayInfoType.batteryLevel);
