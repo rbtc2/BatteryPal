@@ -148,34 +148,77 @@ class GeneralSettingsTab extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                // 자동 순환 속도
+                // 자동 순환
                 Text(
-                  '자동 순환 속도',
+                  '자동 순환',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(height: 8),
-                RadioGroup<BatteryDisplayCycleSpeed>(
-                  groupValue: settingsService.appSettings.batteryDisplayCycleSpeed,
-                  onChanged: (value) {
-                    if (value != null) {
-                      settingsService.updateBatteryDisplayCycleSpeed(value);
-                      setState(() {}); // 다이얼로그 상태 업데이트
+                SwitchListTile(
+                  title: const Text('자동 순환 활성화'),
+                  subtitle: const Text('배터리 정보를 자동으로 전환'),
+                  value: settingsService.appSettings.batteryDisplayCycleSpeed != BatteryDisplayCycleSpeed.off,
+                  onChanged: (enabled) {
+                    if (enabled) {
+                      // 켜기를 선택하면 기본값(보통) 적용
+                      settingsService.updateBatteryDisplayCycleSpeed(BatteryDisplayCycleSpeed.normal);
+                    } else {
+                      settingsService.updateBatteryDisplayCycleSpeed(BatteryDisplayCycleSpeed.off);
                     }
+                    setState(() {}); // 다이얼로그 상태 업데이트
                   },
-                  child: Column(
-                    children: BatteryDisplayCycleSpeed.values.map((speed) => 
-                      RadioListTile<BatteryDisplayCycleSpeed>(
-                        title: Text(speed.displayName),
-                        subtitle: speed == BatteryDisplayCycleSpeed.off 
-                          ? const Text('자동 순환 비활성화')
-                          : Text('${speed.durationSeconds}초마다 전환'),
-                        value: speed,
-                        contentPadding: EdgeInsets.zero,
-                      ),
-                    ).toList(),
-                  ),
+                  contentPadding: EdgeInsets.zero,
+                ),
+                
+                // 속도 선택 (켜기일 때만 표시)
+                AnimatedSize(
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                  child: settingsService.appSettings.batteryDisplayCycleSpeed != BatteryDisplayCycleSpeed.off
+                    ? Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '순환 속도',
+                              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            SegmentedButton<BatteryDisplayCycleSpeed>(
+                              segments: [
+                                ButtonSegment<BatteryDisplayCycleSpeed>(
+                                  value: BatteryDisplayCycleSpeed.slow,
+                                  label: const Text('느림'),
+                                  tooltip: '5초마다 전환',
+                                ),
+                                ButtonSegment<BatteryDisplayCycleSpeed>(
+                                  value: BatteryDisplayCycleSpeed.normal,
+                                  label: const Text('보통'),
+                                  tooltip: '3초마다 전환',
+                                ),
+                                ButtonSegment<BatteryDisplayCycleSpeed>(
+                                  value: BatteryDisplayCycleSpeed.fast,
+                                  label: const Text('빠름'),
+                                  tooltip: '2초마다 전환',
+                                ),
+                              ],
+                              selected: {settingsService.appSettings.batteryDisplayCycleSpeed},
+                              onSelectionChanged: (Set<BatteryDisplayCycleSpeed> newSelection) {
+                                if (newSelection.isNotEmpty) {
+                                  settingsService.updateBatteryDisplayCycleSpeed(newSelection.first);
+                                  setState(() {}); // 다이얼로그 상태 업데이트
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                      )
+                    : const SizedBox.shrink(),
                 ),
                 
                 const SizedBox(height: 16),
