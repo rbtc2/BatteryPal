@@ -26,6 +26,8 @@ class _SettingsTabState extends State<SettingsTab> {
   void initState() {
     super.initState();
     _settingsService = SettingsService();
+    // 설정 초기화 및 로드
+    _settingsService.initialize();
   }
 
   @override

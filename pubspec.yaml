@@ -43,6 +43,9 @@ dependencies:
   path: ^1.8.3
   path_provider: ^2.1.1
   
+  # 설정 영구 저장
+  shared_preferences: ^2.2.2
+  
   # JSON 직렬화
   json_annotation: ^4.8.1
   

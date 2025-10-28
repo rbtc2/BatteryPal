@@ -49,6 +49,8 @@ class _HomeTabState extends State<HomeTab> {
     super.initState();
     _settingsService = SettingsService();
     _initializeLifecycleManager();
+    // 설정 초기화 및 로드
+    _settingsService.initialize();
   }
 
   /// 생명주기 관리자 초기화 (싱글톤 + 탭별 콜백)

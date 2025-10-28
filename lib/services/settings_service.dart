@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/app_models.dart';
 
 /// 설정 데이터를 관리하는 서비스
@@ -29,6 +30,85 @@ class SettingsService extends ChangeNotifier {
 
   AppSettings get appSettings => _appSettings;
 
+  /// 설정 초기화 및 로드
+  Future<void> initialize() async {
+    await loadSettings();
+  }
+
+  /// 설정 로드
+  Future<void> loadSettings() async {
+    await _loadSettingsFromPrefs();
+  }
+
+  /// 설정 저장
+  Future<void> saveSettings() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final settingsJson = _appSettings.toJson();
+      
+      // 각 설정을 개별적으로 저장 (더 간단하고 안전함)
+      await prefs.setBool('notificationsEnabled', settingsJson['notificationsEnabled'] as bool);
+      await prefs.setBool('batteryNotificationsEnabled', settingsJson['batteryNotificationsEnabled'] as bool);
+      await prefs.setBool('darkModeEnabled', settingsJson['darkModeEnabled'] as bool);
+      await prefs.setString('selectedLanguage', settingsJson['selectedLanguage'] as String);
+      await prefs.setBool('powerSaveModeEnabled', settingsJson['powerSaveModeEnabled'] as bool);
+      await prefs.setBool('autoOptimizationEnabled', settingsJson['autoOptimizationEnabled'] as bool);
+      await prefs.setBool('batteryProtectionEnabled', settingsJson['batteryProtectionEnabled'] as bool);
+      await prefs.setDouble('batteryThreshold', settingsJson['batteryThreshold'] as double);
+      await prefs.setBool('smartChargingEnabled', settingsJson['smartChargingEnabled'] as bool);
+      await prefs.setBool('backgroundAppRestriction', settingsJson['backgroundAppRestriction'] as bool);
+      await prefs.setBool('chargingCompleteNotificationEnabled', settingsJson['chargingCompleteNotificationEnabled'] as bool);
+      
+      // 화면 표시 설정
+      await prefs.setString('batteryDisplayCycleSpeed', settingsJson['batteryDisplayCycleSpeed'] as String);
+      await prefs.setBool('showChargingCurrent', settingsJson['showChargingCurrent'] as bool);
+      await prefs.setBool('showBatteryPercentage', settingsJson['showBatteryPercentage'] as bool);
+      await prefs.setBool('showBatteryTemperature', settingsJson['showBatteryTemperature'] as bool);
+      await prefs.setBool('enableTapToSwitch', settingsJson['enableTapToSwitch'] as bool);
+      await prefs.setBool('enableSwipeToSwitch', settingsJson['enableSwipeToSwitch'] as bool);
+      
+    } catch (e) {
+      debugPrint('설정 저장 실패: $e');
+    }
+  }
+
+  /// 설정 로드 (개별 키 방식)
+  Future<void> _loadSettingsFromPrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      
+      _appSettings = AppSettings(
+        notificationsEnabled: prefs.getBool('notificationsEnabled') ?? true,
+        batteryNotificationsEnabled: prefs.getBool('batteryNotificationsEnabled') ?? true,
+        darkModeEnabled: prefs.getBool('darkModeEnabled') ?? true,
+        selectedLanguage: prefs.getString('selectedLanguage') ?? '한국어',
+        powerSaveModeEnabled: prefs.getBool('powerSaveModeEnabled') ?? false,
+        autoOptimizationEnabled: prefs.getBool('autoOptimizationEnabled') ?? true,
+        batteryProtectionEnabled: prefs.getBool('batteryProtectionEnabled') ?? true,
+        batteryThreshold: prefs.getDouble('batteryThreshold') ?? 20.0,
+        smartChargingEnabled: prefs.getBool('smartChargingEnabled') ?? false,
+        backgroundAppRestriction: prefs.getBool('backgroundAppRestriction') ?? false,
+        chargingCompleteNotificationEnabled: prefs.getBool('chargingCompleteNotificationEnabled') ?? false,
+        
+        batteryDisplayCycleSpeed: BatteryDisplayCycleSpeed.values.firstWhere(
+          (e) => e.name == prefs.getString('batteryDisplayCycleSpeed'),
+          orElse: () => BatteryDisplayCycleSpeed.normal,
+        ),
+        showChargingCurrent: prefs.getBool('showChargingCurrent') ?? true,
+        showBatteryPercentage: prefs.getBool('showBatteryPercentage') ?? true,
+        showBatteryTemperature: prefs.getBool('showBatteryTemperature') ?? true,
+        enableTapToSwitch: prefs.getBool('enableTapToSwitch') ?? true,
+        enableSwipeToSwitch: prefs.getBool('enableSwipeToSwitch') ?? true,
+        
+        lastUpdated: DateTime.now(),
+      );
+      
+      notifyListeners();
+    } catch (e) {
+      debugPrint('설정 로드 실패: $e');
+    }
+  }
+
   /// 알림 설정 토글
   void toggleNotifications() {
     _appSettings = _appSettings.copyWith(
@@ -36,6 +116,7 @@ class SettingsService extends ChangeNotifier {
       lastUpdated: DateTime.now(),
     );
     notifyListeners();
+    _autoSave();
   }
 
   /// 테마 설정 토글
@@ -45,6 +126,7 @@ class SettingsService extends ChangeNotifier {
       lastUpdated: DateTime.now(),
     );
     notifyListeners();
+    _autoSave();
   }
 
   /// 언어 설정 변경
@@ -54,6 +136,7 @@ class SettingsService extends ChangeNotifier {
       lastUpdated: DateTime.now(),
     );
     notifyListeners();
+    _autoSave();
   }
 
   /// 절전 모드 설정 변경
@@ -63,6 +146,7 @@ class SettingsService extends ChangeNotifier {
       lastUpdated: DateTime.now(),
     );
     notifyListeners();
+    _autoSave();
   }
 
   /// 백그라운드 앱 제한 설정 변경
@@ -72,6 +156,7 @@ class SettingsService extends ChangeNotifier {
       lastUpdated: DateTime.now(),
     );
     notifyListeners();
+    _autoSave();
   }
 
   /// 배터리 알림 설정 변경
@@ -81,6 +166,7 @@ class SettingsService extends ChangeNotifier {
       lastUpdated: DateTime.now(),
     );
     notifyListeners();
+    _autoSave();
   }
 
   /// 배터리 임계값 설정 변경
@@ -90,6 +176,7 @@ class SettingsService extends ChangeNotifier {
       lastUpdated: DateTime.now(),
     );
     notifyListeners();
+    _autoSave();
   }
 
   /// 충전 완료 알림 설정 변경
@@ -99,6 +186,7 @@ class SettingsService extends ChangeNotifier {
       lastUpdated: DateTime.now(),
     );
     notifyListeners();
+    _autoSave();
   }
 
   /// 자동 최적화 설정 변경
@@ -108,6 +196,7 @@ class SettingsService extends ChangeNotifier {
       lastUpdated: DateTime.now(),
     );
     notifyListeners();
+    _autoSave();
   }
 
   /// 스마트 충전 설정 변경
@@ -117,6 +206,7 @@ class SettingsService extends ChangeNotifier {
       lastUpdated: DateTime.now(),
     );
     notifyListeners();
+    _autoSave();
   }
 
   /// 배터리 보호 설정 변경
@@ -126,6 +216,7 @@ class SettingsService extends ChangeNotifier {
       lastUpdated: DateTime.now(),
     );
     notifyListeners();
+    _autoSave();
   }
 
   /// 배터리 표시 순환 속도 설정 변경
@@ -147,6 +238,7 @@ class SettingsService extends ChangeNotifier {
     }
     
     notifyListeners();
+    _autoSave();
   }
 
   /// 충전 전류 표시 설정 변경
@@ -156,6 +248,7 @@ class SettingsService extends ChangeNotifier {
       lastUpdated: DateTime.now(),
     );
     notifyListeners();
+    _autoSave();
   }
 
   /// 배터리 퍼센트 표시 설정 변경
@@ -165,6 +258,7 @@ class SettingsService extends ChangeNotifier {
       lastUpdated: DateTime.now(),
     );
     notifyListeners();
+    _autoSave();
   }
 
   /// 배터리 온도 표시 설정 변경
@@ -174,6 +268,7 @@ class SettingsService extends ChangeNotifier {
       lastUpdated: DateTime.now(),
     );
     notifyListeners();
+    _autoSave();
   }
 
   /// 탭으로 전환 설정 변경
@@ -183,6 +278,7 @@ class SettingsService extends ChangeNotifier {
       lastUpdated: DateTime.now(),
     );
     notifyListeners();
+    _autoSave();
   }
 
   /// 스와이프로 전환 설정 변경
@@ -192,6 +288,7 @@ class SettingsService extends ChangeNotifier {
       lastUpdated: DateTime.now(),
     );
     notifyListeners();
+    _autoSave();
   }
 
   /// 설정 초기화
@@ -220,5 +317,11 @@ class SettingsService extends ChangeNotifier {
       lastUpdated: DateTime.now(),
     );
     notifyListeners();
+    _autoSave();
+  }
+
+  /// 자동 저장 (비동기, 에러 무시)
+  void _autoSave() {
+    saveSettings().catchError((e) => debugPrint('자동 저장 실패: $e'));
   }
 }
