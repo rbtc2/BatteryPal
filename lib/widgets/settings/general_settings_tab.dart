@@ -283,6 +283,32 @@ class GeneralSettingsTab extends StatelessWidget {
                       },
                   contentPadding: EdgeInsets.zero,
                 ),
+                CheckboxListTile(
+                  title: Text(
+                    '배터리 온도 표시',
+                    style: settingsService.appSettings.batteryDisplayCycleSpeed == BatteryDisplayCycleSpeed.off
+                      ? TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                        )
+                      : null,
+                  ),
+                  subtitle: Text(
+                    '배터리 온도 정보 표시',
+                    style: settingsService.appSettings.batteryDisplayCycleSpeed == BatteryDisplayCycleSpeed.off
+                      ? TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                        )
+                      : null,
+                  ),
+                  value: settingsService.appSettings.showBatteryTemperature,
+                  onChanged: settingsService.appSettings.batteryDisplayCycleSpeed == BatteryDisplayCycleSpeed.off 
+                    ? null 
+                    : (value) {
+                        settingsService.updateShowBatteryTemperature(value ?? false);
+                        setState(() {}); // 다이얼로그 상태 업데이트
+                      },
+                  contentPadding: EdgeInsets.zero,
+                ),
                 
                 const SizedBox(height: 16),
                 

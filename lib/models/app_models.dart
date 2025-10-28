@@ -431,6 +431,7 @@ class AppSettings {
   final BatteryDisplayCycleSpeed batteryDisplayCycleSpeed; // 자동 순환 속도
   final bool showChargingCurrent; // 충전 전류 표시 여부
   final bool showBatteryPercentage; // 배터리 퍼센트 표시 여부
+  final bool showBatteryTemperature; // 배터리 온도 표시 여부
   final bool enableTapToSwitch; // 탭으로 전환 여부
   final bool enableSwipeToSwitch; // 스와이프로 전환 여부
   
@@ -453,6 +454,7 @@ class AppSettings {
     this.batteryDisplayCycleSpeed = BatteryDisplayCycleSpeed.normal,
     this.showChargingCurrent = true,
     this.showBatteryPercentage = true,
+    this.showBatteryTemperature = true,
     this.enableTapToSwitch = true,
     this.enableSwipeToSwitch = true,
     
@@ -481,6 +483,7 @@ class AppSettings {
       'batteryDisplayCycleSpeed': batteryDisplayCycleSpeed.name,
       'showChargingCurrent': showChargingCurrent,
       'showBatteryPercentage': showBatteryPercentage,
+      'showBatteryTemperature': showBatteryTemperature,
       'enableTapToSwitch': enableTapToSwitch,
       'enableSwipeToSwitch': enableSwipeToSwitch,
       
@@ -510,6 +513,7 @@ class AppSettings {
       ),
       showChargingCurrent: json['showChargingCurrent'] ?? true,
       showBatteryPercentage: json['showBatteryPercentage'] ?? true,
+      showBatteryTemperature: json['showBatteryTemperature'] ?? true,
       enableTapToSwitch: json['enableTapToSwitch'] ?? true,
       enableSwipeToSwitch: json['enableSwipeToSwitch'] ?? true,
       
@@ -535,6 +539,7 @@ class AppSettings {
     BatteryDisplayCycleSpeed? batteryDisplayCycleSpeed,
     bool? showChargingCurrent,
     bool? showBatteryPercentage,
+    bool? showBatteryTemperature,
     bool? enableTapToSwitch,
     bool? enableSwipeToSwitch,
     
@@ -557,6 +562,7 @@ class AppSettings {
       batteryDisplayCycleSpeed: batteryDisplayCycleSpeed ?? this.batteryDisplayCycleSpeed,
       showChargingCurrent: showChargingCurrent ?? this.showChargingCurrent,
       showBatteryPercentage: showBatteryPercentage ?? this.showBatteryPercentage,
+      showBatteryTemperature: showBatteryTemperature ?? this.showBatteryTemperature,
       enableTapToSwitch: enableTapToSwitch ?? this.enableTapToSwitch,
       enableSwipeToSwitch: enableSwipeToSwitch ?? this.enableSwipeToSwitch,
       
@@ -587,6 +593,7 @@ class AppSettings {
         other.batteryDisplayCycleSpeed == batteryDisplayCycleSpeed &&
         other.showChargingCurrent == showChargingCurrent &&
         other.showBatteryPercentage == showBatteryPercentage &&
+        other.showBatteryTemperature == showBatteryTemperature &&
         other.enableTapToSwitch == enableTapToSwitch &&
         other.enableSwipeToSwitch == enableSwipeToSwitch &&
         other.lastUpdated == lastUpdated;
@@ -609,6 +616,7 @@ class AppSettings {
       batteryDisplayCycleSpeed,
       showChargingCurrent,
       showBatteryPercentage,
+      showBatteryTemperature,
       enableTapToSwitch,
       enableSwipeToSwitch,
       lastUpdated,

@@ -72,6 +72,9 @@ class _BatteryStatusCardState extends State<BatteryStatusCard>
   // 사용자 상호작용 후 일시정지 시간
   Timer? _pauseTimer;
   
+  // 자동 순환 타이머
+  Timer? _cycleTimer;
+  
   @override
   void initState() {
     super.initState();
@@ -134,6 +137,7 @@ class _BatteryStatusCardState extends State<BatteryStatusCard>
     _pulseController.dispose();
     _cycleController.dispose();
     _pauseTimer?.cancel();
+    _cycleTimer?.cancel();
     super.dispose();
   }
   
@@ -174,14 +178,18 @@ class _BatteryStatusCardState extends State<BatteryStatusCard>
   
   /// 순환 타이머 시작
   void _startCycleTimer() {
+    // 이전 타이머가 있으면 취소
+    _cycleTimer?.cancel();
+    
     final settings = widget.settingsService?.appSettings;
     final durationSeconds = settings?.batteryDisplayCycleSpeed.durationSeconds ?? 5;
     
-    Timer.periodic(Duration(seconds: durationSeconds), (timer) {
+    _cycleTimer = Timer.periodic(Duration(seconds: durationSeconds), (timer) {
       if (mounted && widget.batteryInfo?.isCharging == true) {
         _nextDisplayInfo();
       } else {
         timer.cancel();
+        _cycleTimer = null;
       }
     });
   }
@@ -190,6 +198,8 @@ class _BatteryStatusCardState extends State<BatteryStatusCard>
   void _stopAutoCycle() {
     _cycleController.stop();
     _pauseTimer?.cancel();
+    _cycleTimer?.cancel();
+    _cycleTimer = null;
   }
   
   /// 다음 정보로 전환
@@ -299,8 +309,10 @@ class _BatteryStatusCardState extends State<BatteryStatusCard>
       availableTypes.add(DisplayInfoType.chargingCurrent);
     }
     
-    // 배터리 온도는 항상 표시
-    availableTypes.add(DisplayInfoType.batteryTemp);
+    // 배터리 온도 표시 설정 확인
+    if (settings?.showBatteryTemperature != false) {
+      availableTypes.add(DisplayInfoType.batteryTemp);
+    }
     
     return availableTypes;
   }

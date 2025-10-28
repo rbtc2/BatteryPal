@@ -20,6 +20,7 @@ class SettingsService extends ChangeNotifier {
     batteryDisplayCycleSpeed: BatteryDisplayCycleSpeed.normal,
     showChargingCurrent: true,
     showBatteryPercentage: true,
+    showBatteryTemperature: true,
     enableTapToSwitch: true,
     enableSwipeToSwitch: true,
     
@@ -166,6 +167,15 @@ class SettingsService extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 배터리 온도 표시 설정 변경
+  void updateShowBatteryTemperature(bool enabled) {
+    _appSettings = _appSettings.copyWith(
+      showBatteryTemperature: enabled,
+      lastUpdated: DateTime.now(),
+    );
+    notifyListeners();
+  }
+
   /// 탭으로 전환 설정 변경
   void updateEnableTapToSwitch(bool enabled) {
     _appSettings = _appSettings.copyWith(
@@ -203,6 +213,7 @@ class SettingsService extends ChangeNotifier {
       batteryDisplayCycleSpeed: BatteryDisplayCycleSpeed.normal,
       showChargingCurrent: true,
       showBatteryPercentage: true,
+      showBatteryTemperature: true,
       enableTapToSwitch: true,
       enableSwipeToSwitch: true,
       
