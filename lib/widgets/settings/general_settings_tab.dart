@@ -320,7 +320,7 @@ class GeneralSettingsTab extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                RadioListTile<String>(
+                CheckboxListTile(
                   title: Text(
                     '탭으로 전환',
                     style: settingsService.appSettings.batteryDisplayCycleSpeed == BatteryDisplayCycleSpeed.off
@@ -337,24 +337,23 @@ class GeneralSettingsTab extends StatelessWidget {
                         )
                       : null,
                   ),
-                  value: 'tap',
-                  groupValue: settingsService.appSettings.enableTapToSwitch 
-                    ? 'tap' 
-                    : settingsService.appSettings.enableSwipeToSwitch 
-                      ? 'swipe' 
-                      : 'none',
+                  value: settingsService.appSettings.enableTapToSwitch,
                   onChanged: settingsService.appSettings.batteryDisplayCycleSpeed == BatteryDisplayCycleSpeed.off 
                     ? null 
                     : (value) {
-                        if (value == 'tap') {
+                        if (value == true) {
+                          // 탭 활성화 → 스와이프 자동 비활성화
                           settingsService.updateEnableTapToSwitch(true);
                           settingsService.updateEnableSwipeToSwitch(false);
+                        } else {
+                          // 탭 비활성화 (둘 다 비활성화 가능)
+                          settingsService.updateEnableTapToSwitch(false);
                         }
                         setState(() {}); // 다이얼로그 상태 업데이트
                       },
                   contentPadding: EdgeInsets.zero,
                 ),
-                RadioListTile<String>(
+                CheckboxListTile(
                   title: Text(
                     '스와이프로 전환',
                     style: settingsService.appSettings.batteryDisplayCycleSpeed == BatteryDisplayCycleSpeed.off
@@ -371,51 +370,16 @@ class GeneralSettingsTab extends StatelessWidget {
                         )
                       : null,
                   ),
-                  value: 'swipe',
-                  groupValue: settingsService.appSettings.enableTapToSwitch 
-                    ? 'tap' 
-                    : settingsService.appSettings.enableSwipeToSwitch 
-                      ? 'swipe' 
-                      : 'none',
+                  value: settingsService.appSettings.enableSwipeToSwitch,
                   onChanged: settingsService.appSettings.batteryDisplayCycleSpeed == BatteryDisplayCycleSpeed.off 
                     ? null 
                     : (value) {
-                        if (value == 'swipe') {
+                        if (value == true) {
+                          // 스와이프 활성화 → 탭 자동 비활성화
                           settingsService.updateEnableTapToSwitch(false);
                           settingsService.updateEnableSwipeToSwitch(true);
-                        }
-                        setState(() {}); // 다이얼로그 상태 업데이트
-                      },
-                  contentPadding: EdgeInsets.zero,
-                ),
-                RadioListTile<String>(
-                  title: Text(
-                    '둘 다 비활성화',
-                    style: settingsService.appSettings.batteryDisplayCycleSpeed == BatteryDisplayCycleSpeed.off
-                      ? TextStyle(
-                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
-                        )
-                      : null,
-                  ),
-                  subtitle: Text(
-                    '수동 제스처 비활성화',
-                    style: settingsService.appSettings.batteryDisplayCycleSpeed == BatteryDisplayCycleSpeed.off
-                      ? TextStyle(
-                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
-                        )
-                      : null,
-                  ),
-                  value: 'none',
-                  groupValue: settingsService.appSettings.enableTapToSwitch 
-                    ? 'tap' 
-                    : settingsService.appSettings.enableSwipeToSwitch 
-                      ? 'swipe' 
-                      : 'none',
-                  onChanged: settingsService.appSettings.batteryDisplayCycleSpeed == BatteryDisplayCycleSpeed.off 
-                    ? null 
-                    : (value) {
-                        if (value == 'none') {
-                          settingsService.updateEnableTapToSwitch(false);
+                        } else {
+                          // 스와이프 비활성화 (둘 다 비활성화 가능)
                           settingsService.updateEnableSwipeToSwitch(false);
                         }
                         setState(() {}); // 다이얼로그 상태 업데이트
