@@ -138,6 +138,53 @@ class NotificationService {
     }
   }
 
+  /// 충전 퍼센트 알림 표시
+  Future<void> showChargingPercentNotification(int percent) async {
+    if (!_isInitialized) {
+      debugPrint('알림 서비스가 초기화되지 않았습니다.');
+      await initialize();
+    }
+
+    try {
+      const AndroidNotificationDetails androidDetails =
+          AndroidNotificationDetails(
+        'battery_charging_channel',
+        '배터리 충전 알림',
+        channelDescription: '배터리 충전 상태에 대한 알림을 받습니다.',
+        importance: Importance.high,
+        priority: Priority.high,
+        showWhen: true,
+        enableVibration: true,
+        playSound: true,
+      );
+
+      const DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      );
+
+      const NotificationDetails notificationDetails = NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
+      );
+
+      // 알림 ID는 퍼센트 기반으로 고유하게 설정 (1-1000은 충전 완료 알림용, 1001+는 퍼센트 알림용)
+      final notificationId = 1000 + percent.toInt();
+
+      await _notifications.show(
+        notificationId,
+        '충전 알림',
+        '배터리가 $percent% 충전되었습니다.',
+        notificationDetails,
+      );
+
+      debugPrint('충전 퍼센트 알림 표시됨: $percent%');
+    } catch (e) {
+      debugPrint('충전 퍼센트 알림 표시 실패: $e');
+    }
+  }
+
   /// 알림 권한 확인
   Future<bool> checkPermission() async {
     final status = await Permission.notification.status;

@@ -33,6 +33,9 @@ class BatteryService {
   SettingsService? _settingsService;
   bool _hasNotifiedChargingComplete = false; // 중복 알림 방지
   
+  // 충전 퍼센트 알림 관련
+  final Map<double, bool> _chargingPercentNotified = {}; // 각 퍼센트별 알림 여부 추적
+  
   /// SettingsService 설정 (선택적)
   void setSettingsService(SettingsService? settingsService) {
     _settingsService = settingsService;
@@ -396,15 +399,20 @@ class BatteryService {
           _startChargingCurrentMonitoring();
           // 충전 시작 시 알림 플래그 리셋
           _hasNotifiedChargingComplete = false;
+          _chargingPercentNotified.clear();
         } else if (!batteryInfo.isCharging && wasCharging) {
           debugPrint('충전 종료 감지 - 충전 전류 모니터링 중지');
           _stopChargingCurrentMonitoring();
           // 충전 종료 시 알림 플래그 리셋
           _hasNotifiedChargingComplete = false;
+          _chargingPercentNotified.clear();
         }
         
         // 충전 완료 알림 체크
         _checkChargingCompleteNotification(batteryInfo, previousLevel, wasCharging);
+        
+        // 충전 퍼센트 알림 체크
+        _checkChargingPercentNotification(batteryInfo, previousLevel);
         
         debugPrint('네이티브 배터리 상태 변화 처리 완료: ${batteryInfo.formattedLevel}');
       } else {
@@ -479,6 +487,9 @@ class BatteryService {
         
         // 충전 완료 알림 체크
         _checkChargingCompleteNotification(batteryInfo, previousLevel, wasCharging);
+        
+        // 충전 퍼센트 알림 체크
+        _checkChargingPercentNotification(batteryInfo, previousLevel);
         
         debugPrint('배터리 정보 업데이트 완료: ${batteryInfo.formattedLevel}');
       } else {
@@ -579,6 +590,37 @@ class BatteryService {
     }
   }
   
+  /// 충전 타입이 알림 대상인지 확인
+  bool _shouldNotifyForChargingType(
+    String chargingType,
+    bool notifyOnFastCharging,
+    bool notifyOnNormalCharging,
+  ) {
+    // 둘 다 false면 알림 안 함
+    if (!notifyOnFastCharging && !notifyOnNormalCharging) {
+      return false;
+    }
+    
+    // 둘 다 true면 모든 타입 알림
+    if (notifyOnFastCharging && notifyOnNormalCharging) {
+      return true;
+    }
+    
+    // AC는 고속 충전, USB/Wireless는 일반 충전
+    final isFastCharging = chargingType == 'AC';
+    final isNormalCharging = chargingType == 'USB' || chargingType == 'Wireless';
+    
+    if (notifyOnFastCharging && isFastCharging) {
+      return true;
+    }
+    
+    if (notifyOnNormalCharging && isNormalCharging) {
+      return true;
+    }
+    
+    return false;
+  }
+
   /// 충전 완료 알림 체크 및 표시
   Future<void> _checkChargingCompleteNotification(
     BatteryInfo batteryInfo,
@@ -592,6 +634,17 @@ class BatteryService {
     
     // 충전 완료 알림이 비활성화되어 있으면 알림 안 함
     if (!_settingsService!.appSettings.chargingCompleteNotificationEnabled) {
+      return;
+    }
+    
+    // 충전 타입 필터 확인
+    final shouldNotify = _shouldNotifyForChargingType(
+      batteryInfo.chargingType,
+      _settingsService!.appSettings.chargingCompleteNotifyOnFastCharging,
+      _settingsService!.appSettings.chargingCompleteNotifyOnNormalCharging,
+    );
+    
+    if (!shouldNotify) {
       return;
     }
     
@@ -619,6 +672,68 @@ class BatteryService {
     // 배터리 레벨이 100% 미만으로 떨어지면 알림 플래그 리셋 (다시 충전 시 알림 가능하도록)
     if (batteryInfo.level < 100.0) {
       _hasNotifiedChargingComplete = false;
+    }
+  }
+
+  /// 충전 퍼센트 알림 체크 및 표시
+  Future<void> _checkChargingPercentNotification(
+    BatteryInfo batteryInfo,
+    double previousLevel,
+  ) async {
+    // 설정이 없으면 알림 안 함
+    if (_settingsService == null) {
+      return;
+    }
+    
+    // 충전 퍼센트 알림이 비활성화되어 있으면 알림 안 함
+    if (!_settingsService!.appSettings.chargingPercentNotificationEnabled) {
+      return;
+    }
+    
+    // 충전 중이 아니면 알림 안 함
+    if (!batteryInfo.isCharging) {
+      // 충전 종료 시 알림 플래그 리셋
+      _chargingPercentNotified.clear();
+      return;
+    }
+    
+    // 알림 받을 퍼센트 목록이 비어있으면 알림 안 함
+    final thresholds = _settingsService!.appSettings.chargingPercentThresholds;
+    if (thresholds.isEmpty) {
+      return;
+    }
+    
+    // 충전 타입 필터 확인
+    final shouldNotify = _shouldNotifyForChargingType(
+      batteryInfo.chargingType,
+      _settingsService!.appSettings.chargingPercentNotifyOnFastCharging,
+      _settingsService!.appSettings.chargingPercentNotifyOnNormalCharging,
+    );
+    
+    if (!shouldNotify) {
+      return;
+    }
+    
+    // 각 임계값에 대해 확인
+    for (final threshold in thresholds) {
+      // 현재 레벨이 임계값 이상이고, 이전 레벨이 임계값 미만인 경우 알림
+      if (batteryInfo.level >= threshold && previousLevel < threshold) {
+        // 이미 알림을 보낸 퍼센트인지 확인
+        if (!(_chargingPercentNotified[threshold] ?? false)) {
+          try {
+            await NotificationService().showChargingPercentNotification(threshold.toInt());
+            _chargingPercentNotified[threshold] = true;
+            debugPrint('충전 퍼센트 알림 표시됨: ${threshold.toInt()}%');
+          } catch (e) {
+            debugPrint('충전 퍼센트 알림 표시 실패: $e');
+          }
+        }
+      }
+      
+      // 레벨이 임계값 미만으로 떨어지면 알림 플래그 리셋
+      if (batteryInfo.level < threshold) {
+        _chargingPercentNotified[threshold] = false;
+      }
     }
   }
   
@@ -689,6 +804,10 @@ class BatteryService {
     _recentChargingCurrents.clear();
     _chargingCurrentInterval = 1000; // 기본값으로 리셋
     
+    // 알림 플래그 초기화
+    _hasNotifiedChargingComplete = false;
+    _chargingPercentNotified.clear();
+    
     // 기존 구독 정리
     await _batteryStateSubscription?.cancel();
     _batteryStateSubscription = null;
@@ -725,6 +844,9 @@ class BatteryService {
     
     // 충전 전류 안정성 추적 데이터 정리
     _recentChargingCurrents.clear();
+    
+    // 알림 플래그 정리
+    _chargingPercentNotified.clear();
     
     debugPrint('배터리 서비스 dispose 완료');
   }

@@ -17,6 +17,16 @@ class SettingsService extends ChangeNotifier {
     backgroundAppRestriction: false,
     chargingCompleteNotificationEnabled: false,
     
+    // 충전 완료 알림 설정 기본값
+    chargingCompleteNotifyOnFastCharging: true,
+    chargingCompleteNotifyOnNormalCharging: true,
+    
+    // 충전 퍼센트 알림 설정 기본값
+    chargingPercentNotificationEnabled: false,
+    chargingPercentThresholds: const [],
+    chargingPercentNotifyOnFastCharging: true,
+    chargingPercentNotifyOnNormalCharging: true,
+    
     // 화면 표시 설정 기본값
     batteryDisplayCycleSpeed: BatteryDisplayCycleSpeed.normal,
     showChargingCurrent: true,
@@ -59,6 +69,16 @@ class SettingsService extends ChangeNotifier {
       await prefs.setBool('backgroundAppRestriction', settingsJson['backgroundAppRestriction'] as bool);
       await prefs.setBool('chargingCompleteNotificationEnabled', settingsJson['chargingCompleteNotificationEnabled'] as bool);
       
+      // 충전 완료 알림 설정
+      await prefs.setBool('chargingCompleteNotifyOnFastCharging', settingsJson['chargingCompleteNotifyOnFastCharging'] as bool);
+      await prefs.setBool('chargingCompleteNotifyOnNormalCharging', settingsJson['chargingCompleteNotifyOnNormalCharging'] as bool);
+      
+      // 충전 퍼센트 알림 설정
+      await prefs.setBool('chargingPercentNotificationEnabled', settingsJson['chargingPercentNotificationEnabled'] as bool);
+      await prefs.setStringList('chargingPercentThresholds', (settingsJson['chargingPercentThresholds'] as List<dynamic>).map((e) => e.toString()).toList());
+      await prefs.setBool('chargingPercentNotifyOnFastCharging', settingsJson['chargingPercentNotifyOnFastCharging'] as bool);
+      await prefs.setBool('chargingPercentNotifyOnNormalCharging', settingsJson['chargingPercentNotifyOnNormalCharging'] as bool);
+      
       // 화면 표시 설정
       await prefs.setString('batteryDisplayCycleSpeed', settingsJson['batteryDisplayCycleSpeed'] as String);
       await prefs.setBool('showChargingCurrent', settingsJson['showChargingCurrent'] as bool);
@@ -89,6 +109,19 @@ class SettingsService extends ChangeNotifier {
         smartChargingEnabled: prefs.getBool('smartChargingEnabled') ?? false,
         backgroundAppRestriction: prefs.getBool('backgroundAppRestriction') ?? false,
         chargingCompleteNotificationEnabled: prefs.getBool('chargingCompleteNotificationEnabled') ?? false,
+        
+        // 충전 완료 알림 설정
+        chargingCompleteNotifyOnFastCharging: prefs.getBool('chargingCompleteNotifyOnFastCharging') ?? true,
+        chargingCompleteNotifyOnNormalCharging: prefs.getBool('chargingCompleteNotifyOnNormalCharging') ?? true,
+        
+        // 충전 퍼센트 알림 설정
+        chargingPercentNotificationEnabled: prefs.getBool('chargingPercentNotificationEnabled') ?? false,
+        chargingPercentThresholds: (prefs.getStringList('chargingPercentThresholds') ?? [])
+            .map((e) => double.tryParse(e) ?? 0.0)
+            .where((e) => e > 0)
+            .toList(),
+        chargingPercentNotifyOnFastCharging: prefs.getBool('chargingPercentNotifyOnFastCharging') ?? true,
+        chargingPercentNotifyOnNormalCharging: prefs.getBool('chargingPercentNotifyOnNormalCharging') ?? true,
         
         batteryDisplayCycleSpeed: BatteryDisplayCycleSpeed.values.firstWhere(
           (e) => e.name == prefs.getString('batteryDisplayCycleSpeed'),
@@ -183,6 +216,83 @@ class SettingsService extends ChangeNotifier {
   void updateChargingCompleteNotification(bool enabled) {
     _appSettings = _appSettings.copyWith(
       chargingCompleteNotificationEnabled: enabled,
+      lastUpdated: DateTime.now(),
+    );
+    notifyListeners();
+    _autoSave();
+  }
+
+  /// 충전 완료 알림 - 고속 충전 설정 변경
+  void updateChargingCompleteNotifyOnFastCharging(bool enabled) {
+    _appSettings = _appSettings.copyWith(
+      chargingCompleteNotifyOnFastCharging: enabled,
+      lastUpdated: DateTime.now(),
+    );
+    notifyListeners();
+    _autoSave();
+  }
+
+  /// 충전 완료 알림 - 일반 충전 설정 변경
+  void updateChargingCompleteNotifyOnNormalCharging(bool enabled) {
+    _appSettings = _appSettings.copyWith(
+      chargingCompleteNotifyOnNormalCharging: enabled,
+      lastUpdated: DateTime.now(),
+    );
+    notifyListeners();
+    _autoSave();
+  }
+
+  /// 충전 퍼센트 알림 활성화 설정 변경
+  void updateChargingPercentNotification(bool enabled) {
+    _appSettings = _appSettings.copyWith(
+      chargingPercentNotificationEnabled: enabled,
+      lastUpdated: DateTime.now(),
+    );
+    notifyListeners();
+    _autoSave();
+  }
+
+  /// 충전 퍼센트 알림 - 고속 충전 설정 변경
+  void updateChargingPercentNotifyOnFastCharging(bool enabled) {
+    _appSettings = _appSettings.copyWith(
+      chargingPercentNotifyOnFastCharging: enabled,
+      lastUpdated: DateTime.now(),
+    );
+    notifyListeners();
+    _autoSave();
+  }
+
+  /// 충전 퍼센트 알림 - 일반 충전 설정 변경
+  void updateChargingPercentNotifyOnNormalCharging(bool enabled) {
+    _appSettings = _appSettings.copyWith(
+      chargingPercentNotifyOnNormalCharging: enabled,
+      lastUpdated: DateTime.now(),
+    );
+    notifyListeners();
+    _autoSave();
+  }
+
+  /// 충전 퍼센트 알림 임계값 추가
+  void addChargingPercentThreshold(double threshold) {
+    final thresholds = List<double>.from(_appSettings.chargingPercentThresholds);
+    if (!thresholds.contains(threshold)) {
+      thresholds.add(threshold);
+      thresholds.sort((a, b) => b.compareTo(a)); // 내림차순 정렬
+      _appSettings = _appSettings.copyWith(
+        chargingPercentThresholds: thresholds,
+        lastUpdated: DateTime.now(),
+      );
+      notifyListeners();
+      _autoSave();
+    }
+  }
+
+  /// 충전 퍼센트 알림 임계값 제거
+  void removeChargingPercentThreshold(double threshold) {
+    final thresholds = List<double>.from(_appSettings.chargingPercentThresholds);
+    thresholds.remove(threshold);
+    _appSettings = _appSettings.copyWith(
+      chargingPercentThresholds: thresholds,
       lastUpdated: DateTime.now(),
     );
     notifyListeners();
@@ -305,6 +415,16 @@ class SettingsService extends ChangeNotifier {
       smartChargingEnabled: false,
       backgroundAppRestriction: false,
       chargingCompleteNotificationEnabled: false,
+      
+      // 충전 완료 알림 설정 기본값
+      chargingCompleteNotifyOnFastCharging: true,
+      chargingCompleteNotifyOnNormalCharging: true,
+      
+      // 충전 퍼센트 알림 설정 기본값
+      chargingPercentNotificationEnabled: false,
+      chargingPercentThresholds: const [],
+      chargingPercentNotifyOnFastCharging: true,
+      chargingPercentNotifyOnNormalCharging: true,
       
       // 화면 표시 설정 기본값
       batteryDisplayCycleSpeed: BatteryDisplayCycleSpeed.normal,

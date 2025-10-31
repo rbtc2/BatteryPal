@@ -427,6 +427,16 @@ class AppSettings {
   final bool backgroundAppRestriction;
   final bool chargingCompleteNotificationEnabled; // 충전 완료 알림 활성화
   
+  // 충전 완료 알림 설정
+  final bool chargingCompleteNotifyOnFastCharging; // 고속 충전(AC) 시에만 알림
+  final bool chargingCompleteNotifyOnNormalCharging; // 일반 충전(USB/Wireless) 시에만 알림
+  
+  // 충전 퍼센트 알림 설정
+  final bool chargingPercentNotificationEnabled; // 충전 퍼센트 알림 활성화
+  final List<double> chargingPercentThresholds; // 알림 받을 퍼센트 목록 [70, 80, 90, 100]
+  final bool chargingPercentNotifyOnFastCharging; // 고속 충전 시에만 알림
+  final bool chargingPercentNotifyOnNormalCharging; // 일반 충전 시에만 알림
+  
   // 화면 표시 설정
   final BatteryDisplayCycleSpeed batteryDisplayCycleSpeed; // 자동 순환 속도
   final bool showChargingCurrent; // 충전 전류 표시 여부
@@ -449,6 +459,16 @@ class AppSettings {
     this.smartChargingEnabled = false,
     this.backgroundAppRestriction = false,
     this.chargingCompleteNotificationEnabled = false, // 기본값: false (Pro 기능)
+    
+    // 충전 완료 알림 설정 기본값
+    this.chargingCompleteNotifyOnFastCharging = true,
+    this.chargingCompleteNotifyOnNormalCharging = true,
+    
+    // 충전 퍼센트 알림 설정 기본값
+    this.chargingPercentNotificationEnabled = false,
+    this.chargingPercentThresholds = const [],
+    this.chargingPercentNotifyOnFastCharging = true,
+    this.chargingPercentNotifyOnNormalCharging = true,
     
     // 화면 표시 설정 기본값
     this.batteryDisplayCycleSpeed = BatteryDisplayCycleSpeed.normal,
@@ -479,6 +499,16 @@ class AppSettings {
       'backgroundAppRestriction': backgroundAppRestriction,
       'chargingCompleteNotificationEnabled': chargingCompleteNotificationEnabled,
       
+      // 충전 완료 알림 설정
+      'chargingCompleteNotifyOnFastCharging': chargingCompleteNotifyOnFastCharging,
+      'chargingCompleteNotifyOnNormalCharging': chargingCompleteNotifyOnNormalCharging,
+      
+      // 충전 퍼센트 알림 설정
+      'chargingPercentNotificationEnabled': chargingPercentNotificationEnabled,
+      'chargingPercentThresholds': chargingPercentThresholds,
+      'chargingPercentNotifyOnFastCharging': chargingPercentNotifyOnFastCharging,
+      'chargingPercentNotifyOnNormalCharging': chargingPercentNotifyOnNormalCharging,
+      
       // 화면 표시 설정
       'batteryDisplayCycleSpeed': batteryDisplayCycleSpeed.name,
       'showChargingCurrent': showChargingCurrent,
@@ -505,6 +535,18 @@ class AppSettings {
       smartChargingEnabled: json['smartChargingEnabled'] ?? false,
       backgroundAppRestriction: json['backgroundAppRestriction'] ?? false,
       chargingCompleteNotificationEnabled: json['chargingCompleteNotificationEnabled'] ?? false,
+      
+      // 충전 완료 알림 설정
+      chargingCompleteNotifyOnFastCharging: json['chargingCompleteNotifyOnFastCharging'] ?? true,
+      chargingCompleteNotifyOnNormalCharging: json['chargingCompleteNotifyOnNormalCharging'] ?? true,
+      
+      // 충전 퍼센트 알림 설정
+      chargingPercentNotificationEnabled: json['chargingPercentNotificationEnabled'] ?? false,
+      chargingPercentThresholds: (json['chargingPercentThresholds'] as List<dynamic>?)
+          ?.map((e) => (e as num).toDouble())
+          .toList() ?? const [],
+      chargingPercentNotifyOnFastCharging: json['chargingPercentNotifyOnFastCharging'] ?? true,
+      chargingPercentNotifyOnNormalCharging: json['chargingPercentNotifyOnNormalCharging'] ?? true,
       
       // 화면 표시 설정
       batteryDisplayCycleSpeed: BatteryDisplayCycleSpeed.values.firstWhere(
@@ -535,6 +577,16 @@ class AppSettings {
     bool? backgroundAppRestriction,
     bool? chargingCompleteNotificationEnabled,
     
+    // 충전 완료 알림 설정
+    bool? chargingCompleteNotifyOnFastCharging,
+    bool? chargingCompleteNotifyOnNormalCharging,
+    
+    // 충전 퍼센트 알림 설정
+    bool? chargingPercentNotificationEnabled,
+    List<double>? chargingPercentThresholds,
+    bool? chargingPercentNotifyOnFastCharging,
+    bool? chargingPercentNotifyOnNormalCharging,
+    
     // 화면 표시 설정
     BatteryDisplayCycleSpeed? batteryDisplayCycleSpeed,
     bool? showChargingCurrent,
@@ -557,6 +609,16 @@ class AppSettings {
       smartChargingEnabled: smartChargingEnabled ?? this.smartChargingEnabled,
       backgroundAppRestriction: backgroundAppRestriction ?? this.backgroundAppRestriction,
       chargingCompleteNotificationEnabled: chargingCompleteNotificationEnabled ?? this.chargingCompleteNotificationEnabled,
+      
+      // 충전 완료 알림 설정
+      chargingCompleteNotifyOnFastCharging: chargingCompleteNotifyOnFastCharging ?? this.chargingCompleteNotifyOnFastCharging,
+      chargingCompleteNotifyOnNormalCharging: chargingCompleteNotifyOnNormalCharging ?? this.chargingCompleteNotifyOnNormalCharging,
+      
+      // 충전 퍼센트 알림 설정
+      chargingPercentNotificationEnabled: chargingPercentNotificationEnabled ?? this.chargingPercentNotificationEnabled,
+      chargingPercentThresholds: chargingPercentThresholds ?? this.chargingPercentThresholds,
+      chargingPercentNotifyOnFastCharging: chargingPercentNotifyOnFastCharging ?? this.chargingPercentNotifyOnFastCharging,
+      chargingPercentNotifyOnNormalCharging: chargingPercentNotifyOnNormalCharging ?? this.chargingPercentNotifyOnNormalCharging,
       
       // 화면 표시 설정
       batteryDisplayCycleSpeed: batteryDisplayCycleSpeed ?? this.batteryDisplayCycleSpeed,
