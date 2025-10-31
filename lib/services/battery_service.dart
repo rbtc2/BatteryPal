@@ -4,6 +4,8 @@ import 'package:battery_plus/battery_plus.dart';
 import 'package:flutter/material.dart';
 import 'native_battery_service.dart';
 import '../models/app_models.dart';
+import 'notification_service.dart';
+import 'settings_service.dart';
 
 /// 배터리 정보를 관리하는 서비스 클래스
 class BatteryService {
@@ -26,6 +28,15 @@ class BatteryService {
   // 충전 전류 안정성 추적
   final List<int> _recentChargingCurrents = <int>[];
   static const int _stabilityCheckCount = 5; // 최근 5회 측정값으로 안정성 판단
+  
+  // 충전 완료 알림 관련
+  SettingsService? _settingsService;
+  bool _hasNotifiedChargingComplete = false; // 중복 알림 방지
+  
+  /// SettingsService 설정 (선택적)
+  void setSettingsService(SettingsService? settingsService) {
+    _settingsService = settingsService;
+  }
   
   Stream<BatteryInfo> get batteryInfoStream {
     if (_batteryInfoController == null || _batteryInfoController!.isClosed) {
@@ -373,6 +384,7 @@ class BatteryService {
       );
       
       if (_isValidBatteryInfo(batteryInfo)) {
+        final previousLevel = _currentBatteryInfo?.level ?? 0.0;
         _currentBatteryInfo = batteryInfo;
         
         // 즉시 스트림에 이벤트 추가 (디바운싱 없이)
@@ -382,10 +394,17 @@ class BatteryService {
         if (batteryInfo.isCharging && !wasCharging) {
           debugPrint('충전 시작 감지 - 충전 전류 모니터링 시작');
           _startChargingCurrentMonitoring();
+          // 충전 시작 시 알림 플래그 리셋
+          _hasNotifiedChargingComplete = false;
         } else if (!batteryInfo.isCharging && wasCharging) {
           debugPrint('충전 종료 감지 - 충전 전류 모니터링 중지');
           _stopChargingCurrentMonitoring();
+          // 충전 종료 시 알림 플래그 리셋
+          _hasNotifiedChargingComplete = false;
         }
+        
+        // 충전 완료 알림 체크
+        _checkChargingCompleteNotification(batteryInfo, previousLevel, wasCharging);
         
         debugPrint('네이티브 배터리 상태 변화 처리 완료: ${batteryInfo.formattedLevel}');
       } else {
@@ -443,15 +462,23 @@ class BatteryService {
       // 최종 검증 및 업데이트
       if (batteryInfo != null && _isValidBatteryInfo(batteryInfo)) {
         final wasCharging = _currentBatteryInfo?.isCharging ?? false;
+        final previousLevel = _currentBatteryInfo?.level ?? 0.0;
         _currentBatteryInfo = batteryInfo;
         _safeAddEvent(batteryInfo);
         
         // 충전 상태 변화 감지하여 충전 전류 모니터링 시작/중지
         if (batteryInfo.isCharging && !wasCharging) {
           _startChargingCurrentMonitoring();
+          // 충전 시작 시 알림 플래그 리셋
+          _hasNotifiedChargingComplete = false;
         } else if (!batteryInfo.isCharging && wasCharging) {
           _stopChargingCurrentMonitoring();
+          // 충전 종료 시 알림 플래그 리셋
+          _hasNotifiedChargingComplete = false;
         }
+        
+        // 충전 완료 알림 체크
+        _checkChargingCompleteNotification(batteryInfo, previousLevel, wasCharging);
         
         debugPrint('배터리 정보 업데이트 완료: ${batteryInfo.formattedLevel}');
       } else {
@@ -549,6 +576,49 @@ class BatteryService {
     } catch (e) {
       debugPrint('플러그인 배터리 정보 수집 실패: $e');
       return null;
+    }
+  }
+  
+  /// 충전 완료 알림 체크 및 표시
+  Future<void> _checkChargingCompleteNotification(
+    BatteryInfo batteryInfo,
+    double previousLevel,
+    bool wasCharging,
+  ) async {
+    // 설정이 없으면 알림 안 함
+    if (_settingsService == null) {
+      return;
+    }
+    
+    // 충전 완료 알림이 비활성화되어 있으면 알림 안 함
+    if (!_settingsService!.appSettings.chargingCompleteNotificationEnabled) {
+      return;
+    }
+    
+    // 이미 알림을 보냈으면 다시 보내지 않음
+    if (_hasNotifiedChargingComplete) {
+      return;
+    }
+    
+    // 조건 확인:
+    // 1. 현재 충전 중이어야 함
+    // 2. 배터리 레벨이 100%여야 함
+    // 3. 이전 레벨이 100% 미만이어야 함 (100%에 도달한 순간 감지)
+    if (batteryInfo.isCharging &&
+        batteryInfo.level >= 100.0 &&
+        previousLevel < 100.0) {
+      try {
+        await NotificationService().showChargingCompleteNotification();
+        _hasNotifiedChargingComplete = true;
+        debugPrint('충전 완료 알림 표시됨');
+      } catch (e) {
+        debugPrint('충전 완료 알림 표시 실패: $e');
+      }
+    }
+    
+    // 배터리 레벨이 100% 미만으로 떨어지면 알림 플래그 리셋 (다시 충전 시 알림 가능하도록)
+    if (batteryInfo.level < 100.0) {
+      _hasNotifiedChargingComplete = false;
     }
   }
   

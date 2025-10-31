@@ -54,6 +54,10 @@ dependencies:
   
   # Google Fonts (Pretendard 폰트 사용)
   google_fonts: ^6.1.0
+  
+  # 알림 패키지
+  flutter_local_notifications: ^17.2.3
+  permission_handler: ^11.3.1
 
 dev_dependencies:
   flutter_test:

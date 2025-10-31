@@ -5,6 +5,13 @@
     <!-- 앱 사용 통계 접근 권한 (스크린 타임 기능용) -->
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" />
     
+    <!-- 알림 권한 (Android 13 이상) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    
+    <!-- 알림을 위한 추가 권한 (부팅 후 알림을 위해) -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <uses-permission android:name="android.permission.VIBRATE"/>
+    
     <application
         android:label="batterypal"
         android:name="${applicationName}"
@@ -36,6 +43,16 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        
+        <!-- 알림 채널 설정을 위한 리시버 -->
+        <receiver android:exported="false" 
+                  android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"/>
+        <receiver android:exported="false" 
+                  android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+            </intent-filter>
+        </receiver>
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

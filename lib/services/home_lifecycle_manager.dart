@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/app_models.dart';
 import 'battery_service.dart';
+import 'settings_service.dart';
 
 /// 홈 탭 생명주기 관리 서비스 (싱글톤)
 /// 앱 생명주기, 탭 전환, 배터리 모니터링 등의 로직을 관리
@@ -16,8 +17,18 @@ class HomeLifecycleManager {
   // 배터리 서비스
   final BatteryService _batteryService = BatteryService();
   
+  // 설정 서비스 (선택적) - BatteryService에 전달용
+  // ignore: unused_field
+  SettingsService? _settingsService;
+  
   // 스트림 구독 관리
   StreamSubscription<BatteryInfo>? _batteryInfoSubscription;
+  
+  /// SettingsService 설정
+  void setSettingsService(SettingsService? settingsService) {
+    _settingsService = settingsService;
+    _batteryService.setSettingsService(settingsService);
+  }
   
   // 주기적 새로고침 타이머
   Timer? _periodicRefreshTimer;
