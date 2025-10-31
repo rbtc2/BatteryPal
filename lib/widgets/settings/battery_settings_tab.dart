@@ -3,7 +3,6 @@ import '../../services/settings_service.dart';
 import '../../widgets/settings/settings_widgets.dart';
 import '../../widgets/common/common_widgets.dart';
 import '../../utils/dialog_utils.dart';
-import '../../constants/app_constants.dart';
 
 /// 배터리 설정 탭 위젯
 class BatterySettingsTab extends StatelessWidget {
@@ -51,7 +50,7 @@ class BatterySettingsTab extends StatelessWidget {
               
               const SizedBox(height: 16),
               
-              // 배터리 알림 설정
+              // 배터리 알림 설정 (Pro 기능)
               _buildBatterySettingsCard(
                 context,
                 '배터리 알림',
@@ -61,31 +60,23 @@ class BatterySettingsTab extends StatelessWidget {
                   SettingsSwitchItem(
                     title: '배터리 알림 활성화',
                     subtitle: '배터리 부족 시 알림 받기',
-                    value: settingsService.appSettings.batteryNotificationsEnabled,
-                    onChanged: settingsService.updateBatteryNotifications,
+                    value: isProUser ? settingsService.appSettings.batteryNotificationsEnabled : false,
+                    onChanged: isProUser
+                        ? settingsService.updateBatteryNotifications
+                        : (val) => DialogUtils.showSettingsProUpgradeDialog(
+                              context,
+                              onUpgrade: onProToggle,
+                            ),
                   ),
-                  SettingsSliderItem(
-                    title: '알림 임계값',
-                    subtitle: '배터리가 이 수준 이하로 떨어지면 알림',
-                    value: settingsService.appSettings.batteryThreshold,
-                    valueText: '${settingsService.appSettings.batteryThreshold.toStringAsFixed(0)}%',
-                    min: AppConstants.batteryThresholdMin,
-                    max: AppConstants.batteryThresholdMax,
-                    divisions: 9,
-                    onChanged: settingsService.updateBatteryThreshold,
-                  ),
-                  SettingsProSwitchItem(
+                  SettingsSwitchItem(
                     title: '충전 완료 알림',
                     subtitle: '충전 완료 시 알림 받기',
                     value: settingsService.appSettings.chargingCompleteNotificationEnabled,
-                    isProUser: isProUser,
                     onChanged: settingsService.updateChargingCompleteNotification,
-                    onProUpgrade: () => DialogUtils.showSettingsProUpgradeDialog(
-                      context,
-                      onUpgrade: onProToggle,
-                    ),
                   ),
                 ],
+                isProFeature: true,
+                isProUser: isProUser,
               ),
               
               const SizedBox(height: 16),
@@ -153,8 +144,10 @@ class BatterySettingsTab extends StatelessWidget {
     String title,
     IconData icon,
     String description,
-    List<Widget> items,
-  ) {
+    List<Widget> items, {
+    bool isProFeature = false,
+    bool isProUser = false,
+  }) {
     return CustomCard(
       elevation: 2,
       borderRadius: BorderRadius.circular(12),
@@ -177,6 +170,28 @@ class BatterySettingsTab extends StatelessWidget {
                   fontSize: 16,
                 ),
               ),
+              if (isProFeature) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(
+                      color: Colors.amber.withValues(alpha: 0.5),
+                      width: 1,
+                    ),
+                  ),
+                  child: const Text(
+                    'Pro',
+                    style: TextStyle(
+                      color: Colors.amber,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
           const SizedBox(height: 4),

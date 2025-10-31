@@ -125,7 +125,7 @@ class SettingsSliderItem extends StatelessWidget {
   final double min;
   final double max;
   final int divisions;
-  final ValueChanged<double> onChanged;
+  final ValueChanged<double>? onChanged;
 
   const SettingsSliderItem({
     super.key,
@@ -136,7 +136,7 @@ class SettingsSliderItem extends StatelessWidget {
     required this.min,
     required this.max,
     required this.divisions,
-    required this.onChanged,
+    this.onChanged,
   });
 
   @override
@@ -330,6 +330,108 @@ class SettingsProSwitchItem extends StatelessWidget {
               onProUpgrade?.call();
             },
             activeTrackColor: Theme.of(context).colorScheme.primary,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Pro 기능이 있는 슬라이더 항목 위젯
+class SettingsProSliderItem extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final double value;
+  final String valueText;
+  final double min;
+  final double max;
+  final int divisions;
+  final bool isProUser;
+  final ValueChanged<double> onChanged;
+  final VoidCallback? onProUpgrade;
+
+  const SettingsProSliderItem({
+    super.key,
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.valueText,
+    required this.min,
+    required this.max,
+    required this.divisions,
+    required this.isProUser,
+    required this.onChanged,
+    this.onProUpgrade,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w500,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(
+                        color: Colors.amber.withValues(alpha: 0.5),
+                        width: 1,
+                      ),
+                    ),
+                    child: const Text(
+                      'Pro',
+                      style: TextStyle(
+                        color: Colors.amber,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              Text(
+                valueText,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.primary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+          Text(
+            subtitle,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Slider(
+            value: value,
+            min: min,
+            max: max,
+            divisions: divisions,
+            onChanged: isProUser ? onChanged : (val) {
+              onProUpgrade?.call();
+            },
+            activeColor: Theme.of(context).colorScheme.primary,
           ),
         ],
       ),
