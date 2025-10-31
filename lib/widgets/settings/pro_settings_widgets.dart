@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../widgets/common/common_widgets.dart';
 import '../../utils/dialog_utils.dart';
 import '../../constants/app_constants.dart';
+import '../../screens/pro_upgrade_screen.dart';
 
 /// Pro 업그레이드 카드 위젯
 class ProUpgradeCard extends StatelessWidget {
@@ -64,10 +65,15 @@ class ProUpgradeCard extends StatelessWidget {
                 children: [
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: () => DialogUtils.showSettingsProUpgradeDialog(
-                        context,
-                        onUpgrade: onUpgrade,
-                      ),
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => ProUpgradeScreen(
+                              onUpgrade: onUpgrade,
+                            ),
+                          ),
+                        );
+                      },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.white,
                         foregroundColor: Theme.of(context).colorScheme.primary,
