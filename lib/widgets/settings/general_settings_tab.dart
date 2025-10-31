@@ -5,6 +5,7 @@ import '../../widgets/settings/settings_widgets.dart';
 import '../../widgets/settings/pro_settings_widgets.dart';
 import '../../utils/dialog_utils.dart';
 import '../../constants/app_constants.dart';
+import '../../services/notification_service.dart';
 
 /// 일반 설정 탭 위젯
 class GeneralSettingsTab extends StatelessWidget {
@@ -77,6 +78,21 @@ class GeneralSettingsTab extends StatelessWidget {
               
               // Pro 설정 (Pro 사용자용)
               if (isProUser) const ProSettingsSection(),
+              
+              const SizedBox(height: 24),
+              
+              // 개발자 모드
+              SettingsSection(
+                title: '개발자',
+                items: [
+                  SettingsItem(
+                    title: '개발자 모드',
+                    icon: Icons.developer_mode,
+                    subtitle: '알림 테스트 및 개발 기능',
+                    onTap: () => _showDeveloperModeDialog(context),
+                  ),
+                ],
+              ),
               
               const SizedBox(height: 24),
               
@@ -397,6 +413,118 @@ class GeneralSettingsTab extends StatelessWidget {
           ),
         ],
       ),
+      ),
+    );
+  }
+
+  void _showDeveloperModeDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.developer_mode, size: 24),
+            SizedBox(width: 8),
+            Text('개발자 모드'),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '알림 테스트',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '충전 완료 알림을 테스트할 수 있습니다. 실제 충전 완료 시 표시되는 알림과 동일한 알림이 표시됩니다.',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: 16),
+              // 충전 완료 알림 설정 상태 표시
+              ListenableBuilder(
+                listenable: settingsService,
+                builder: (context, _) {
+                  final isEnabled = settingsService.appSettings.chargingCompleteNotificationEnabled;
+                  return Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: isEnabled
+                          ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3)
+                          : Theme.of(context).colorScheme.errorContainer.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          isEnabled ? Icons.check_circle : Icons.cancel,
+                          color: isEnabled
+                              ? Theme.of(context).colorScheme.primary
+                              : Theme.of(context).colorScheme.error,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '충전 완료 알림: ${isEnabled ? "활성화" : "비활성화"}',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w500,
+                              color: isEnabled
+                                  ? Theme.of(context).colorScheme.primary
+                                  : Theme.of(context).colorScheme.error,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('닫기'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () async {
+              // 알림 테스트
+              try {
+                await NotificationService().showChargingCompleteNotification();
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('알림이 전송되었습니다.'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('알림 전송 실패: $e'),
+                      backgroundColor: Theme.of(context).colorScheme.error,
+                      duration: const Duration(seconds: 3),
+                    ),
+                  );
+                }
+              }
+            },
+            icon: const Icon(Icons.notifications_active),
+            label: const Text('알림 테스트'),
+          ),
+        ],
       ),
     );
   }
