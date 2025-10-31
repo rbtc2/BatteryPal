@@ -60,13 +60,8 @@ class BatterySettingsTab extends StatelessWidget {
                   SettingsSwitchItem(
                     title: '배터리 알림 활성화',
                     subtitle: '배터리 부족 시 알림 받기',
-                    value: isProUser ? settingsService.appSettings.batteryNotificationsEnabled : false,
-                    onChanged: isProUser
-                        ? settingsService.updateBatteryNotifications
-                        : (val) => DialogUtils.showSettingsProUpgradeDialog(
-                              context,
-                              onUpgrade: onProToggle,
-                            ),
+                    value: settingsService.appSettings.batteryNotificationsEnabled,
+                    onChanged: settingsService.updateBatteryNotifications,
                   ),
                   SettingsSwitchItem(
                     title: '충전 완료 알림',
