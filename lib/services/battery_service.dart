@@ -6,6 +6,7 @@ import 'native_battery_service.dart';
 import '../models/app_models.dart';
 import 'notification_service.dart';
 import 'settings_service.dart';
+import 'battery_history_database_service.dart';
 
 /// 배터리 정보를 관리하는 서비스 클래스
 class BatteryService {
@@ -35,6 +36,14 @@ class BatteryService {
   
   // 충전 퍼센트 알림 관련
   final Map<double, bool> _chargingPercentNotified = {}; // 각 퍼센트별 알림 여부 추적
+  
+  // 충전 전류 데이터 저장을 위한 데이터베이스 서비스
+  final BatteryHistoryDatabaseService _databaseService = BatteryHistoryDatabaseService();
+  bool _isDatabaseInitialized = false;
+  
+  // 충전 전류 저장을 위한 배치 버퍼 (성능 최적화)
+  final List<Map<String, dynamic>> _chargingCurrentBuffer = [];
+  Timer? _chargingCurrentSaveTimer;
   
   /// SettingsService 설정 (선택적)
   void setSettingsService(SettingsService? settingsService) {
@@ -275,12 +284,15 @@ class BatteryService {
           timestamp: DateTime.now(),
         );
         
-        // 충전 전류가 실제로 변경된 경우에만 업데이트
+        // 충전 전류가 실제로 변경된 경우에만 업데이트 및 저장
         if (_currentBatteryInfo!.chargingCurrent != chargingCurrent) {
           debugPrint('충전 전류 변화 감지: ${_currentBatteryInfo!.chargingCurrent}mA → ${chargingCurrent}mA');
           
           _currentBatteryInfo = updatedBatteryInfo;
           _safeAddEvent(updatedBatteryInfo);
+          
+          // 충전 전류 데이터를 데이터베이스에 저장 (배치 처리)
+          await _saveChargingCurrentToDatabase(chargingCurrent);
           
           debugPrint('충전 전류 업데이트 완료: ${chargingCurrent}mA');
         }
@@ -288,6 +300,59 @@ class BatteryService {
       
     } catch (e) {
       debugPrint('충전 전류 업데이트 실패: $e');
+    }
+  }
+  
+  /// 충전 전류 데이터를 데이터베이스에 저장 (배치 처리)
+  Future<void> _saveChargingCurrentToDatabase(int currentMa) async {
+    try {
+      // 데이터베이스 초기화 확인
+      if (!_isDatabaseInitialized) {
+        await _databaseService.initialize();
+        _isDatabaseInitialized = true;
+      }
+      
+      // 현재 시간과 충전 전류를 버퍼에 추가
+      _chargingCurrentBuffer.add({
+        'timestamp': DateTime.now(),
+        'currentMa': currentMa,
+      });
+      
+      // 배치 저장 타이머가 없으면 시작 (10초마다 저장)
+      if (_chargingCurrentSaveTimer == null) {
+        _chargingCurrentSaveTimer = Timer.periodic(Duration(seconds: 10), (timer) async {
+          if (_chargingCurrentBuffer.isNotEmpty) {
+            final pointsToSave = List<Map<String, dynamic>>.from(_chargingCurrentBuffer);
+            _chargingCurrentBuffer.clear();
+            
+            try {
+              await _databaseService.insertChargingCurrentPoints(pointsToSave);
+              debugPrint('충전 전류 데이터 ${pointsToSave.length}개 배치 저장 완료');
+            } catch (e) {
+              debugPrint('충전 전류 데이터 배치 저장 실패: $e');
+              // 실패 시 다시 버퍼에 추가
+              _chargingCurrentBuffer.addAll(pointsToSave);
+            }
+          }
+        });
+      }
+      
+      // 버퍼가 너무 크면 (100개 이상) 즉시 저장
+      if (_chargingCurrentBuffer.length >= 100) {
+        final pointsToSave = List<Map<String, dynamic>>.from(_chargingCurrentBuffer);
+        _chargingCurrentBuffer.clear();
+        
+        try {
+          await _databaseService.insertChargingCurrentPoints(pointsToSave);
+          debugPrint('충전 전류 데이터 ${pointsToSave.length}개 즉시 저장 완료 (버퍼 초과)');
+        } catch (e) {
+          debugPrint('충전 전류 데이터 즉시 저장 실패: $e');
+          // 실패 시 다시 버퍼에 추가
+          _chargingCurrentBuffer.addAll(pointsToSave);
+        }
+      }
+    } catch (e) {
+      debugPrint('충전 전류 데이터 저장 준비 실패: $e');
     }
   }
   
@@ -359,7 +424,7 @@ class BatteryService {
   }
 
   /// 네이티브에서 오는 배터리 상태 변화 즉시 처리
-  void _handleNativeBatteryStateChange(Map<String, dynamic> chargingInfo) {
+  Future<void> _handleNativeBatteryStateChange(Map<String, dynamic> chargingInfo) async {
     if (_isDisposed) {
       debugPrint('서비스가 이미 dispose됨, 네이티브 배터리 상태 변화 처리 건너뜀');
       return;
@@ -403,6 +468,8 @@ class BatteryService {
         } else if (!batteryInfo.isCharging && wasCharging) {
           debugPrint('충전 종료 감지 - 충전 전류 모니터링 중지');
           _stopChargingCurrentMonitoring();
+          // 충전 종료 시 남은 데이터 저장
+          await _flushChargingCurrentBuffer();
           // 충전 종료 시 알림 플래그 리셋
           _hasNotifiedChargingComplete = false;
           _chargingPercentNotified.clear();
@@ -431,6 +498,29 @@ class BatteryService {
     
     // 충전 전류 모니터링도 중지
     _stopChargingCurrentMonitoring();
+    
+    // 남은 충전 전류 데이터 저장
+    _flushChargingCurrentBuffer();
+  }
+  
+  /// 충전 전류 버퍼에 남은 데이터를 즉시 저장
+  Future<void> _flushChargingCurrentBuffer() async {
+    _chargingCurrentSaveTimer?.cancel();
+    _chargingCurrentSaveTimer = null;
+    
+    if (_chargingCurrentBuffer.isNotEmpty) {
+      final pointsToSave = List<Map<String, dynamic>>.from(_chargingCurrentBuffer);
+      _chargingCurrentBuffer.clear();
+      
+      try {
+        if (_isDatabaseInitialized) {
+          await _databaseService.insertChargingCurrentPoints(pointsToSave);
+          debugPrint('충전 전류 데이터 ${pointsToSave.length}개 최종 저장 완료');
+        }
+      } catch (e) {
+        debugPrint('충전 전류 데이터 최종 저장 실패: $e');
+      }
+    }
   }
 
   /// 배터리 정보 업데이트
@@ -481,6 +571,8 @@ class BatteryService {
           _hasNotifiedChargingComplete = false;
         } else if (!batteryInfo.isCharging && wasCharging) {
           _stopChargingCurrentMonitoring();
+          // 충전 종료 시 남은 데이터 저장
+          await _flushChargingCurrentBuffer();
           // 충전 종료 시 알림 플래그 리셋
           _hasNotifiedChargingComplete = false;
         }

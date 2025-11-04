@@ -1,6 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../services/charging_chart_service.dart';
+import '../models/charging_data_models.dart';
+import '../../../../../services/battery_history_database_service.dart';
 
 /// 섹션 2: 충전 전류 그래프 (메인)
 class ChargingCurrentChart extends StatefulWidget {
@@ -19,7 +22,90 @@ class ChargingCurrentChart extends StatefulWidget {
 
 class _ChargingCurrentChartState extends State<ChargingCurrentChart> {
   String _selectedTab = '오늘'; // '오늘', '어제', '이번 주'
+  List<ChargingDataPoint> _chartData = [];
+  bool _isLoading = true;
+  DateTime? _selectedDate;
   
+  final BatteryHistoryDatabaseService _databaseService = BatteryHistoryDatabaseService();
+  Timer? _refreshTimer;
+  
+  @override
+  void initState() {
+    super.initState();
+    _loadChartData();
+    // 주기적으로 차트 데이터 새로고침 (오늘 탭일 때만, 30초마다)
+    _startAutoRefresh();
+  }
+  
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+  
+  void _startAutoRefresh() {
+    _refreshTimer?.cancel();
+    _refreshTimer = Timer.periodic(Duration(seconds: 30), (timer) {
+      // 오늘 탭일 때만 자동 새로고침
+      if (_selectedTab == '오늘' && mounted) {
+        _loadChartData();
+      }
+    });
+  }
+
+  Future<void> _loadChartData() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      await _databaseService.initialize();
+      
+      DateTime targetDate;
+      switch (_selectedTab) {
+        case '어제':
+          targetDate = DateTime.now().subtract(Duration(days: 1));
+          break;
+        case '이번 주':
+          // 이번 주는 오늘 데이터만 표시 (향후 개선 가능)
+          targetDate = DateTime.now();
+          break;
+        case '오늘':
+        default:
+          targetDate = DateTime.now();
+          break;
+      }
+      
+      _selectedDate = targetDate;
+      
+      // 데이터베이스에서 충전 전류 데이터 조회
+      final dbData = await _databaseService.getChargingCurrentDataByDate(targetDate);
+      
+      // ChargingCurrentPoint 리스트로 변환
+      final points = dbData.map((row) => ChargingCurrentPoint(
+        timestamp: row['timestamp'] as DateTime,
+        currentMa: row['currentMa'] as int,
+      )).toList();
+      
+      // 차트 데이터로 변환
+      final chartData = ChargingChartService.convertToChartData(
+        points,
+        targetDate: targetDate,
+      );
+      
+      setState(() {
+        _chartData = chartData;
+        _isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('차트 데이터 로드 실패: $e');
+      setState(() {
+        _chartData = [];
+        _isLoading = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -115,13 +201,15 @@ class _ChargingCurrentChartState extends State<ChargingCurrentChart> {
                     color: Theme.of(context).colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Row(
+                    child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(Icons.calendar_today, size: 14),
                       SizedBox(width: 6),
                       Text(
-                        '2024.01.15',
+                        _selectedDate != null
+                            ? '${_selectedDate!.year}.${_selectedDate!.month.toString().padLeft(2, '0')}.${_selectedDate!.day.toString().padLeft(2, '0')}'
+                            : DateTime.now().toString().split(' ')[0].replaceAll('-', '.'),
                         style: TextStyle(fontSize: 12),
                       ),
                     ],
@@ -171,6 +259,8 @@ class _ChargingCurrentChartState extends State<ChargingCurrentChart> {
         setState(() {
           _selectedTab = label;
         });
+        _loadChartData();
+        _startAutoRefresh(); // 탭 변경 시 자동 새로고침 재시작
       },
       borderRadius: BorderRadius.circular(8),
       child: Container(
@@ -226,10 +316,30 @@ class _ChargingCurrentChartState extends State<ChargingCurrentChart> {
   }
   
   Widget _buildChart() {
-    final data = ChargingChartService.generateDummyData();
+    if (_isLoading) {
+      return Center(
+        child: CircularProgressIndicator(),
+      );
+    }
+    
+    if (_chartData.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.battery_charging_full, size: 48, color: Colors.grey),
+            SizedBox(height: 8),
+            Text(
+              '충전 데이터가 없습니다',
+              style: TextStyle(color: Colors.grey, fontSize: 14),
+            ),
+          ],
+        ),
+      );
+    }
     
     return LineChart(
-      ChargingChartService.createChartData(data),
+      ChargingChartService.createChartData(_chartData),
     );
   }
   

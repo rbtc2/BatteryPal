@@ -392,11 +392,25 @@ class BatteryHistoryDatabaseService {
         orderBy: 'timestamp ASC',
       );
       
-      // 결과를 Map 형식으로 변환 (timestamp는 DateTime으로, charging_current는 currentMa로)
-      final data = results.map((row) => <String, dynamic>{
-        'timestamp': DateTime.fromMillisecondsSinceEpoch(row['timestamp'] as int),
-        'currentMa': row['charging_current'] as int,
-      }).toList();
+      // 결과를 Map 형식으로 변환하고, 같은 시간(분 단위)의 포인트는 하나만 사용
+      final timeMap = <String, Map<String, dynamic>>{}; // "YYYY-MM-DD HH:MM" -> data
+      
+      for (final row in results) {
+        final timestamp = DateTime.fromMillisecondsSinceEpoch(row['timestamp'] as int);
+        final timeKey = '${timestamp.year}-${timestamp.month.toString().padLeft(2, '0')}-${timestamp.day.toString().padLeft(2, '0')} ${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}';
+        
+        // 같은 분 단위의 데이터가 있으면, 더 높은 전류 값을 가진 것으로 교체
+        if (!timeMap.containsKey(timeKey) || 
+            (row['charging_current'] as int) > timeMap[timeKey]!['currentMa']) {
+          timeMap[timeKey] = {
+            'timestamp': timestamp,
+            'currentMa': row['charging_current'] as int,
+          };
+        }
+      }
+      
+      final data = timeMap.values.toList()
+        ..sort((a, b) => (a['timestamp'] as DateTime).compareTo(b['timestamp'] as DateTime));
       
       debugPrint('${data.length}개의 충전 전류 데이터 조회 완료 (날짜: ${date.toString().split(' ')[0]})');
       
