@@ -46,7 +46,7 @@ class _ChargingCurrentChartState extends State<ChargingCurrentChart> {
   void _startAutoRefresh() {
     _refreshTimer?.cancel();
     _refreshTimer = Timer.periodic(Duration(seconds: 30), (timer) {
-      // 오늘 탭일 때만 자동 새로고침
+      // 오늘 탭일 때만 자동 새로고침 (수동 선택한 날짜는 자동 새로고침 안 함)
       if (_selectedTab == '오늘' && mounted) {
         _loadChartData();
       }
@@ -70,13 +70,20 @@ class _ChargingCurrentChartState extends State<ChargingCurrentChart> {
           // 이번 주는 오늘 데이터만 표시 (향후 개선 가능)
           targetDate = DateTime.now();
           break;
+        case '선택':
+          // 수동으로 선택한 날짜 사용
+          targetDate = _selectedDate ?? DateTime.now();
+          break;
         case '오늘':
         default:
           targetDate = DateTime.now();
           break;
       }
       
-      _selectedDate = targetDate;
+      // _selectedTab이 '선택'이 아닐 때만 _selectedDate 업데이트
+      if (_selectedTab != '선택') {
+        _selectedDate = targetDate;
+      }
       
       // 데이터베이스에서 충전 전류 데이터 조회
       final dbData = await _databaseService.getChargingCurrentDataByDate(targetDate);
@@ -195,24 +202,28 @@ class _ChargingCurrentChartState extends State<ChargingCurrentChart> {
                 SizedBox(width: 8),
                 _buildTabButton('이번 주'),
                 Spacer(),
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
+                InkWell(
+                  onTap: _showDatePicker,
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                     child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.calendar_today, size: 14),
-                      SizedBox(width: 6),
-                      Text(
-                        _selectedDate != null
-                            ? '${_selectedDate!.year}.${_selectedDate!.month.toString().padLeft(2, '0')}.${_selectedDate!.day.toString().padLeft(2, '0')}'
-                            : DateTime.now().toString().split(' ')[0].replaceAll('-', '.'),
-                        style: TextStyle(fontSize: 12),
-                      ),
-                    ],
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.calendar_today, size: 14),
+                        SizedBox(width: 6),
+                        Text(
+                          _selectedDate != null
+                              ? '${_selectedDate!.year}.${_selectedDate!.month.toString().padLeft(2, '0')}.${_selectedDate!.day.toString().padLeft(2, '0')}'
+                              : DateTime.now().toString().split(' ')[0].replaceAll('-', '.'),
+                          style: TextStyle(fontSize: 12),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -341,6 +352,59 @@ class _ChargingCurrentChartState extends State<ChargingCurrentChart> {
     return LineChart(
       ChargingChartService.createChartData(_chartData),
     );
+  }
+  
+  /// 날짜 선택 다이얼로그 표시
+  /// 오늘로부터 7일 전까지의 날짜만 선택 가능
+  Future<void> _showDatePicker() async {
+    final now = DateTime.now();
+    // 날짜만 비교하기 위해 시간 제거
+    final today = DateTime(now.year, now.month, now.day);
+    final firstDate = today.subtract(Duration(days: 7)); // 7일 전
+    final lastDate = today; // 오늘
+    
+    // 초기 날짜 설정 (선택된 날짜가 없으면 오늘)
+    final initialDate = _selectedDate ?? today;
+    
+    final selectedDate = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: firstDate,
+      lastDate: lastDate,
+      helpText: '날짜 선택 (최근 7일)',
+      cancelText: '취소',
+      confirmText: '확인',
+      selectableDayPredicate: (date) {
+        // 선택 가능한 날짜 범위 체크 (7일 전 ~ 오늘)
+        final dateOnly = DateTime(date.year, date.month, date.day);
+        final daysDiff = today.difference(dateOnly).inDays;
+        return daysDiff >= 0 && daysDiff <= 7;
+      },
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: Theme.of(context).colorScheme.primary,
+              onPrimary: Theme.of(context).colorScheme.onPrimary,
+              surface: Theme.of(context).colorScheme.surface,
+              onSurface: Theme.of(context).colorScheme.onSurface,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    
+    if (selectedDate != null) {
+      // 날짜만 사용 (시간 제거)
+      final selectedDateOnly = DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
+      
+      setState(() {
+        _selectedDate = selectedDateOnly;
+        _selectedTab = '선택'; // 탭을 '선택'으로 변경하여 수동 선택임을 표시
+      });
+      _loadChartData();
+    }
   }
   
   void _showDetailedAnalysis() {

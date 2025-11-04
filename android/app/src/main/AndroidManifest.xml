@@ -14,7 +14,7 @@
     
     <application
         android:label="batterypal"
-        android:name="${applicationName}"
+        android:name=".MainApplication"
         android:icon="@mipmap/ic_launcher">
         <activity
             android:name=".MainActivity"

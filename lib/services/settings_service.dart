@@ -73,6 +73,9 @@ class SettingsService extends ChangeNotifier {
       await prefs.setBool('chargingCompleteNotifyOnFastCharging', settingsJson['chargingCompleteNotifyOnFastCharging'] as bool);
       await prefs.setBool('chargingCompleteNotifyOnNormalCharging', settingsJson['chargingCompleteNotifyOnNormalCharging'] as bool);
       
+      // 네이티브 코드에서도 읽을 수 있도록 Flutter SharedPreferences에 저장됨
+      // (네이티브 코드는 FlutterSharedPreferences 파일을 직접 읽음)
+      
       // 충전 퍼센트 알림 설정
       await prefs.setBool('chargingPercentNotificationEnabled', settingsJson['chargingPercentNotificationEnabled'] as bool);
       await prefs.setStringList('chargingPercentThresholds', (settingsJson['chargingPercentThresholds'] as List<dynamic>).map((e) => e.toString()).toList());
