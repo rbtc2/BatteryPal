@@ -435,8 +435,14 @@ class BatteryHistoryDatabaseConfig {
   /// 데이터 보관 기간 (일)
   static const int dataRetentionDays = 30;
   
+  /// 충전 전류 데이터 보관 기간 (일) - 그래프용 데이터는 7일만 보관
+  static const int chargingCurrentRetentionDays = 7;
+  
   /// 자동 정리 주기 (일)
   static const int autoCleanupIntervalDays = 7;
+  
+  /// 일별 자동 정리 실행 시간 (시간) - 매일 자정에 실행
+  static const int dailyCleanupHour = 0;
   
   /// 최대 데이터 포인트 수
   static const int maxDataPoints = 10000;

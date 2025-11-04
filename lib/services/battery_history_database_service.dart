@@ -128,6 +128,11 @@ class BatteryHistoryDatabaseService {
       CREATE INDEX idx_charging_timestamp ON ${BatteryHistoryDatabaseConfig.tableName} (is_charging, timestamp)
     ''');
     
+    // 충전 전류 데이터 조회 최적화를 위한 날짜별 인덱스
+    await db.execute('''
+      CREATE INDEX idx_charging_current_date ON ${BatteryHistoryDatabaseConfig.tableName} (charging_current, timestamp)
+    ''');
+    
     // 데이터 품질 인덱스
     await db.execute('''
       CREATE INDEX idx_data_quality ON ${BatteryHistoryDatabaseConfig.tableName} (data_quality)
@@ -517,6 +522,49 @@ class BatteryHistoryDatabaseService {
       rethrow;
     }
   }
+  
+  /// 충전 전류 데이터만 정리 (7일 이상 된 데이터 삭제)
+  /// 그래프용 충전 전류 데이터는 7일만 보관
+  Future<int> cleanupOldChargingCurrentData() async {
+    await initialization;
+    if (_database == null) throw Exception('데이터베이스가 초기화되지 않았습니다');
+    
+    final cutoffDays = BatteryHistoryDatabaseConfig.chargingCurrentRetentionDays;
+    final cutoffTime = DateTime.now().subtract(Duration(days: cutoffDays));
+    final cutoffTimestamp = cutoffTime.millisecondsSinceEpoch;
+    
+    try {
+      // 삭제 전 행 수 확인
+      final beforeCount = await _database!.rawQuery('''
+        SELECT COUNT(*) as count FROM ${BatteryHistoryDatabaseConfig.tableName}
+        WHERE charging_current > 0
+      ''');
+      
+      // 충전 전류 데이터만 삭제 (charging_current가 0이 아닌 데이터 중에서 오래된 것)
+      await _database!.delete(
+        BatteryHistoryDatabaseConfig.tableName,
+        where: 'timestamp < ? AND charging_current > 0',
+        whereArgs: [cutoffTimestamp],
+      );
+      
+      // 삭제 후 행 수 확인
+      final afterCount = await _database!.rawQuery('''
+        SELECT COUNT(*) as count FROM ${BatteryHistoryDatabaseConfig.tableName}
+        WHERE charging_current > 0
+      ''');
+      
+      final before = Sqflite.firstIntValue(beforeCount) ?? 0;
+      final after = Sqflite.firstIntValue(afterCount) ?? 0;
+      final deletedCount = before - after;
+      
+      debugPrint('$deletedCount개의 오래된 충전 전류 데이터 정리 완료 (${cutoffDays}일 이상)');
+      return deletedCount;
+    } catch (e, stackTrace) {
+      debugPrint('오래된 충전 전류 데이터 정리 실패: $e');
+      debugPrint('스택 트레이스: $stackTrace');
+      rethrow;
+    }
+  }
 
   /// 데이터 압축 (중복 데이터 제거)
   Future<int> compressData() async {
@@ -553,6 +601,10 @@ class BatteryHistoryDatabaseService {
 
   /// 자동 정리 스케줄링
   void _scheduleAutoCleanup() {
+    // 매일 자정에 충전 전류 데이터 정리 실행
+    _scheduleDailyCleanup();
+    
+    // 일주일마다 전체 데이터 정리 실행
     Timer.periodic(
       Duration(days: BatteryHistoryDatabaseConfig.autoCleanupIntervalDays),
       (timer) async {
@@ -563,6 +615,38 @@ class BatteryHistoryDatabaseService {
         }
       },
     );
+  }
+  
+  /// 매일 자정에 실행되는 충전 전류 데이터 정리
+  void _scheduleDailyCleanup() {
+    // 다음 자정 시간 계산
+    final now = DateTime.now();
+    final tomorrow = DateTime(now.year, now.month, now.day + 1, 
+                              BatteryHistoryDatabaseConfig.dailyCleanupHour);
+    final durationUntilMidnight = tomorrow.difference(now);
+    
+    // 다음 자정까지 대기 후 실행
+    Timer(durationUntilMidnight, () {
+      // 매일 자정에 실행
+      Timer.periodic(Duration(days: 1), (timer) async {
+        try {
+          debugPrint('일별 충전 전류 데이터 정리 실행 (${DateTime.now()})');
+          await cleanupOldChargingCurrentData();
+        } catch (e) {
+          debugPrint('일별 충전 전류 데이터 정리 실패: $e');
+        }
+      });
+      
+      // 첫 실행은 즉시
+      Timer(Duration(seconds: 1), () async {
+        try {
+          debugPrint('초기 충전 전류 데이터 정리 실행');
+          await cleanupOldChargingCurrentData();
+        } catch (e) {
+          debugPrint('초기 충전 전류 데이터 정리 실패: $e');
+        }
+      });
+    });
   }
 
   /// 데이터베이스 백업

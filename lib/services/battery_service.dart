@@ -328,6 +328,12 @@ class BatteryService {
             try {
               await _databaseService.insertChargingCurrentPoints(pointsToSave);
               debugPrint('충전 전류 데이터 ${pointsToSave.length}개 배치 저장 완료');
+              
+              // 저장 후 7일 이상 된 데이터 자동 정리 (주기적으로만 실행)
+              // 매 저장마다 실행하면 성능 저하가 있으므로, 10번 중 1번만 실행
+              if (DateTime.now().second % 10 == 0) {
+                await _databaseService.cleanupOldChargingCurrentData();
+              }
             } catch (e) {
               debugPrint('충전 전류 데이터 배치 저장 실패: $e');
               // 실패 시 다시 버퍼에 추가
@@ -345,6 +351,11 @@ class BatteryService {
         try {
           await _databaseService.insertChargingCurrentPoints(pointsToSave);
           debugPrint('충전 전류 데이터 ${pointsToSave.length}개 즉시 저장 완료 (버퍼 초과)');
+          
+          // 저장 후 7일 이상 된 데이터 자동 정리 (드물게만 실행)
+          if (DateTime.now().second % 30 == 0) {
+            await _databaseService.cleanupOldChargingCurrentData();
+          }
         } catch (e) {
           debugPrint('충전 전류 데이터 즉시 저장 실패: $e');
           // 실패 시 다시 버퍼에 추가
