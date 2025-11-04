@@ -1,6 +1,17 @@
 // 충전 패턴 분석을 위한 데이터 모델들
 
-/// 충전 데이터 포인트 클래스
+/// 충전 전류 원본 데이터 포인트 클래스
+class ChargingCurrentPoint {
+  final DateTime timestamp;  // 예: 2025-11-04 13:00:00
+  final int currentMa;        // 예: 500 (단위: mA)
+  
+  ChargingCurrentPoint({
+    required this.timestamp,
+    required this.currentMa,
+  });
+}
+
+/// 충전 데이터 포인트 클래스 (그래프용)
 class ChargingDataPoint {
   final double hour; // 0.0 ~ 24.0
   final double currentMa;

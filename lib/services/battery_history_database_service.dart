@@ -223,6 +223,99 @@ class BatteryHistoryDatabaseService {
     }
   }
 
+  /// 충전 전류 데이터 포인트 일괄 저장
+  /// timestamp와 currentMa만 포함된 Map 리스트를 받아서 저장
+  /// 기존 데이터가 있으면 charging_current만 업데이트, 없으면 기본값으로 새 레코드 생성
+  Future<List<int>> insertChargingCurrentPoints(List<Map<String, dynamic>> points) async {
+    await initialization;
+    if (_database == null) throw Exception('데이터베이스가 초기화되지 않았습니다');
+    
+    if (points.isEmpty) return [];
+    
+    try {
+      // 트랜잭션을 사용하여 성능 최적화
+      return await _database!.transaction((txn) async {
+        final batch = txn.batch();
+        
+        for (final point in points) {
+          final timestamp = point['timestamp'] as DateTime;
+          final currentMa = point['currentMa'] as int;
+          final timestampMs = timestamp.millisecondsSinceEpoch;
+          
+          // 해당 timestamp에 대한 기존 데이터 확인
+          final existing = await txn.query(
+            BatteryHistoryDatabaseConfig.tableName,
+            where: 'timestamp = ?',
+            whereArgs: [timestampMs],
+            limit: 1,
+          );
+          
+          if (existing.isNotEmpty) {
+            // 기존 데이터가 있으면 charging_current만 업데이트
+            batch.update(
+              BatteryHistoryDatabaseConfig.tableName,
+              {'charging_current': currentMa},
+              where: 'timestamp = ?',
+              whereArgs: [timestampMs],
+            );
+          } else {
+            // 기존 데이터가 없으면 최근 배터리 데이터를 조회하여 기본값으로 사용
+            final recentData = await txn.query(
+              BatteryHistoryDatabaseConfig.tableName,
+              orderBy: 'timestamp DESC',
+              limit: 1,
+            );
+            
+            Map<String, dynamic> dataMap;
+            if (recentData.isNotEmpty) {
+              // 최근 데이터를 복사하여 사용
+              final recent = recentData.first;
+              dataMap = Map<String, dynamic>.from(recent);
+              dataMap['id'] = null; // 새 레코드이므로 ID는 null
+              dataMap['timestamp'] = timestampMs;
+              dataMap['charging_current'] = currentMa;
+              dataMap['is_charging'] = currentMa > 0 ? 1 : 0;
+              dataMap['created_at'] = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+            } else {
+              // 최근 데이터도 없으면 기본값으로 생성
+              dataMap = {
+                'timestamp': timestampMs,
+                'level': 0.0,
+                'state': 0, // BatteryState.unknown
+                'temperature': -1.0,
+                'voltage': -1,
+                'capacity': -1,
+                'health': -1,
+                'charging_type': 'Unknown',
+                'charging_current': currentMa,
+                'is_charging': currentMa > 0 ? 1 : 0,
+                'is_app_in_foreground': 1,
+                'collection_method': 'automatic',
+                'data_quality': 0.5,
+                'created_at': DateTime.now().millisecondsSinceEpoch ~/ 1000,
+              };
+            }
+            
+            batch.insert(
+              BatteryHistoryDatabaseConfig.tableName,
+              dataMap,
+              conflictAlgorithm: ConflictAlgorithm.replace,
+            );
+          }
+        }
+        
+        final results = await batch.commit();
+        debugPrint('${points.length}개 충전 전류 데이터 포인트 일괄 저장 완료 (트랜잭션)');
+        
+        return results.whereType<int>().toList();
+      });
+    } catch (e, stackTrace) {
+      debugPrint('충전 전류 데이터 포인트 일괄 저장 실패: $e');
+      debugPrint('스택 트레이스: $stackTrace');
+      rethrow;
+    }
+  }
+
   /// 특정 기간의 배터리 히스토리 데이터 조회
   Future<List<BatteryHistoryDataPoint>> getBatteryHistoryData({
     DateTime? startTime,
@@ -277,6 +370,42 @@ class BatteryHistoryDatabaseService {
       limit: count,
       orderByTimestampDesc: true,
     );
+  }
+
+  /// 특정 날짜의 충전 전류 데이터 조회
+  /// 날짜별로 그룹화하여 timestamp와 charging_current를 반환
+  Future<List<Map<String, dynamic>>> getChargingCurrentDataByDate(DateTime date) async {
+    await initialization;
+    if (_database == null) throw Exception('데이터베이스가 초기화되지 않았습니다');
+    
+    try {
+      // 해당 날짜의 시작 시간 (00:00:00)
+      final startOfDay = DateTime(date.year, date.month, date.day);
+      // 해당 날짜의 끝 시간 (23:59:59.999)
+      final endOfDay = DateTime(date.year, date.month, date.day, 23, 59, 59, 999);
+      
+      final results = await _database!.query(
+        BatteryHistoryDatabaseConfig.tableName,
+        columns: ['timestamp', 'charging_current'],
+        where: 'timestamp >= ? AND timestamp <= ?',
+        whereArgs: [startOfDay.millisecondsSinceEpoch, endOfDay.millisecondsSinceEpoch],
+        orderBy: 'timestamp ASC',
+      );
+      
+      // 결과를 Map 형식으로 변환 (timestamp는 DateTime으로, charging_current는 currentMa로)
+      final data = results.map((row) => <String, dynamic>{
+        'timestamp': DateTime.fromMillisecondsSinceEpoch(row['timestamp'] as int),
+        'currentMa': row['charging_current'] as int,
+      }).toList();
+      
+      debugPrint('${data.length}개의 충전 전류 데이터 조회 완료 (날짜: ${date.toString().split(' ')[0]})');
+      
+      return data;
+    } catch (e, stackTrace) {
+      debugPrint('충전 전류 데이터 조회 실패: $e');
+      debugPrint('스택 트레이스: $stackTrace');
+      rethrow;
+    }
   }
 
   /// 특정 기간의 배터리 통계 조회
