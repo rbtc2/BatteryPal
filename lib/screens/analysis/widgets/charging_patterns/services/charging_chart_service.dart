@@ -105,7 +105,8 @@ class ChargingChartService {
   }
 
   /// 충전 데이터를 세션별로 분리
-  /// 0mA 포인트가 나오면 이전 세션 종료, 0mA가 아닌 포인트가 나오면 새 세션 시작
+  /// 0mA 포인트가 나오면 이전 세션 종료
+  /// 충전 포인트들 사이에 일정 시간 이상(1시간) 간격이 있으면 별도 세션으로 분리
   /// 각 세션은 시작 시간부터 종료 시간까지의 연속된 충전 구간
   static List<List<ChargingDataPoint>> _splitIntoSessions(List<ChargingDataPoint> data) {
     if (data.isEmpty) {
@@ -115,27 +116,44 @@ class ChargingChartService {
 
     final sessions = <List<ChargingDataPoint>>[];
     var currentSession = <ChargingDataPoint>[];
-    bool isCharging = false;
+    
+    // 세션 분리를 위한 최소 시간 간격 (시간 단위)
+    // 충전 포인트들 사이에 이 시간 이상 간격이 있으면 별도 세션으로 간주
+    const minSessionGapHours = 1.0; // 1시간
+    
+    ChargingDataPoint? lastChargingPoint; // 마지막 충전 포인트 (전류 > 0)
 
     for (final point in data) {
       if (point.currentMa > 0) {
-        // 충전 시작 감지
-        if (!isCharging && currentSession.isEmpty) {
-          // 이전 세션이 끝나고 새로운 세션 시작
+        // 충전 포인트 발견
+        if (lastChargingPoint == null) {
+          // 첫 번째 충전 포인트 - 새 세션 시작
           currentSession = [point];
-          isCharging = true;
-        } else if (isCharging) {
-          // 충전 중이면 현재 세션에 추가
-          currentSession.add(point);
+          lastChargingPoint = point;
+        } else {
+          // 이전 충전 포인트와의 시간 간격 계산
+          final timeGap = point.hour - lastChargingPoint.hour;
+          
+          if (timeGap >= minSessionGapHours) {
+            // 시간 간격이 충분히 크면 이전 세션 종료하고 새 세션 시작
+            if (currentSession.isNotEmpty) {
+              sessions.add(List.from(currentSession));
+            }
+            currentSession = [point];
+            lastChargingPoint = point;
+          } else {
+            // 연속된 충전 구간이면 현재 세션에 추가
+            currentSession.add(point);
+            lastChargingPoint = point;
+          }
         }
       } else {
-        // 0mA 감지 - 충전 종료
-        if (isCharging && currentSession.isNotEmpty) {
-          // 세션 종료 포인트 추가 (선택적)
-          // 마지막 충전 포인트 직전까지가 세션
+        // 0mA 포인트 감지 - 충전 종료
+        if (currentSession.isNotEmpty) {
+          // 현재 세션 종료
           sessions.add(List.from(currentSession));
           currentSession.clear();
-          isCharging = false;
+          lastChargingPoint = null; // 세션 종료 후 초기화
         }
       }
     }
@@ -145,7 +163,7 @@ class ChargingChartService {
       sessions.add(currentSession);
     }
 
-    debugPrint('_splitIntoSessions: ${sessions.length} sessions');
+    debugPrint('_splitIntoSessions: ${data.length} points → ${sessions.length} sessions');
     return sessions;
   }
 
