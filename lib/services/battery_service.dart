@@ -319,29 +319,27 @@ class BatteryService {
       });
       
       // 배치 저장 타이머가 없으면 시작 (10초마다 저장)
-      if (_chargingCurrentSaveTimer == null) {
-        _chargingCurrentSaveTimer = Timer.periodic(Duration(seconds: 10), (timer) async {
-          if (_chargingCurrentBuffer.isNotEmpty) {
-            final pointsToSave = List<Map<String, dynamic>>.from(_chargingCurrentBuffer);
-            _chargingCurrentBuffer.clear();
+      _chargingCurrentSaveTimer ??= Timer.periodic(Duration(seconds: 10), (timer) async {
+        if (_chargingCurrentBuffer.isNotEmpty) {
+          final pointsToSave = List<Map<String, dynamic>>.from(_chargingCurrentBuffer);
+          _chargingCurrentBuffer.clear();
+          
+          try {
+            await _databaseService.insertChargingCurrentPoints(pointsToSave);
+            debugPrint('충전 전류 데이터 ${pointsToSave.length}개 배치 저장 완료');
             
-            try {
-              await _databaseService.insertChargingCurrentPoints(pointsToSave);
-              debugPrint('충전 전류 데이터 ${pointsToSave.length}개 배치 저장 완료');
-              
-              // 저장 후 7일 이상 된 데이터 자동 정리 (주기적으로만 실행)
-              // 매 저장마다 실행하면 성능 저하가 있으므로, 10번 중 1번만 실행
-              if (DateTime.now().second % 10 == 0) {
-                await _databaseService.cleanupOldChargingCurrentData();
-              }
-            } catch (e) {
-              debugPrint('충전 전류 데이터 배치 저장 실패: $e');
-              // 실패 시 다시 버퍼에 추가
-              _chargingCurrentBuffer.addAll(pointsToSave);
+            // 저장 후 7일 이상 된 데이터 자동 정리 (주기적으로만 실행)
+            // 매 저장마다 실행하면 성능 저하가 있으므로, 10번 중 1번만 실행
+            if (DateTime.now().second % 10 == 0) {
+              await _databaseService.cleanupOldChargingCurrentData();
             }
+          } catch (e) {
+            debugPrint('충전 전류 데이터 배치 저장 실패: $e');
+            // 실패 시 다시 버퍼에 추가
+            _chargingCurrentBuffer.addAll(pointsToSave);
           }
-        });
-      }
+        }
+      });
       
       // 버퍼가 너무 크면 (100개 이상) 즉시 저장
       if (_chargingCurrentBuffer.length >= 100) {

@@ -557,7 +557,7 @@ class BatteryHistoryDatabaseService {
       final after = Sqflite.firstIntValue(afterCount) ?? 0;
       final deletedCount = before - after;
       
-      debugPrint('$deletedCount개의 오래된 충전 전류 데이터 정리 완료 (${cutoffDays}일 이상)');
+      debugPrint('$deletedCount개의 오래된 충전 전류 데이터 정리 완료 ($cutoffDays일 이상)');
       return deletedCount;
     } catch (e, stackTrace) {
       debugPrint('오래된 충전 전류 데이터 정리 실패: $e');

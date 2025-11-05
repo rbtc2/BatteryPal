@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/app_usage_service.dart';
+import '../services/daily_usage_stats_service.dart';
 
 /// 실제 앱 사용 데이터 모델 (기존 _AppUsageData 대체)
 class RealAppUsageData {
@@ -194,18 +195,63 @@ class AppUsageManager {
       // 총 스크린 타임 계산
       final Duration totalScreenTime = await AppUsageService.getTodayScreenTime();
       
-      // 상위 앱들 변환
+      // 오늘 날짜 기준으로 계산 (자정부터 현재까지)
+      final DateTime now = DateTime.now();
+      final DateTime todayStart = DateTime(now.year, now.month, now.day);
+      final Duration todayDuration = now.difference(todayStart);
+      
+      // 상위 앱들 변환 (백그라운드 시간 계산 포함)
       final List<RealAppUsageData> topApps = appUsageList
           .where((app) => app.totalTimeInForeground.inMilliseconds > 0)
           .take(5)
           .map((app) => _convertToRealAppUsageData(app, totalScreenTime))
           .toList();
       
-      // 백그라운드 시간 추정 (실제로는 정확한 백그라운드 시간을 알기 어려움)
-      final Duration backgroundTime = Duration.zero; // 추후 개선 필요
+      // 백그라운드 시간 추정
+      // 방법: 각 앱의 활성 기간에서 포그라운드 시간을 빼서 백그라운드 시간 추정
+      // 단, 이 방법은 완벽하지 않지만 대략적인 추정치를 제공
+      Duration totalEstimatedBackgroundTime = Duration.zero;
+      
+      for (final app in appUsageList) {
+        if (app.totalTimeInForeground.inMilliseconds > 0) {
+          // 앱의 활성 기간 계산 (firstTimeStamp ~ lastTimeStamp)
+          // 단, 오늘 날짜 범위 내에서만 계산
+          final DateTime appFirstTime = app.firstTimeStamp.isBefore(todayStart) 
+              ? todayStart 
+              : app.firstTimeStamp;
+          final DateTime appLastTime = app.lastTimeStamp.isAfter(now) 
+              ? now 
+              : app.lastTimeStamp;
+          
+          final Duration appActiveDuration = appLastTime.difference(appFirstTime);
+          
+          // 활성 기간에서 포그라운드 시간을 빼면 대략적인 백그라운드 시간
+          // 단, 포그라운드 시간이 활성 기간보다 길 수 있으므로 최소값은 0
+          final Duration appBackgroundTime = appActiveDuration > app.totalTimeInForeground
+              ? appActiveDuration - app.totalTimeInForeground
+              : Duration.zero;
+          
+          // 백그라운드 시간이 너무 길면 (예: 24시간 이상) 제한
+          // 실제로는 백그라운드 시간이 포그라운드 시간의 일정 비율을 넘지 않도록 제한
+          final Duration maxReasonableBackground = app.totalTimeInForeground * 2; // 최대 포그라운드 시간의 2배
+          final Duration finalAppBackgroundTime = appBackgroundTime > maxReasonableBackground
+              ? maxReasonableBackground
+              : appBackgroundTime;
+          
+          totalEstimatedBackgroundTime += finalAppBackgroundTime;
+        }
+      }
+      
+      // 백그라운드 시간이 오늘 하루 시간을 넘지 않도록 제한
+      final Duration backgroundTime = totalEstimatedBackgroundTime > todayDuration
+          ? todayDuration
+          : totalEstimatedBackgroundTime;
       
       // 총 사용 시간 (스크린 타임 + 백그라운드 시간)
-      final Duration totalUsageTime = totalScreenTime + backgroundTime;
+      // 단, 오늘 하루 시간을 넘지 않도록 제한
+      final Duration totalUsageTime = (totalScreenTime + backgroundTime) > todayDuration
+          ? todayDuration
+          : totalScreenTime + backgroundTime;
       
       _cachedSummary = ScreenTimeSummary(
         totalScreenTime: totalScreenTime,
@@ -216,6 +262,10 @@ class AppUsageManager {
       );
       
       _lastCacheTime = DateTime.now();
+      
+      // 어제 데이터 저장 체크 (백그라운드에서 실행)
+      DailyUsageStatsService.checkAndSaveYesterday(_cachedSummary);
+      
       return _cachedSummary!;
       
     } catch (e) {
@@ -241,6 +291,30 @@ class AppUsageManager {
       totalScreenTime
     );
     
+    // 앱별 백그라운드 시간 추정
+    final DateTime now = DateTime.now();
+    final DateTime todayStart = DateTime(now.year, now.month, now.day);
+    
+    final DateTime appFirstTime = app.firstTimeStamp.isBefore(todayStart) 
+        ? todayStart 
+        : app.firstTimeStamp;
+    final DateTime appLastTime = app.lastTimeStamp.isAfter(now) 
+        ? now 
+        : app.lastTimeStamp;
+    
+    final Duration appActiveDuration = appLastTime.difference(appFirstTime);
+    
+    // 활성 기간에서 포그라운드 시간을 빼서 백그라운드 시간 추정
+    final Duration appBackgroundTime = appActiveDuration > app.totalTimeInForeground
+        ? appActiveDuration - app.totalTimeInForeground
+        : Duration.zero;
+    
+    // 백그라운드 시간이 너무 길면 제한 (포그라운드 시간의 2배를 넘지 않도록)
+    final Duration maxReasonableBackground = app.totalTimeInForeground * 2;
+    final Duration finalBackgroundTime = appBackgroundTime > maxReasonableBackground
+        ? maxReasonableBackground
+        : appBackgroundTime;
+    
     // 앱별 색상 결정
     final Color color = _getAppColor(app.packageName);
     
@@ -248,7 +322,7 @@ class AppUsageManager {
       packageName: app.packageName,
       appName: app.appName,
       totalTimeInForeground: app.totalTimeInForeground,
-      backgroundTime: Duration.zero, // 추후 개선 필요
+      backgroundTime: finalBackgroundTime,
       batteryPercent: batteryPercent,
       launchCount: app.launchCount,
       lastTimeUsed: app.lastTimeUsed,
