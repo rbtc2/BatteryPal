@@ -75,7 +75,7 @@ class BatteryStateReceiver : BroadcastReceiver() {
                             showChargingCompleteNotification(context)
                             
                             // 알림 플래그 설정
-                            prefs.edit().putBoolean("has_notified_charging_complete", true).apply()
+                            batteryStatePrefs.edit().putBoolean("has_notified_charging_complete", true).apply()
                             Log.d("BatteryPal", "BatteryStateReceiver: 충전 완료 알림 표시됨")
                         }
                     }
