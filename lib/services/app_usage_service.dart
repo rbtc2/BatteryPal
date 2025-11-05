@@ -77,9 +77,22 @@ class AppUsageService {
       final List<dynamic> usageStats = await _channel.invokeMethod('getAppUsageStats');
       
       final List<AppUsageData> appUsageList = usageStats.map((stat) {
+        final packageName = stat['packageName'] as String;
+        // appName이 없거나 null인 경우를 처리
+        String appName;
+        if (stat.containsKey('appName') && stat['appName'] != null) {
+          appName = stat['appName'] as String;
+        } else {
+          // 폴백: 패키지명의 마지막 부분 사용
+          final parts = packageName.split('.');
+          appName = parts.isNotEmpty ? parts.last : packageName;
+        }
+        
+        debugPrint('앱 정보: 패키지=$packageName, 이름=$appName');
+        
         return AppUsageData(
-          packageName: stat['packageName'] as String,
-          appName: stat['appName'] as String? ?? stat['packageName'] as String,
+          packageName: packageName,
+          appName: appName,
           totalTimeInForeground: Duration(milliseconds: stat['totalTimeInForeground'] as int),
           lastTimeUsed: DateTime.fromMillisecondsSinceEpoch(stat['lastTimeUsed'] as int),
           launchCount: stat['launchCount'] as int,

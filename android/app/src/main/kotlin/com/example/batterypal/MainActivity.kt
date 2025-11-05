@@ -54,7 +54,9 @@ class MainActivity : FlutterActivity() {
                     result.success(chargingCurrent)
                 }
                 "getAppUsageStats" -> {
+                    android.util.Log.d("BatteryPal", "Flutter에서 getAppUsageStats 요청 받음")
                     val appUsageStats = getAppUsageStats()
+                    android.util.Log.d("BatteryPal", "getAppUsageStats 결과: ${appUsageStats.size}개 앱 반환")
                     result.success(appUsageStats)
                 }
                 "getTodayScreenTime" -> {
@@ -342,6 +344,7 @@ class MainActivity : FlutterActivity() {
     
     /// 앱 사용 통계 가져오기
     private fun getAppUsageStats(): List<Map<String, Any>> {
+        android.util.Log.d("BatteryPal", "getAppUsageStats() 호출됨")
         try {
             val usageStatsManager = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
             val pm = packageManager
@@ -354,17 +357,27 @@ class MainActivity : FlutterActivity() {
                 time
             )
             
+            android.util.Log.d("BatteryPal", "사용 통계 조회 완료: ${usageStats.size}개 앱 발견")
+            
             return usageStats.map { usage ->
                 // PackageManager를 사용하여 실제 앱 이름 가져오기
                 var appName = usage.packageName
                 try {
-                    val applicationInfo = pm.getApplicationInfo(usage.packageName, 0)
-                    appName = pm.getApplicationLabel(applicationInfo).toString()
-                } catch (e: Exception) {
-                    // 앱 이름을 가져올 수 없으면 패키지명의 마지막 부분 사용
+                    val applicationInfo = pm.getApplicationInfo(usage.packageName, PackageManager.GET_META_DATA)
+                    val label = pm.getApplicationLabel(applicationInfo)
+                    appName = label?.toString() ?: usage.packageName
+                    android.util.Log.d("BatteryPal", "앱 이름 가져오기 성공: ${usage.packageName} -> $appName")
+                } catch (e: android.content.pm.PackageManager.NameNotFoundException) {
+                    // 앱이 설치되지 않았거나 제거된 경우
                     val parts = usage.packageName.split('.')
                     appName = if (parts.isNotEmpty()) parts.last() else usage.packageName
-                    android.util.Log.w("BatteryPal", "앱 이름 가져오기 실패 (${usage.packageName}): ${e.message}")
+                    android.util.Log.w("BatteryPal", "앱을 찾을 수 없음 (${usage.packageName}): ${e.message}")
+                } catch (e: Exception) {
+                    // 기타 예외 발생 시
+                    val parts = usage.packageName.split('.')
+                    appName = if (parts.isNotEmpty()) parts.last() else usage.packageName
+                    android.util.Log.w("BatteryPal", "앱 이름 가져오기 실패 (${usage.packageName}): ${e.javaClass.simpleName} - ${e.message}")
+                    android.util.Log.w("BatteryPal", "예외 스택 트레이스: ${android.util.Log.getStackTraceString(e)}")
                 }
                 
                 mapOf(
