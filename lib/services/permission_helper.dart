@@ -29,6 +29,7 @@ class PermissionHelper {
     }
 
     // 권한이 없으면 다이얼로그 표시
+    if (!context.mounted) return false;
     final result = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
@@ -94,6 +95,7 @@ class PermissionHelper {
     }
 
     // 권한이 없으면 다이얼로그 표시
+    if (!context.mounted) return false;
     final result = await showDialog<bool>(
       context: context,
       barrierDismissible: false,

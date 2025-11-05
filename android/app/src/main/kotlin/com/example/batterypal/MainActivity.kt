@@ -6,6 +6,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.os.BatteryManager
 import android.os.Bundle
 import android.provider.Settings
@@ -343,6 +344,7 @@ class MainActivity : FlutterActivity() {
     private fun getAppUsageStats(): List<Map<String, Any>> {
         try {
             val usageStatsManager = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+            val pm = packageManager
             val time = System.currentTimeMillis()
             val startTime = time - (24 * 60 * 60 * 1000) // 24시간 전
             
@@ -353,8 +355,21 @@ class MainActivity : FlutterActivity() {
             )
             
             return usageStats.map { usage ->
+                // PackageManager를 사용하여 실제 앱 이름 가져오기
+                var appName = usage.packageName
+                try {
+                    val applicationInfo = pm.getApplicationInfo(usage.packageName, 0)
+                    appName = pm.getApplicationLabel(applicationInfo).toString()
+                } catch (e: Exception) {
+                    // 앱 이름을 가져올 수 없으면 패키지명의 마지막 부분 사용
+                    val parts = usage.packageName.split('.')
+                    appName = if (parts.isNotEmpty()) parts.last() else usage.packageName
+                    android.util.Log.w("BatteryPal", "앱 이름 가져오기 실패 (${usage.packageName}): ${e.message}")
+                }
+                
                 mapOf(
                     "packageName" to usage.packageName,
+                    "appName" to appName,
                     "totalTimeInForeground" to usage.totalTimeInForeground,
                     "lastTimeUsed" to usage.lastTimeUsed,
                     "launchCount" to 0, // launchCount는 API 레벨에 따라 사용 불가능할 수 있음

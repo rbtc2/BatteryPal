@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 /// 앱 사용 통계 데이터 모델
 class AppUsageData {
   final String packageName;
+  final String appName;
   final Duration totalTimeInForeground;
   final DateTime lastTimeUsed;
   final int launchCount;
@@ -13,22 +14,13 @@ class AppUsageData {
   
   const AppUsageData({
     required this.packageName,
+    required this.appName,
     required this.totalTimeInForeground,
     required this.lastTimeUsed,
     required this.launchCount,
     required this.firstTimeStamp,
     required this.lastTimeStamp,
   });
-  
-  /// 앱 이름 추출 (패키지명에서)
-  String get appName {
-    // 패키지명에서 앱 이름 추출
-    final parts = packageName.split('.');
-    if (parts.length > 1) {
-      return parts.last;
-    }
-    return packageName;
-  }
   
   /// 사용 시간을 포맷팅된 문자열로 반환
   String get formattedUsageTime {
@@ -51,6 +43,7 @@ class AppUsageData {
   Map<String, dynamic> toJson() {
     return {
       'packageName': packageName,
+      'appName': appName,
       'totalTimeInForeground': totalTimeInForeground.inMilliseconds,
       'lastTimeUsed': lastTimeUsed.toIso8601String(),
       'launchCount': launchCount,
@@ -63,6 +56,7 @@ class AppUsageData {
   factory AppUsageData.fromJson(Map<String, dynamic> json) {
     return AppUsageData(
       packageName: json['packageName'] as String,
+      appName: json['appName'] as String? ?? json['packageName'] as String,
       totalTimeInForeground: Duration(milliseconds: json['totalTimeInForeground'] as int),
       lastTimeUsed: DateTime.parse(json['lastTimeUsed'] as String),
       launchCount: json['launchCount'] as int,
@@ -85,6 +79,7 @@ class AppUsageService {
       final List<AppUsageData> appUsageList = usageStats.map((stat) {
         return AppUsageData(
           packageName: stat['packageName'] as String,
+          appName: stat['appName'] as String? ?? stat['packageName'] as String,
           totalTimeInForeground: Duration(milliseconds: stat['totalTimeInForeground'] as int),
           lastTimeUsed: DateTime.fromMillisecondsSinceEpoch(stat['lastTimeUsed'] as int),
           launchCount: stat['launchCount'] as int,
