@@ -390,6 +390,33 @@ class ChargingChartService {
           color: Colors.grey.withValues(alpha: 0.3),
         ),
       ),
+      lineTouchData: LineTouchData(
+        enabled: true,
+        touchTooltipData: LineTouchTooltipData(
+          tooltipRoundedRadius: 8,
+          tooltipPadding: const EdgeInsets.all(8),
+          getTooltipItems: (touchedSpots) {
+            return touchedSpots.map((touchedSpot) {
+              // mA 값을 소수점 한 자리로 반올림
+              final currentMa = touchedSpot.y.toStringAsFixed(1);
+              // 시간 포맷 (예: 14.5 -> 14:30)
+              final hour = touchedSpot.x.toInt();
+              final minute = ((touchedSpot.x - hour) * 60).round();
+              final timeStr = '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
+              
+              return LineTooltipItem(
+                '$currentMa mA\n$timeStr',
+                const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              );
+            }).toList();
+          },
+        ),
+        handleBuiltInTouches: true,
+      ),
       minX: 0,
       maxX: 24,
       minY: 0,
