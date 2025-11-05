@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../models/app_usage_models.dart';
 import '../../../services/daily_usage_stats_service.dart';
+import '../../../services/permission_helper.dart';
 
 /// 사용 패턴 탭 - 완전히 새로 구현된 스켈레톤 UI
 /// 
@@ -163,10 +164,12 @@ class _TodaySummaryCardState extends State<TodaySummaryCard> {
   }
 
   Future<void> _handlePermissionRequest() async {
-    await _appUsageManager.openPermissionSettings();
-    // 설정에서 돌아온 후 다시 로드 (약간의 딜레이 후)
-    await Future.delayed(const Duration(seconds: 1));
-    _loadScreenTimeData();
+    // 개선된 권한 요청: 다이얼로그를 먼저 표시하고 사용자가 허용하면 설정으로 이동
+    final granted = await PermissionHelper.requestUsageStatsPermission(context);
+    if (granted) {
+      // 권한이 허용되었으면 데이터 새로고침
+      await _loadScreenTimeData(clearCache: true);
+    }
   }
 
   @override

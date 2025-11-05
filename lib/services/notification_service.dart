@@ -1,6 +1,7 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter/material.dart';
+import 'permission_helper.dart';
 
 /// 알림을 관리하는 서비스 클래스
 class NotificationService {
@@ -192,7 +193,21 @@ class NotificationService {
   }
 
   /// 알림 권한 요청 (외부에서 호출 가능)
-  Future<bool> requestPermission() async {
+  /// 
+  /// [context] BuildContext (다이얼로그 표시용, null이면 기본 요청)
+  /// [showDialog] 다이얼로그를 표시할지 여부 (기본값: false)
+  /// 
+  /// Returns 권한이 허용되었는지 여부
+  Future<bool> requestPermission({
+    BuildContext? context,
+    bool showDialog = false,
+  }) async {
+    // context가 있고 다이얼로그를 표시하려면 PermissionHelper 사용
+    if (context != null && showDialog) {
+      return await PermissionHelper.requestNotificationPermission(context);
+    }
+    
+    // 기본 권한 요청
     final status = await Permission.notification.request();
     return status.isGranted;
   }

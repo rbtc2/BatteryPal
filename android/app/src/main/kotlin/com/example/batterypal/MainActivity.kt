@@ -9,6 +9,7 @@ import android.content.IntentFilter
 import android.os.BatteryManager
 import android.os.Bundle
 import android.provider.Settings
+import android.net.Uri
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -415,15 +416,32 @@ class MainActivity : FlutterActivity() {
         }
     }
     
-    /// 사용 통계 설정 화면 열기
+    /// 사용 통계 설정 화면 열기 (개선된 버전)
+    /// 먼저 특정 앱의 설정 페이지로 이동 시도, 실패하면 일반 사용 통계 설정 화면으로 이동
     private fun openUsageStatsSettings() {
         try {
-            val intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
-            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            startActivity(intent)
-            android.util.Log.d("BatteryPal", "사용 통계 설정 화면 열기")
+            val packageName = applicationContext.packageName
+            
+            // 먼저 특정 앱의 설정 페이지를 열려고 시도
+            // 이렇게 하면 안드로이드에서 해당 앱의 설정이 하이라이트됩니다
+            try {
+                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.parse("package:$packageName")
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                startActivity(intent)
+                android.util.Log.d("BatteryPal", "앱 설정 페이지로 이동 (패키지: $packageName)")
+            } catch (e: Exception) {
+                // 실패하면 일반 사용 통계 설정 화면으로 이동
+                android.util.Log.w("BatteryPal", "앱 설정 페이지 열기 실패, 일반 설정으로 이동: $e")
+                val intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                startActivity(intent)
+                android.util.Log.d("BatteryPal", "사용 통계 설정 화면으로 이동")
+            }
         } catch (e: Exception) {
-            android.util.Log.e("BatteryPal", "사용 통계 설정 화면 열기 실패", e)
+            android.util.Log.e("BatteryPal", "설정 화면 열기 실패", e)
         }
     }
 }
