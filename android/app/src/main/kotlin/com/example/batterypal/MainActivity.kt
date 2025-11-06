@@ -350,7 +350,15 @@ class MainActivity : FlutterActivity() {
             val usageStatsManager = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
             val pm = packageManager
             val time = System.currentTimeMillis()
-            val startTime = time - (24 * 60 * 60 * 1000) // 24시간 전
+            // 오늘 자정(00:00:00)부터 현재까지의 데이터 가져오기
+            val calendar = java.util.Calendar.getInstance().apply {
+                timeInMillis = time
+                set(java.util.Calendar.HOUR_OF_DAY, 0)
+                set(java.util.Calendar.MINUTE, 0)
+                set(java.util.Calendar.SECOND, 0)
+                set(java.util.Calendar.MILLISECOND, 0)
+            }
+            val startTime = calendar.timeInMillis
             
             val usageStats = usageStatsManager.queryUsageStats(
                 UsageStatsManager.INTERVAL_DAILY,
@@ -446,7 +454,15 @@ class MainActivity : FlutterActivity() {
         try {
             val usageStatsManager = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
             val time = System.currentTimeMillis()
-            val startTime = time - (24 * 60 * 60 * 1000) // 24시간 전
+            // 오늘 자정(00:00:00)부터 현재까지의 데이터 가져오기
+            val calendar = java.util.Calendar.getInstance().apply {
+                timeInMillis = time
+                set(java.util.Calendar.HOUR_OF_DAY, 0)
+                set(java.util.Calendar.MINUTE, 0)
+                set(java.util.Calendar.SECOND, 0)
+                set(java.util.Calendar.MILLISECOND, 0)
+            }
+            val startTime = calendar.timeInMillis
             
             val usageStats = usageStatsManager.queryUsageStats(
                 UsageStatsManager.INTERVAL_DAILY,
@@ -471,9 +487,18 @@ class MainActivity : FlutterActivity() {
         try {
             val usageStatsManager = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
             val time = System.currentTimeMillis()
+            // 오늘 자정(00:00:00)부터 현재까지의 데이터 가져오기
+            val calendar = java.util.Calendar.getInstance().apply {
+                timeInMillis = time
+                set(java.util.Calendar.HOUR_OF_DAY, 0)
+                set(java.util.Calendar.MINUTE, 0)
+                set(java.util.Calendar.SECOND, 0)
+                set(java.util.Calendar.MILLISECOND, 0)
+            }
+            val startTime = calendar.timeInMillis
             val usageStats = usageStatsManager.queryUsageStats(
                 UsageStatsManager.INTERVAL_DAILY,
-                time - (24 * 60 * 60 * 1000),
+                startTime,
                 time
             )
             

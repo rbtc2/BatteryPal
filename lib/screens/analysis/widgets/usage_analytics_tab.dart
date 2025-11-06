@@ -596,15 +596,30 @@ class _AppBatteryUsageCardState extends State<AppBatteryUsageCard> {
                 Text('📱', style: TextStyle(fontSize: 24)),
                 SizedBox(width: 12),
                 Expanded(
-                  child: Text(
-                    '앱별 배터리 소모 (오늘)',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '앱별 사용 시간 비율 (오늘)',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        '스크린 타임 기준 비율 (실제 배터리 소모와 다를 수 있음)',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ),
                 ),
                 // 새로고침 버튼

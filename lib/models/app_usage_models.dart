@@ -196,14 +196,6 @@ class AppUsageManager {
       // 앱 사용 통계 가져오기
       final List<AppUsageData> appUsageList = await AppUsageService.getTodayAppUsage();
       
-      // 총 스크린 타임 계산
-      final Duration totalScreenTime = await AppUsageService.getTodayScreenTime();
-      
-      // 오늘 날짜 기준으로 계산 (자정부터 현재까지)
-      final DateTime now = DateTime.now();
-      final DateTime todayStart = DateTime(now.year, now.month, now.day);
-      final Duration todayDuration = now.difference(todayStart);
-      
       // 시스템 앱 필터링 및 중복 제거 (같은 패키지명 합산)
       final Map<String, AppUsageData> mergedApps = {};
       
@@ -252,17 +244,19 @@ class AppUsageManager {
         }
       }
       
-      // 합산된 앱들을 시간 순으로 정렬하고 상위 5개 선택
-      final List<RealAppUsageData> topApps = mergedApps.values
-          .toList()
-          .map((app) => _convertToRealAppUsageData(app, totalScreenTime))
-          .toList()
-        ..sort((a, b) => b.totalTimeInForeground.compareTo(a.totalTimeInForeground));
+      // 시스템 앱을 제외한 총 스크린 타임 계산
+      final Duration totalScreenTime = mergedApps.values
+          .fold<Duration>(
+            Duration.zero,
+            (sum, app) => sum + app.totalTimeInForeground,
+          );
       
-      // 상위 5개만 선택
-      final top5Apps = topApps.take(5).toList();
+      // 오늘 날짜 기준으로 계산 (자정부터 현재까지)
+      final DateTime now = DateTime.now();
+      final DateTime todayStart = DateTime(now.year, now.month, now.day);
+      final Duration todayDuration = now.difference(todayStart);
       
-      // 백그라운드 시간 추정
+      // 백그라운드 시간 추정 (비율 계산에 사용하기 위해 먼저 계산)
       // 방법: 각 앱의 활성 기간에서 포그라운드 시간을 빼서 백그라운드 시간 추정
       // 단, 이 방법은 완벽하지 않지만 대략적인 추정치를 제공
       Duration totalEstimatedBackgroundTime = Duration.zero;
@@ -302,6 +296,17 @@ class AppUsageManager {
           ? todayDuration
           : totalEstimatedBackgroundTime;
       
+      // 합산된 앱들을 시간 순으로 정렬하고 상위 5개 선택
+      // 백그라운드 시간을 포함하여 비율 계산
+      final List<RealAppUsageData> topApps = mergedApps.values
+          .toList()
+          .map((app) => _convertToRealAppUsageData(app, totalScreenTime, backgroundTime))
+          .toList()
+        ..sort((a, b) => b.totalTimeInForeground.compareTo(a.totalTimeInForeground));
+      
+      // 상위 5개만 선택
+      final top5Apps = topApps.take(5).toList();
+      
       // 총 사용 시간 (스크린 타임 + 백그라운드 시간)
       // 단, 오늘 하루 시간을 넘지 않도록 제한
       final Duration totalUsageTime = (totalScreenTime + backgroundTime) > todayDuration
@@ -339,7 +344,7 @@ class AppUsageManager {
   }
   
   /// AppUsageData를 RealAppUsageData로 변환
-  RealAppUsageData _convertToRealAppUsageData(AppUsageData app, Duration totalScreenTime) {
+  RealAppUsageData _convertToRealAppUsageData(AppUsageData app, Duration totalScreenTime, Duration totalBackgroundTime) {
     // 배터리 사용량 추정
     // 주의: 이것은 스크린 타임 비율이지 실제 배터리 소모 비율이 아닙니다.
     // 실제 배터리 소모는 CPU 사용량, 네트워크 사용량, 화면 밝기 등에 따라 달라집니다.
@@ -371,13 +376,27 @@ class AppUsageManager {
         ? maxReasonableBackground
         : appBackgroundTime;
     
-    // 배터리 소모 비율 계산 (스크린 타임 비율 기반)
+    // 사용 시간 비율 계산 (스크린 타임 + 백그라운드 시간 고려)
     // 실제 배터리 소모를 정확히 측정하려면 Android의 BatteryStats API가 필요하지만,
-    // 일반 앱에서는 사용할 수 없으므로 스크린 타임 비율을 사용합니다.
+    // 일반 앱에서는 사용할 수 없으므로 사용 시간 비율을 사용합니다.
+    // 
+    // 백그라운드 시간은 포그라운드 시간보다 덜 소모하므로 0.3배 가중치 적용
+    // 앱의 총 사용 시간 = 포그라운드 시간 + (앱의 백그라운드 시간 × 0.3)
+    final double effectiveAppUsageTime = app.totalTimeInForeground.inMilliseconds.toDouble() + 
+        (finalBackgroundTime.inMilliseconds.toDouble() * 0.3);
+    
+    // 시스템 앱을 제외한 전체 총 사용 시간 계산 (포그라운드 + 백그라운드 가중치)
+    // totalScreenTime은 이미 시스템 앱이 제외된 포그라운드 시간의 합
+    // totalBackgroundTime은 모든 앱의 백그라운드 시간 합
+    // 전체 총 사용 시간 = 전체 포그라운드 시간 + (전체 백그라운드 시간 × 0.3)
     double batteryPercent = 0.0;
-    if (totalScreenTime.inMilliseconds > 0) {
-      // 스크린 타임 비율 계산 (포그라운드 시간 기준)
-      // 주의: 이것은 실제 배터리 소모 비율이 아니라 스크린 타임 비율입니다.
+    final double totalEffectiveUsageTime = totalScreenTime.inMilliseconds.toDouble() + 
+        (totalBackgroundTime.inMilliseconds.toDouble() * 0.3);
+    
+    if (totalEffectiveUsageTime > 0) {
+      batteryPercent = (effectiveAppUsageTime / totalEffectiveUsageTime) * 100;
+    } else if (totalScreenTime.inMilliseconds > 0) {
+      // 폴백: 포그라운드 시간만 사용 (백그라운드 시간이 없는 경우)
       batteryPercent = (app.totalTimeInForeground.inMilliseconds / totalScreenTime.inMilliseconds) * 100;
     }
     
@@ -408,6 +427,9 @@ class AppUsageManager {
       'com.sec.android.',
       'com.sec.',
       'com.samsung.',
+      'com.microsoft.exchange', // Microsoft Exchange
+      'com.android.email', // Android Email
+      'com.samsung.android.email', // Samsung Email
     ];
     
     // 정확히 "android"인 경우도 시스템 앱으로 간주
@@ -441,6 +463,9 @@ class AppUsageManager {
       '설정',
       'Settings',
       'settings',
+      'exchange', // Exchange 서비스 (이메일 동기화)
+      'Exchange',
+      'EXCHANGE',
     ];
     
     // 정확히 일치하는 경우
@@ -450,7 +475,10 @@ class AppUsageManager {
     
     // 소문자로 변환하여 비교
     final lowerName = appName.toLowerCase();
-    if (lowerName == 'android' || lowerName == 'system' || lowerName == 'settings') {
+    if (lowerName == 'android' || 
+        lowerName == 'system' || 
+        lowerName == 'settings' ||
+        lowerName == 'exchange') {
       return true;
     }
     
