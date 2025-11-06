@@ -200,19 +200,69 @@ class AppUsageManager {
       final DateTime todayStart = DateTime(now.year, now.month, now.day);
       final Duration todayDuration = now.difference(todayStart);
       
-      // 상위 앱들 변환 (백그라운드 시간 계산 포함)
-      final List<RealAppUsageData> topApps = appUsageList
-          .where((app) => app.totalTimeInForeground.inMilliseconds > 0)
-          .take(5)
+      // 시스템 앱 필터링 및 중복 제거 (같은 패키지명 합산)
+      final Map<String, AppUsageData> mergedApps = {};
+      
+      for (final app in appUsageList) {
+        // 시스템 앱 필터링
+        if (_isSystemApp(app.packageName)) {
+          continue;
+        }
+        
+        // 사용 시간이 0보다 큰 앱만 처리
+        if (app.totalTimeInForeground.inMilliseconds <= 0) {
+          continue;
+        }
+        
+        // 같은 패키지명이 이미 있으면 시간 합산
+        if (mergedApps.containsKey(app.packageName)) {
+          final existingApp = mergedApps[app.packageName]!;
+          // 시간 합산
+          final mergedTime = existingApp.totalTimeInForeground + app.totalTimeInForeground;
+          // 더 최근의 lastTimeUsed 사용
+          final latestLastUsed = existingApp.lastTimeUsed.isAfter(app.lastTimeUsed)
+              ? existingApp.lastTimeUsed
+              : app.lastTimeUsed;
+          // 더 이른 firstTimeStamp 사용
+          final earliestFirstStamp = existingApp.firstTimeStamp.isBefore(app.firstTimeStamp)
+              ? existingApp.firstTimeStamp
+              : app.firstTimeStamp;
+          // 더 늦은 lastTimeStamp 사용
+          final latestLastStamp = existingApp.lastTimeStamp.isAfter(app.lastTimeStamp)
+              ? existingApp.lastTimeStamp
+              : app.lastTimeStamp;
+          
+          mergedApps[app.packageName] = AppUsageData(
+            packageName: app.packageName,
+            appName: app.appName, // 앱 이름은 동일하므로 그대로 사용
+            totalTimeInForeground: mergedTime,
+            lastTimeUsed: latestLastUsed,
+            launchCount: existingApp.launchCount + app.launchCount,
+            firstTimeStamp: earliestFirstStamp,
+            lastTimeStamp: latestLastStamp,
+          );
+        } else {
+          // 새로운 앱이면 그대로 추가
+          mergedApps[app.packageName] = app;
+        }
+      }
+      
+      // 합산된 앱들을 시간 순으로 정렬하고 상위 5개 선택
+      final List<RealAppUsageData> topApps = mergedApps.values
+          .toList()
           .map((app) => _convertToRealAppUsageData(app, totalScreenTime))
-          .toList();
+          .toList()
+        ..sort((a, b) => b.totalTimeInForeground.compareTo(a.totalTimeInForeground));
+      
+      // 상위 5개만 선택
+      final top5Apps = topApps.take(5).toList();
       
       // 백그라운드 시간 추정
       // 방법: 각 앱의 활성 기간에서 포그라운드 시간을 빼서 백그라운드 시간 추정
       // 단, 이 방법은 완벽하지 않지만 대략적인 추정치를 제공
       Duration totalEstimatedBackgroundTime = Duration.zero;
       
-      for (final app in appUsageList) {
+      for (final app in mergedApps.values) {
         if (app.totalTimeInForeground.inMilliseconds > 0) {
           // 앱의 활성 기간 계산 (firstTimeStamp ~ lastTimeStamp)
           // 단, 오늘 날짜 범위 내에서만 계산
@@ -257,7 +307,7 @@ class AppUsageManager {
         totalScreenTime: totalScreenTime,
         backgroundTime: backgroundTime,
         totalUsageTime: totalUsageTime,
-        topApps: topApps,
+        topApps: top5Apps,
         hasPermission: true,
       );
       
@@ -285,11 +335,12 @@ class AppUsageManager {
   
   /// AppUsageData를 RealAppUsageData로 변환
   RealAppUsageData _convertToRealAppUsageData(AppUsageData app, Duration totalScreenTime) {
-    // 배터리 사용량 추정 (실제 배터리 사용량은 별도로 수집해야 함)
-    final double batteryPercent = AppUsageService.calculateUsagePercentage(
-      app.totalTimeInForeground, 
-      totalScreenTime
-    );
+    // 배터리 사용량 추정
+    // 주의: 이것은 스크린 타임 비율이지 실제 배터리 소모 비율이 아닙니다.
+    // 실제 배터리 소모는 CPU 사용량, 네트워크 사용량, 화면 밝기 등에 따라 달라집니다.
+    // 
+    // 현재는 스크린 타임 비율을 사용합니다.
+    // 배터리 소모 비율 = (포그라운드 시간 / 전체 스크린 타임) * 100
     
     // 앱별 백그라운드 시간 추정
     final DateTime now = DateTime.now();
@@ -315,6 +366,16 @@ class AppUsageManager {
         ? maxReasonableBackground
         : appBackgroundTime;
     
+    // 배터리 소모 비율 계산 (스크린 타임 비율 기반)
+    // 실제 배터리 소모를 정확히 측정하려면 Android의 BatteryStats API가 필요하지만,
+    // 일반 앱에서는 사용할 수 없으므로 스크린 타임 비율을 사용합니다.
+    double batteryPercent = 0.0;
+    if (totalScreenTime.inMilliseconds > 0) {
+      // 스크린 타임 비율 계산 (포그라운드 시간 기준)
+      // 주의: 이것은 실제 배터리 소모 비율이 아니라 스크린 타임 비율입니다.
+      batteryPercent = (app.totalTimeInForeground.inMilliseconds / totalScreenTime.inMilliseconds) * 100;
+    }
+    
     // 앱별 색상 결정
     final Color color = _getAppColor(app.packageName);
     
@@ -328,6 +389,34 @@ class AppUsageManager {
       lastTimeUsed: app.lastTimeUsed,
       color: color,
     );
+  }
+  
+  /// 시스템 앱인지 확인
+  bool _isSystemApp(String packageName) {
+    // 시스템 앱 패키지명 패턴
+    final systemAppPatterns = [
+      'com.android.',
+      'com.google.android.apps.',
+      'com.samsung.android.',
+      'android',
+      'com.sec.android.',
+      'com.sec.',
+      'com.samsung.',
+    ];
+    
+    // 정확히 "android"인 경우도 시스템 앱으로 간주
+    if (packageName == 'android') {
+      return true;
+    }
+    
+    // 패턴 매칭
+    for (final pattern in systemAppPatterns) {
+      if (packageName.startsWith(pattern)) {
+        return true;
+      }
+    }
+    
+    return false;
   }
   
   /// 앱별 색상 결정

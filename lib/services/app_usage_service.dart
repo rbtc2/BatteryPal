@@ -73,7 +73,6 @@ class AppUsageService {
   /// 오늘의 앱 사용 통계 가져오기
   static Future<List<AppUsageData>> getTodayAppUsage() async {
     try {
-      debugPrint('앱 사용 통계 요청...');
       final List<dynamic> usageStats = await _channel.invokeMethod('getAppUsageStats');
       
       final List<AppUsageData> appUsageList = usageStats.map((stat) {
@@ -88,8 +87,6 @@ class AppUsageService {
           appName = parts.isNotEmpty ? parts.last : packageName;
         }
         
-        debugPrint('앱 정보: 패키지=$packageName, 이름=$appName');
-        
         return AppUsageData(
           packageName: packageName,
           appName: appName,
@@ -101,7 +98,6 @@ class AppUsageService {
         );
       }).toList();
       
-      debugPrint('앱 사용 통계 수집 완료: ${appUsageList.length}개 앱');
       return appUsageList;
       
     } catch (e) {
