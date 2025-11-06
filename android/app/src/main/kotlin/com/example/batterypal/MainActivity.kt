@@ -11,6 +11,10 @@ import android.os.BatteryManager
 import android.os.Bundle
 import android.provider.Settings
 import android.net.Uri
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.Drawable
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -357,6 +361,8 @@ class MainActivity : FlutterActivity() {
             return usageStats.map { usage ->
                 // PackageManager를 사용하여 실제 앱 이름 가져오기
                 var appName = usage.packageName
+                var appIcon = ""
+                
                 try {
                     val applicationInfo = pm.getApplicationInfo(usage.packageName, PackageManager.GET_META_DATA)
                     // loadLabel() 사용 (getApplicationLabel()보다 더 안정적)
@@ -366,6 +372,24 @@ class MainActivity : FlutterActivity() {
                     if (appName.isEmpty() || appName == usage.packageName) {
                         val label = pm.getApplicationLabel(applicationInfo)
                         appName = label?.toString() ?: usage.packageName
+                    }
+                    
+                    // 앱 아이콘 가져오기
+                    try {
+                        val drawable = pm.getApplicationIcon(usage.packageName)
+                        val bitmap = drawableToBitmap(drawable, 96, 96) // 96x96 크기로 변환
+                        val outputStream = java.io.ByteArrayOutputStream()
+                        bitmap.compress(Bitmap.CompressFormat.PNG, 90, outputStream)
+                        val iconBytes = outputStream.toByteArray()
+                        if (iconBytes.isNotEmpty()) {
+                            appIcon = android.util.Base64.encodeToString(iconBytes, android.util.Base64.NO_WRAP)
+                        } else {
+                            appIcon = ""
+                        }
+                    } catch (e: Exception) {
+                        // 아이콘 가져오기 실패 시 빈 문자열
+                        appIcon = ""
+                        android.util.Log.w("BatteryPal", "앱 아이콘 가져오기 실패 (${usage.packageName}): ${e.message}")
                     }
                 } catch (e: android.content.pm.PackageManager.NameNotFoundException) {
                     // 앱이 설치되지 않았거나 제거된 경우
@@ -382,6 +406,7 @@ class MainActivity : FlutterActivity() {
                 mapOf(
                     "packageName" to usage.packageName,
                     "appName" to appName,
+                    "appIcon" to appIcon,
                     "totalTimeInForeground" to usage.totalTimeInForeground,
                     "lastTimeUsed" to usage.lastTimeUsed,
                     "launchCount" to 0, // launchCount는 API 레벨에 따라 사용 불가능할 수 있음
@@ -394,6 +419,26 @@ class MainActivity : FlutterActivity() {
             android.util.Log.e("BatteryPal", "앱 사용 통계 가져오기 실패", e)
             return emptyList()
         }
+    }
+    
+    /// Drawable을 Bitmap으로 변환
+    private fun drawableToBitmap(drawable: Drawable, width: Int, height: Int): Bitmap {
+        // BitmapDrawable인 경우 크기 조정
+        if (drawable is BitmapDrawable && drawable.bitmap != null) {
+            val originalBitmap = drawable.bitmap
+            // 원하는 크기와 다르면 크기 조정
+            if (originalBitmap.width != width || originalBitmap.height != height) {
+                return Bitmap.createScaledBitmap(originalBitmap, width, height, true)
+            }
+            return originalBitmap
+        }
+        
+        // 일반 Drawable인 경우 Canvas에 그리기
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        drawable.setBounds(0, 0, width, height)
+        drawable.draw(canvas)
+        return bitmap
     }
     
     /// 오늘의 총 스크린 타임 계산

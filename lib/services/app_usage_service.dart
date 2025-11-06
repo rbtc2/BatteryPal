@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 class AppUsageData {
   final String packageName;
   final String appName;
+  final String? appIcon; // Base64 인코딩된 앱 아이콘
   final Duration totalTimeInForeground;
   final DateTime lastTimeUsed;
   final int launchCount;
@@ -15,6 +16,7 @@ class AppUsageData {
   const AppUsageData({
     required this.packageName,
     required this.appName,
+    this.appIcon,
     required this.totalTimeInForeground,
     required this.lastTimeUsed,
     required this.launchCount,
@@ -44,6 +46,7 @@ class AppUsageData {
     return {
       'packageName': packageName,
       'appName': appName,
+      'appIcon': appIcon,
       'totalTimeInForeground': totalTimeInForeground.inMilliseconds,
       'lastTimeUsed': lastTimeUsed.toIso8601String(),
       'launchCount': launchCount,
@@ -57,6 +60,7 @@ class AppUsageData {
     return AppUsageData(
       packageName: json['packageName'] as String,
       appName: json['appName'] as String? ?? json['packageName'] as String,
+      appIcon: json['appIcon'] as String?,
       totalTimeInForeground: Duration(milliseconds: json['totalTimeInForeground'] as int),
       lastTimeUsed: DateTime.parse(json['lastTimeUsed'] as String),
       launchCount: json['launchCount'] as int,
@@ -87,9 +91,15 @@ class AppUsageService {
           appName = parts.isNotEmpty ? parts.last : packageName;
         }
         
+        // appIcon 처리 (Base64 문자열)
+        final appIcon = stat.containsKey('appIcon') && stat['appIcon'] != null && (stat['appIcon'] as String).isNotEmpty
+            ? stat['appIcon'] as String
+            : null;
+        
         return AppUsageData(
           packageName: packageName,
           appName: appName,
+          appIcon: appIcon,
           totalTimeInForeground: Duration(milliseconds: stat['totalTimeInForeground'] as int),
           lastTimeUsed: DateTime.fromMillisecondsSinceEpoch(stat['lastTimeUsed'] as int),
           launchCount: stat['launchCount'] as int,

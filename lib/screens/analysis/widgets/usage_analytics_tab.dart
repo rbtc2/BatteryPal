@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
 import '../../../models/app_usage_models.dart';
 import '../../../services/daily_usage_stats_service.dart';
 import '../../../services/permission_helper.dart';
@@ -715,16 +716,42 @@ class _AppBatteryUsageCardState extends State<AppBatteryUsageCard> {
           // 앱 이름 + 퍼센트
           Row(
             children: [
-              // 심각도 아이콘
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: app.color,
-                  shape: BoxShape.circle,
+              // 앱 아이콘 또는 색상 점
+              if (app.appIcon != null && app.appIcon!.isNotEmpty)
+                Container(
+                  width: 24,
+                  height: 24,
+                  margin: EdgeInsets.only(right: 8),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: Image.memory(
+                      base64Decode(app.appIcon!),
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        // 아이콘 로드 실패 시 폴백
+                        return Container(
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            color: app.color.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Icon(Icons.apps, size: 16, color: app.color),
+                        );
+                      },
+                    ),
+                  ),
+                )
+              else
+                Container(
+                  width: 8,
+                  height: 8,
+                  margin: EdgeInsets.only(right: 8),
+                  decoration: BoxDecoration(
+                    color: app.color,
+                    shape: BoxShape.circle,
+                  ),
                 ),
-              ),
-              SizedBox(width: 8),
               Expanded(
                 child: Text(
                   app.appName,

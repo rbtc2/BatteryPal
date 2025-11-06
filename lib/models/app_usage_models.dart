@@ -6,6 +6,7 @@ import '../services/daily_usage_stats_service.dart';
 class RealAppUsageData {
   final String packageName;
   final String appName;
+  final String? appIcon; // Base64 인코딩된 앱 아이콘
   final Duration totalTimeInForeground;
   final Duration backgroundTime;
   final double batteryPercent;
@@ -16,6 +17,7 @@ class RealAppUsageData {
   const RealAppUsageData({
     required this.packageName,
     required this.appName,
+    this.appIcon,
     required this.totalTimeInForeground,
     required this.backgroundTime,
     required this.batteryPercent,
@@ -60,6 +62,7 @@ class RealAppUsageData {
     return {
       'packageName': packageName,
       'appName': appName,
+      'appIcon': appIcon,
       'totalTimeInForeground': totalTimeInForeground.inMilliseconds,
       'backgroundTime': backgroundTime.inMilliseconds,
       'batteryPercent': batteryPercent,
@@ -74,6 +77,7 @@ class RealAppUsageData {
     return RealAppUsageData(
       packageName: json['packageName'] as String,
       appName: json['appName'] as String,
+      appIcon: json['appIcon'] as String?,
       totalTimeInForeground: Duration(milliseconds: json['totalTimeInForeground'] as int),
       backgroundTime: Duration(milliseconds: json['backgroundTime'] as int),
       batteryPercent: json['batteryPercent'] as double,
@@ -204,8 +208,8 @@ class AppUsageManager {
       final Map<String, AppUsageData> mergedApps = {};
       
       for (final app in appUsageList) {
-        // 시스템 앱 필터링
-        if (_isSystemApp(app.packageName)) {
+        // 시스템 앱 필터링 (패키지명 또는 앱 이름 기준)
+        if (_isSystemApp(app.packageName) || _isSystemAppByName(app.appName)) {
           continue;
         }
         
@@ -235,6 +239,7 @@ class AppUsageManager {
           mergedApps[app.packageName] = AppUsageData(
             packageName: app.packageName,
             appName: app.appName, // 앱 이름은 동일하므로 그대로 사용
+            appIcon: existingApp.appIcon ?? app.appIcon, // 아이콘은 기존 것이 있으면 사용
             totalTimeInForeground: mergedTime,
             lastTimeUsed: latestLastUsed,
             launchCount: existingApp.launchCount + app.launchCount,
@@ -382,6 +387,7 @@ class AppUsageManager {
     return RealAppUsageData(
       packageName: app.packageName,
       appName: app.appName,
+      appIcon: app.appIcon,
       totalTimeInForeground: app.totalTimeInForeground,
       backgroundTime: finalBackgroundTime,
       batteryPercent: batteryPercent,
@@ -391,7 +397,7 @@ class AppUsageManager {
     );
   }
   
-  /// 시스템 앱인지 확인
+  /// 시스템 앱인지 확인 (패키지명 기준)
   bool _isSystemApp(String packageName) {
     // 시스템 앱 패키지명 패턴
     final systemAppPatterns = [
@@ -414,6 +420,38 @@ class AppUsageManager {
       if (packageName.startsWith(pattern)) {
         return true;
       }
+    }
+    
+    return false;
+  }
+  
+  /// 시스템 앱인지 확인 (앱 이름 기준)
+  /// 앱 이름이 모호하거나 시스템 앱을 나타내는 경우 필터링
+  bool _isSystemAppByName(String appName) {
+    // 모호한 시스템 앱 이름들
+    final ambiguousSystemNames = [
+      'android',
+      'Android',
+      'ANDROID',
+      '시스템',
+      'System',
+      'system',
+      '시스템 UI',
+      'System UI',
+      '설정',
+      'Settings',
+      'settings',
+    ];
+    
+    // 정확히 일치하는 경우
+    if (ambiguousSystemNames.contains(appName)) {
+      return true;
+    }
+    
+    // 소문자로 변환하여 비교
+    final lowerName = appName.toLowerCase();
+    if (lowerName == 'android' || lowerName == 'system' || lowerName == 'settings') {
+      return true;
     }
     
     return false;
