@@ -366,7 +366,18 @@ class MainActivity : FlutterActivity() {
                 time
             )
             
-            return usageStats.map { usage ->
+            // null 체크 및 빈 리스트 처리
+            if (usageStats == null || usageStats.isEmpty()) {
+                android.util.Log.d("BatteryPal", "사용 통계 데이터가 없습니다")
+                return emptyList()
+            }
+            
+            return usageStats
+                .filter { usage ->
+                    // 사용 시간이 0보다 큰 앱만 필터링
+                    usage.totalTimeInForeground > 0
+                }
+                .map { usage ->
                 // PackageManager를 사용하여 실제 앱 이름 가져오기
                 var appName = usage.packageName
                 var appIcon = ""
@@ -470,8 +481,16 @@ class MainActivity : FlutterActivity() {
                 time
             )
             
-            // 모든 앱의 포그라운드 시간을 합산
-            val totalScreenTime = usageStats.sumOf { it.totalTimeInForeground }
+            // null 체크 및 빈 리스트 처리
+            if (usageStats == null || usageStats.isEmpty()) {
+                android.util.Log.d("BatteryPal", "스크린 타임 데이터가 없습니다")
+                return 0L
+            }
+            
+            // 모든 앱의 포그라운드 시간을 합산 (사용 시간이 0보다 큰 앱만)
+            val totalScreenTime = usageStats
+                .filter { it.totalTimeInForeground > 0 }
+                .sumOf { it.totalTimeInForeground }
             
             android.util.Log.d("BatteryPal", "오늘의 스크린 타임: ${totalScreenTime}ms")
             return totalScreenTime
@@ -502,8 +521,9 @@ class MainActivity : FlutterActivity() {
                 time
             )
             
+            // null 체크: 권한이 있으면 null이 아닌 데이터를 받을 수 있음
             // 권한이 있으면 빈 리스트가 아닌 데이터를 받을 수 있음
-            val hasPermission = usageStats.isNotEmpty()
+            val hasPermission = usageStats != null && usageStats.isNotEmpty()
             android.util.Log.d("BatteryPal", "사용 통계 권한 상태: $hasPermission")
             return hasPermission
             
