@@ -261,37 +261,29 @@ class _WeeklyCalendarCardState extends State<WeeklyCalendarCard> {
     );
   }
 
-  /// 달력 그리드 위젯 (7일, 요일에 맞춰 배치)
+  /// 달력 그리드 위젯 (7일, 오늘을 기준으로 요일에 맞춰 배치)
   Widget _buildCalendarGrid(BuildContext context) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     
-    // 최근 7일 날짜 리스트 생성 (오래된 날짜부터)
-    final List<DateTime> weekDates = [];
-    for (int i = 6; i >= 0; i--) {
-      weekDates.add(today.subtract(Duration(days: i)));
-    }
-    
-    // 첫 번째 날짜의 요일 인덱스 (월요일=0, 일요일=6)
-    final firstDateWeekday = weekDates.first.weekday - 1;
+    // 오늘 날짜의 요일 인덱스 (월요일=0, 일요일=6)
+    final todayWeekday = today.weekday - 1;
     
     // 요일 헤더는 항상 7개 (월~일)
+    // 오늘 날짜를 기준으로 배치: 오늘이 금요일이면 금요일 위치에 오늘 배치
     return Row(
       children: List.generate(7, (index) {
-        // 해당 인덱스에 맞는 날짜 찾기
-        final dateIndex = index - firstDateWeekday;
+        // 해당 요일 인덱스에 맞는 날짜 찾기
+        // 오늘의 요일 인덱스와 비교하여 날짜 계산
+        final daysDiff = index - todayWeekday;
         
-        if (dateIndex >= 0 && dateIndex < weekDates.length) {
-          // 날짜가 있으면 날짜 셀 표시
-          return Expanded(
-            child: _buildDateCell(context, weekDates[dateIndex], today),
-          );
-        } else {
-          // 날짜가 없으면 빈 칸
-          return const Expanded(
-            child: SizedBox(),
-          );
-        }
+        // 오늘 기준으로 앞뒤 날짜 계산
+        final targetDate = today.add(Duration(days: daysDiff));
+        
+        // 모든 날짜를 표시 (미래 날짜도 포함, 비활성화 스타일로)
+        return Expanded(
+          child: _buildDateCell(context, targetDate, today),
+        );
       }),
     );
   }
@@ -299,12 +291,12 @@ class _WeeklyCalendarCardState extends State<WeeklyCalendarCard> {
   /// 날짜 셀 위젯
   Widget _buildDateCell(BuildContext context, DateTime date, DateTime today) {
     final isToday = date.isAtSameMomentAs(today);
+    final isFuture = date.isAfter(today);
     
-    // 해당 날짜의 데이터 찾기
-    final dateKey = _getDateKey(date);
-    final stats = _weeklyStats.firstWhere(
-      (stat) => _getDateKey(stat.date) == dateKey,
-      orElse: () => DailyUsageStats(
+    // 해당 날짜의 데이터 찾기 (미래 날짜는 데이터 없음)
+    DailyUsageStats stats;
+    if (isFuture) {
+      stats = DailyUsageStats(
         date: date,
         screenTime: Duration.zero,
         backgroundTime: Duration.zero,
@@ -312,22 +304,46 @@ class _WeeklyCalendarCardState extends State<WeeklyCalendarCard> {
         backgroundConsumptionPercent: 0.0,
         topAppName: '없음',
         topAppPercent: 0.0,
-      ),
-    );
+      );
+    } else {
+      final dateKey = _getDateKey(date);
+      stats = _weeklyStats.firstWhere(
+        (stat) => _getDateKey(stat.date) == dateKey,
+        orElse: () => DailyUsageStats(
+          date: date,
+          screenTime: Duration.zero,
+          backgroundTime: Duration.zero,
+          totalUsageTime: Duration.zero,
+          backgroundConsumptionPercent: 0.0,
+          topAppName: '없음',
+          topAppPercent: 0.0,
+        ),
+      );
+    }
     
     final hasData = stats.screenTime.inMilliseconds > 0;
+    
+    // 미래 날짜는 비활성화 스타일
+    final isDisabled = isFuture;
+    final textColor = isToday
+        ? Theme.of(context).colorScheme.primary
+        : isDisabled
+            ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3)
+            : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8);
     
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4),
       child: InkWell(
-        onTap: () => _showDateDetailBottomSheet(context, date, stats, isToday),
+        onTap: isDisabled ? null : () => _showDateDetailBottomSheet(context, date, stats, isToday),
         borderRadius: BorderRadius.circular(8),
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
           decoration: BoxDecoration(
             color: isToday 
                 ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
-                : Colors.transparent,
+                : isDisabled
+                    ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05)
+                    : Colors.transparent,
             borderRadius: BorderRadius.circular(8),
             border: isToday
                 ? Border.all(
@@ -345,9 +361,7 @@ class _WeeklyCalendarCardState extends State<WeeklyCalendarCard> {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: isToday ? FontWeight.bold : FontWeight.w500,
-                  color: isToday
-                      ? Theme.of(context).colorScheme.primary
-                      : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
+                  color: textColor,
                 ),
               ),
               const SizedBox(height: 4),
@@ -358,7 +372,9 @@ class _WeeklyCalendarCardState extends State<WeeklyCalendarCard> {
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w500,
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                    color: isDisabled
+                        ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3)
+                        : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -366,10 +382,12 @@ class _WeeklyCalendarCardState extends State<WeeklyCalendarCard> {
                 )
               else
                 Text(
-                  '-',
+                  isFuture ? '-' : '-',
                   style: TextStyle(
                     fontSize: 11,
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+                    color: isDisabled
+                        ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.2)
+                        : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
                   ),
                 ),
             ],
