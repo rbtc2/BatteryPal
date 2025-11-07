@@ -405,7 +405,7 @@ class _WeeklyCalendarCardState extends State<WeeklyCalendarCard> {
            '${date.day.toString().padLeft(2, '0')}';
   }
 
-  /// Duration을 포맷팅된 문자열로 변환 (2줄 표시용)
+  /// Duration을 포맷팅된 문자열로 변환 (2줄 표시용 - 달력 셀용)
   String _formatDuration(Duration duration) {
     final hours = duration.inHours;
     final minutes = duration.inMinutes % 60;
@@ -419,6 +419,22 @@ class _WeeklyCalendarCardState extends State<WeeklyCalendarCard> {
       return '${minutes}m';
     } else {
       return '${duration.inSeconds}s';
+    }
+  }
+  
+  /// Duration을 포맷팅된 문자열로 변환 (1줄 표시용 - 상세 정보용)
+  String _formatDurationForDetail(Duration duration) {
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes % 60;
+    
+    if (hours > 0 && minutes > 0) {
+      return '$hours시간 $minutes분';
+    } else if (hours > 0) {
+      return '$hours시간';
+    } else if (minutes > 0) {
+      return '$minutes분';
+    } else {
+      return '${duration.inSeconds}초';
     }
   }
 
@@ -560,7 +576,7 @@ class _WeeklyCalendarCardState extends State<WeeklyCalendarCard> {
               child: _buildStatItem(
                 context,
                 label: '평균',
-                value: _formatDuration(average),
+                value: _formatDurationForDetail(average),
                 icon: '📊',
               ),
             ),
@@ -570,7 +586,7 @@ class _WeeklyCalendarCardState extends State<WeeklyCalendarCard> {
               child: _buildStatItem(
                 context,
                 label: '최고',
-                value: _formatDuration(max),
+                value: _formatDurationForDetail(max),
                 subtitle: maxDate != null ? '${getWeekdayName(maxDate)}요일' : '',
                 icon: '⬆️',
                 color: Colors.green,
@@ -582,7 +598,7 @@ class _WeeklyCalendarCardState extends State<WeeklyCalendarCard> {
               child: _buildStatItem(
                 context,
                 label: '최저',
-                value: _formatDuration(min),
+                value: _formatDurationForDetail(min),
                 subtitle: minDate != null ? '${getWeekdayName(minDate)}요일' : '',
                 icon: '⬇️',
                 color: Colors.blue,
@@ -628,7 +644,7 @@ class _WeeklyCalendarCardState extends State<WeeklyCalendarCard> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        _formatDuration(yesterdayChange.abs()),
+                        _formatDurationForDetail(yesterdayChange.abs()),
                         style: TextStyle(
                           fontSize: 12,
                           color: yesterdayChange.inMilliseconds > 0
@@ -636,6 +652,8 @@ class _WeeklyCalendarCardState extends State<WeeklyCalendarCard> {
                               : Colors.green,
                           fontWeight: FontWeight.w600,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
@@ -927,7 +945,7 @@ class _WeeklyCalendarCardState extends State<WeeklyCalendarCard> {
                         _buildDetailItem(
                           context,
                           label: '화면 사용 시간',
-                          value: _formatDuration(stats.screenTime),
+                          value: _formatDurationForDetail(stats.screenTime),
                           icon: Icons.phone_android,
                           color: Colors.blue,
                         ),
@@ -935,7 +953,7 @@ class _WeeklyCalendarCardState extends State<WeeklyCalendarCard> {
                         _buildDetailItem(
                           context,
                           label: '백그라운드 시간',
-                          value: _formatDuration(stats.backgroundTime),
+                          value: _formatDurationForDetail(stats.backgroundTime),
                           icon: Icons.settings_backup_restore,
                           color: Colors.orange,
                         ),
@@ -943,7 +961,7 @@ class _WeeklyCalendarCardState extends State<WeeklyCalendarCard> {
                         _buildDetailItem(
                           context,
                           label: '총 사용 시간',
-                          value: _formatDuration(stats.totalUsageTime),
+                          value: _formatDurationForDetail(stats.totalUsageTime),
                           icon: Icons.access_time,
                           color: Colors.purple,
                         ),
@@ -1141,6 +1159,8 @@ class _WeeklyCalendarCardState extends State<WeeklyCalendarCard> {
                     fontWeight: FontWeight.bold,
                     color: color,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
