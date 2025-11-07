@@ -329,8 +329,178 @@ class TodaySummaryCardState extends State<TodaySummaryCard> {
     required String value,
     required Color color,
   }) {
+    return InkWell(
+      onTap: () => _showUsageDetailBottomSheet(context),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: color.withValues(alpha: 0.3),
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(icon, style: TextStyle(fontSize: 24)),
+            SizedBox(height: 8),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 사용 시간 상세 정보 바텀시트 표시
+  void _showUsageDetailBottomSheet(BuildContext context) {
+    if (_summary == null) return;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.75,
+        ),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 드래그 핸들
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            // 헤더
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '📊 사용 시간 상세',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '오늘의 앱 사용 시간 분석',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.of(context).pop(),
+                    tooltip: '닫기',
+                  ),
+                ],
+              ),
+            ),
+            // 내용
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 포그라운드
+                    _buildDetailMetricItem(
+                      context,
+                      icon: '📱',
+                      title: '포그라운드',
+                      value: _summary!.formattedTotalScreenTime,
+                      description: '화면이 켜져 있고 앱을 직접 사용하는 시간입니다. 사용자가 앱과 상호작용하는 실제 사용 시간을 나타냅니다.',
+                      color: Colors.blue,
+                    ),
+                    const SizedBox(height: 16),
+                    // 백그라운드
+                    _buildDetailMetricItem(
+                      context,
+                      icon: '🔋',
+                      title: '백그라운드',
+                      value: _summary!.formattedBackgroundTime,
+                      description: '앱이 실행 중이지만 화면에 보이지 않는 시간입니다. 백그라운드에서 데이터를 동기화하거나 알림을 처리하는 등 배터리를 소모할 수 있습니다.',
+                      color: Colors.orange,
+                    ),
+                    const SizedBox(height: 16),
+                    // 총 사용 시간
+                    _buildDetailMetricItem(
+                      context,
+                      icon: '⏱️',
+                      title: '총 사용 시간',
+                      value: _summary!.formattedTotalUsageTime,
+                      description: '포그라운드 시간과 백그라운드 시간을 합한 전체 앱 사용 시간입니다. 이 값이 높을수록 배터리 소모가 많을 수 있습니다.',
+                      color: Colors.purple,
+                    ),
+                    const SizedBox(height: 24),
+                    // 배터리 관점 인사이트
+                    _buildBatteryInsight(context),
+                    const SizedBox(height: 32),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 상세 메트릭 아이템 위젯
+  Widget _buildDetailMetricItem(
+    BuildContext context, {
+    required String icon,
+    required String title,
+    required String value,
+    required String description,
+    required Color color,
+  }) {
     return Container(
-      padding: EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
@@ -339,31 +509,156 @@ class TodaySummaryCardState extends State<TodaySummaryCard> {
         ),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(icon, style: TextStyle(fontSize: 24)),
-          SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  icon,
+                  style: const TextStyle(fontSize: 24),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      value,
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: color,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(8),
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.info_outline,
+                  size: 16,
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    description,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 배터리 관점 인사이트
+  Widget _buildBatteryInsight(BuildContext context) {
+    if (_summary == null) return const SizedBox.shrink();
+
+    final backgroundPercent = _summary!.backgroundConsumptionPercent;
+    String insightTitle;
+    String insightMessage;
+    Color insightColor;
+
+    if (backgroundPercent > 30) {
+      insightTitle = '⚠️ 백그라운드 소모 주의';
+      insightMessage = '백그라운드 사용 시간이 전체의 ${backgroundPercent.toStringAsFixed(1)}%를 차지합니다. 불필요한 백그라운드 앱을 종료하거나 알림 설정을 조정하면 배터리 수명을 연장할 수 있습니다.';
+      insightColor = Colors.red;
+    } else if (backgroundPercent > 15) {
+      insightTitle = '💡 백그라운드 관리 권장';
+      insightMessage = '백그라운드 사용 시간이 ${backgroundPercent.toStringAsFixed(1)}%입니다. 주기적으로 사용하지 않는 앱을 종료하면 배터리 효율이 개선될 수 있습니다.';
+      insightColor = Colors.orange;
+    } else {
+      insightTitle = '✅ 효율적인 배터리 사용';
+      insightMessage = '백그라운드 사용 시간이 ${backgroundPercent.toStringAsFixed(1)}%로 적절한 수준입니다. 현재 사용 패턴이 배터리에 효율적입니다.';
+      insightColor = Colors.green;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: insightColor.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: insightColor.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: insightColor.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              Icons.lightbulb_outline,
+              color: insightColor,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  insightTitle,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  insightMessage,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
