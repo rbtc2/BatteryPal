@@ -32,11 +32,11 @@ class RealAppUsageData {
     final minutes = totalTimeInForeground.inMinutes % 60;
     
     if (hours > 0) {
-      return '$hours시간 $minutes분';
+      return '${hours}h ${minutes}m';
     } else if (minutes > 0) {
-      return '$minutes분';
+      return '${minutes}m';
     } else {
-      return '${totalTimeInForeground.inSeconds}초';
+      return '${totalTimeInForeground.inSeconds}s';
     }
   }
   
@@ -46,11 +46,11 @@ class RealAppUsageData {
     final minutes = backgroundTime.inMinutes % 60;
     
     if (hours > 0) {
-      return '$hours시간 $minutes분';
+      return '${hours}h ${minutes}m';
     } else if (minutes > 0) {
-      return '$minutes분';
+      return '${minutes}m';
     } else {
-      return '${backgroundTime.inSeconds}초';
+      return '${backgroundTime.inSeconds}s';
     }
   }
   
@@ -104,7 +104,7 @@ class ScreenTimeSummary {
     required this.hasPermission,
   });
   
-  /// 총 스크린 타임을 포맷팅된 문자열로 반환
+  /// 총 스크린 타임을 포맷팅된 문자열로 반환 (메인 표시용)
   String get formattedTotalScreenTime {
     final hours = totalScreenTime.inHours;
     final minutes = totalScreenTime.inMinutes % 60;
@@ -118,17 +118,31 @@ class ScreenTimeSummary {
     }
   }
   
+  /// 총 스크린 타임을 간소화된 형식으로 반환 (카드용)
+  String get formattedTotalScreenTimeCompact {
+    final hours = totalScreenTime.inHours;
+    final minutes = totalScreenTime.inMinutes % 60;
+    
+    if (hours > 0) {
+      return '${hours}h ${minutes}m';
+    } else if (minutes > 0) {
+      return '${minutes}m';
+    } else {
+      return '${totalScreenTime.inSeconds}s';
+    }
+  }
+  
   /// 백그라운드 시간을 포맷팅된 문자열로 반환
   String get formattedBackgroundTime {
     final hours = backgroundTime.inHours;
     final minutes = backgroundTime.inMinutes % 60;
     
     if (hours > 0) {
-      return '$hours시간 $minutes분';
+      return '${hours}h ${minutes}m';
     } else if (minutes > 0) {
-      return '$minutes분';
+      return '${minutes}m';
     } else {
-      return '${backgroundTime.inSeconds}초';
+      return '${backgroundTime.inSeconds}s';
     }
   }
   
@@ -138,11 +152,11 @@ class ScreenTimeSummary {
     final minutes = totalUsageTime.inMinutes % 60;
     
     if (hours > 0) {
-      return '$hours시간 $minutes분';
+      return '${hours}h ${minutes}m';
     } else if (minutes > 0) {
-      return '$minutes분';
+      return '${minutes}m';
     } else {
-      return '${totalUsageTime.inSeconds}초';
+      return '${totalUsageTime.inSeconds}s';
     }
   }
   

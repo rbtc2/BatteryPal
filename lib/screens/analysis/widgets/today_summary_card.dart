@@ -201,7 +201,7 @@ class TodaySummaryCardState extends State<TodaySummaryCard> {
                           context,
                           icon: '📱',
                           label: '포그라운드',
-                          value: _summary!.formattedTotalScreenTime,
+                          value: _summary!.formattedTotalScreenTimeCompact,
                           color: Colors.blue,
                         ),
                       ),
