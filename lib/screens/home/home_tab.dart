@@ -141,9 +141,15 @@ class _HomeTabState extends State<HomeTab> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('BatteryPal'),
+        title: Image.asset(
+          'assets/images/logo.png',
+          height: 32,
+          fit: BoxFit.contain,
+          filterQuality: FilterQuality.high,
+        ),
         backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 0,
+        centerTitle: true,
         actions: [
           // 배터리 새로고침 버튼 (로딩 상태/중복 클릭 방지)
           IconButton(

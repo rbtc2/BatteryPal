@@ -132,8 +132,22 @@ class ScreenTimeSummary {
     }
   }
   
-  /// 백그라운드 시간을 포맷팅된 문자열로 반환
+  /// 백그라운드 시간을 포맷팅된 문자열로 반환 (상세 표시용)
   String get formattedBackgroundTime {
+    final hours = backgroundTime.inHours;
+    final minutes = backgroundTime.inMinutes % 60;
+    
+    if (hours > 0) {
+      return '$hours시간 $minutes분';
+    } else if (minutes > 0) {
+      return '$minutes분';
+    } else {
+      return '${backgroundTime.inSeconds}초';
+    }
+  }
+  
+  /// 백그라운드 시간을 간소화된 형식으로 반환 (카드용)
+  String get formattedBackgroundTimeCompact {
     final hours = backgroundTime.inHours;
     final minutes = backgroundTime.inMinutes % 60;
     
@@ -146,8 +160,22 @@ class ScreenTimeSummary {
     }
   }
   
-  /// 총 사용 시간을 포맷팅된 문자열로 반환
+  /// 총 사용 시간을 포맷팅된 문자열로 반환 (상세 표시용)
   String get formattedTotalUsageTime {
+    final hours = totalUsageTime.inHours;
+    final minutes = totalUsageTime.inMinutes % 60;
+    
+    if (hours > 0) {
+      return '$hours시간 $minutes분';
+    } else if (minutes > 0) {
+      return '$minutes분';
+    } else {
+      return '${totalUsageTime.inSeconds}초';
+    }
+  }
+  
+  /// 총 사용 시간을 간소화된 형식으로 반환 (카드용)
+  String get formattedTotalUsageTimeCompact {
     final hours = totalUsageTime.inHours;
     final minutes = totalUsageTime.inMinutes % 60;
     

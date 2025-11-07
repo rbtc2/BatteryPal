@@ -365,19 +365,20 @@ class _WeeklyCalendarCardState extends State<WeeklyCalendarCard> {
                 ),
               ),
               const SizedBox(height: 4),
-              // 스크린타임 표시
+              // 스크린타임 표시 (2줄 허용)
               if (hasData)
                 Text(
                   _formatDuration(stats.screenTime),
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 10,
                     fontWeight: FontWeight.w500,
                     color: isDisabled
                         ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3)
                         : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                    height: 1.2,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  maxLines: 2,
+                  overflow: TextOverflow.visible,
                   textAlign: TextAlign.center,
                 )
               else
@@ -404,13 +405,16 @@ class _WeeklyCalendarCardState extends State<WeeklyCalendarCard> {
            '${date.day.toString().padLeft(2, '0')}';
   }
 
-  /// Duration을 포맷팅된 문자열로 변환
+  /// Duration을 포맷팅된 문자열로 변환 (2줄 표시용)
   String _formatDuration(Duration duration) {
     final hours = duration.inHours;
     final minutes = duration.inMinutes % 60;
     
-    if (hours > 0) {
-      return '${hours}h ${minutes}m';
+    if (hours > 0 && minutes > 0) {
+      // 시간과 분이 모두 있으면 2줄로 분리
+      return '${hours}h\n${minutes}m';
+    } else if (hours > 0) {
+      return '${hours}h';
     } else if (minutes > 0) {
       return '${minutes}m';
     } else {

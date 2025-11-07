@@ -180,22 +180,25 @@ class TodaySummaryCardState extends State<TodaySummaryCard> {
                 children: [
                   // 큰 스크린타임 숫자 (미묘한 그라데이션 효과)
                   ShaderMask(
+                    blendMode: BlendMode.srcIn,
                     shaderCallback: (bounds) {
                       final primaryColor = Theme.of(context).colorScheme.primary;
-                      // 미묘한 그라데이션: primary에서 약간 더 밝고 포화된 색으로
+                      // 미묘한 그라데이션: primary에서 더 밝은 색으로
                       final hsl = HSLColor.fromColor(primaryColor);
+                      // lightness를 더 크게 증가시켜 차이를 명확하게
                       final lighterColor = hsl
-                          .withLightness((hsl.lightness + 0.08).clamp(0.0, 1.0))
-                          .withSaturation((hsl.saturation + 0.05).clamp(0.0, 1.0))
+                          .withLightness((hsl.lightness + 0.15).clamp(0.0, 1.0))
+                          .withSaturation((hsl.saturation + 0.1).clamp(0.0, 1.0))
                           .toColor();
                       
                       return LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                         colors: [
                           primaryColor,
                           lighterColor,
                         ],
+                        stops: const [0.0, 1.0],
                       ).createShader(bounds);
                     },
                     child: Text(
@@ -231,7 +234,7 @@ class TodaySummaryCardState extends State<TodaySummaryCard> {
                           context,
                           icon: '🔋',
                           label: '백그라운드',
-                          value: _summary!.formattedBackgroundTime,
+                          value: _summary!.formattedBackgroundTimeCompact,
                           color: Colors.orange,
                         ),
                       ),
@@ -241,7 +244,7 @@ class TodaySummaryCardState extends State<TodaySummaryCard> {
                           context,
                           icon: '⏱️',
                           label: '총 사용',
-                          value: _summary!.formattedTotalUsageTime,
+                          value: _summary!.formattedTotalUsageTimeCompact,
                           color: Colors.purple,
                         ),
                       ),
@@ -567,6 +570,8 @@ class TodaySummaryCardState extends State<TodaySummaryCard> {
                         fontWeight: FontWeight.bold,
                         color: color,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
