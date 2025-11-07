@@ -62,22 +62,28 @@ class AppBatteryUsageCardState extends State<AppBatteryUsageCard> {
 
   @override
   Widget build(BuildContext context) {
-    // 선택된 타입에 따라 정렬된 앱 리스트
+    // 선택된 타입에 따라 정렬된 앱 리스트 (실제 사용 시간 기준)
     List<RealAppUsageData> sortedApps;
     if (_summary != null) {
       sortedApps = List<RealAppUsageData>.from(_apps);
       sortedApps.sort((a, b) {
-        final aPercent = a.getPercentByType(
-          _selectedUsageType,
-          _summary!.totalScreenTime,
-          _summary!.backgroundTime,
-        );
-        final bPercent = b.getPercentByType(
-          _selectedUsageType,
-          _summary!.totalScreenTime,
-          _summary!.backgroundTime,
-        );
-        return bPercent.compareTo(aPercent); // 내림차순 정렬
+        // 선택된 타입에 따라 실제 사용 시간 기준으로 정렬
+        Duration aTime;
+        Duration bTime;
+        
+        switch (_selectedUsageType) {
+          case UsageType.foreground:
+            aTime = a.totalTimeInForeground;
+            bTime = b.totalTimeInForeground;
+            break;
+          case UsageType.background:
+            aTime = a.backgroundTime;
+            bTime = b.backgroundTime;
+            break;
+        }
+        
+        // 내림차순 정렬 (시간이 긴 순서대로)
+        return bTime.compareTo(aTime);
       });
     } else {
       sortedApps = _apps;
