@@ -345,6 +345,7 @@ class MainActivity : FlutterActivity() {
     }
     
     /// 앱 사용 통계 가져오기
+    /// 오늘 자정(00:00:00)부터 현재까지의 정확한 데이터만 반환
     private fun getAppUsageStats(): List<Map<String, Any>> {
         try {
             val usageStatsManager = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
@@ -360,8 +361,10 @@ class MainActivity : FlutterActivity() {
             }
             val startTime = calendar.timeInMillis
             
+            // INTERVAL_BEST: 요청한 시간 범위에 가장 적합한 간격을 자동 선택
+            // 오늘 자정부터 현재까지의 정확한 데이터를 가져옴
             val usageStats = usageStatsManager.queryUsageStats(
-                UsageStatsManager.INTERVAL_DAILY,
+                UsageStatsManager.INTERVAL_BEST,
                 startTime,
                 time
             )
@@ -374,8 +377,12 @@ class MainActivity : FlutterActivity() {
             
             return usageStats
                 .filter { usage ->
+                    // 오늘 자정 이후에 사용된 앱만 필터링
+                    // lastTimeStamp가 오늘 자정 이후인지 확인
+                    val isUsedToday = usage.lastTimeStamp >= startTime
                     // 사용 시간이 0보다 큰 앱만 필터링
-                    usage.totalTimeInForeground > 0
+                    val hasUsage = usage.totalTimeInForeground > 0
+                    isUsedToday && hasUsage
                 }
                 .map { usage ->
                 // PackageManager를 사용하여 실제 앱 이름 가져오기
@@ -461,6 +468,7 @@ class MainActivity : FlutterActivity() {
     }
     
     /// 오늘의 총 스크린 타임 계산
+    /// 오늘 자정(00:00:00)부터 현재까지의 정확한 데이터만 계산
     private fun getTodayScreenTime(): Long {
         try {
             val usageStatsManager = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
@@ -475,8 +483,10 @@ class MainActivity : FlutterActivity() {
             }
             val startTime = calendar.timeInMillis
             
+            // INTERVAL_BEST: 요청한 시간 범위에 가장 적합한 간격을 자동 선택
+            // 오늘 자정부터 현재까지의 정확한 데이터를 가져옴
             val usageStats = usageStatsManager.queryUsageStats(
-                UsageStatsManager.INTERVAL_DAILY,
+                UsageStatsManager.INTERVAL_BEST,
                 startTime,
                 time
             )
@@ -487,12 +497,15 @@ class MainActivity : FlutterActivity() {
                 return 0L
             }
             
-            // 모든 앱의 포그라운드 시간을 합산 (사용 시간이 0보다 큰 앱만)
+            // 오늘 자정 이후에 사용된 앱의 포그라운드 시간만 합산
             val totalScreenTime = usageStats
-                .filter { it.totalTimeInForeground > 0 }
+                .filter { 
+                    // 오늘 자정 이후에 사용된 앱만 필터링
+                    it.lastTimeStamp >= startTime && it.totalTimeInForeground > 0
+                }
                 .sumOf { it.totalTimeInForeground }
             
-            android.util.Log.d("BatteryPal", "오늘의 스크린 타임: ${totalScreenTime}ms")
+            android.util.Log.d("BatteryPal", "오늘의 스크린 타임 (자정부터): ${totalScreenTime}ms")
             return totalScreenTime
             
         } catch (e: Exception) {
@@ -515,8 +528,9 @@ class MainActivity : FlutterActivity() {
                 set(java.util.Calendar.MILLISECOND, 0)
             }
             val startTime = calendar.timeInMillis
+            // 권한 확인은 INTERVAL_BEST 사용 (일관성 유지)
             val usageStats = usageStatsManager.queryUsageStats(
-                UsageStatsManager.INTERVAL_DAILY,
+                UsageStatsManager.INTERVAL_BEST,
                 startTime,
                 time
             )

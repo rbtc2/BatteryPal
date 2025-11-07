@@ -196,10 +196,19 @@ class AppUsageManager {
       // 앱 사용 통계 가져오기
       final List<AppUsageData> appUsageList = await AppUsageService.getTodayAppUsage();
       
+      // 오늘 자정 시간 계산 (필터링 기준)
+      final DateTime now = DateTime.now();
+      final DateTime todayStart = DateTime(now.year, now.month, now.day);
+      
       // 시스템 앱 필터링 및 중복 제거 (같은 패키지명 합산)
       final Map<String, AppUsageData> mergedApps = {};
       
       for (final app in appUsageList) {
+        // 오늘 자정 이후에 사용된 앱만 처리 (이중 확인)
+        if (app.lastTimeStamp.isBefore(todayStart)) {
+          continue;
+        }
+        
         // 시스템 앱 필터링 (패키지명 또는 앱 이름 기준)
         if (_isSystemApp(app.packageName) || _isSystemAppByName(app.appName)) {
           continue;
@@ -252,8 +261,7 @@ class AppUsageManager {
           );
       
       // 오늘 날짜 기준으로 계산 (자정부터 현재까지)
-      final DateTime now = DateTime.now();
-      final DateTime todayStart = DateTime(now.year, now.month, now.day);
+      // now와 todayStart는 이미 위에서 선언됨
       final Duration todayDuration = now.difference(todayStart);
       
       // 백그라운드 시간 추정 (비율 계산에 사용하기 위해 먼저 계산)
