@@ -304,57 +304,61 @@ class _WeeklyCalendarCardState extends State<WeeklyCalendarCard> {
     
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
-        decoration: BoxDecoration(
-          color: isToday 
-              ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-          border: isToday
-              ? Border.all(
-                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
-                  width: 1.5,
+      child: InkWell(
+        onTap: () => _showDateDetailBottomSheet(context, date, stats, isToday),
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+          decoration: BoxDecoration(
+            color: isToday 
+                ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+            border: isToday
+                ? Border.all(
+                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
+                    width: 1.5,
+                  )
+                : null,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 날짜 (일)
+              Text(
+                '${date.day}',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: isToday ? FontWeight.bold : FontWeight.w500,
+                  color: isToday
+                      ? Theme.of(context).colorScheme.primary
+                      : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
+                ),
+              ),
+              const SizedBox(height: 4),
+              // 스크린타임 표시
+              if (hasData)
+                Text(
+                  _formatDuration(stats.screenTime),
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
                 )
-              : null,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // 날짜 (일)
-            Text(
-              '${date.day}',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: isToday ? FontWeight.bold : FontWeight.w500,
-                color: isToday
-                    ? Theme.of(context).colorScheme.primary
-                    : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
-              ),
-            ),
-            const SizedBox(height: 4),
-            // 스크린타임 표시
-            if (hasData)
-              Text(
-                _formatDuration(stats.screenTime),
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+              else
+                Text(
+                  '-',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+                  ),
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-              )
-            else
-              Text(
-                '-',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
-                ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -769,6 +773,346 @@ class _WeeklyCalendarCardState extends State<WeeklyCalendarCard> {
         ],
       ),
     );
+  }
+
+  /// 날짜 상세 정보 바텀시트 표시
+  void _showDateDetailBottomSheet(
+    BuildContext context,
+    DateTime date,
+    DailyUsageStats stats,
+    bool isToday,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.75,
+        ),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 드래그 핸들
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            // 헤더
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  // 날짜 정보
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              '${date.year}년 ${date.month}월 ${date.day}일',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(context).colorScheme.onSurface,
+                              ),
+                            ),
+                            if (isToday) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  '오늘',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: Theme.of(context).colorScheme.primary,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _getWeekdayName(date),
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // 닫기 버튼
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.of(context).pop(),
+                    tooltip: '닫기',
+                  ),
+                ],
+              ),
+            ),
+            // 내용
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 스크린타임 요약
+                    _buildDetailSection(
+                      context,
+                      title: '📱 스크린타임',
+                      children: [
+                        _buildDetailItem(
+                          context,
+                          label: '화면 사용 시간',
+                          value: _formatDuration(stats.screenTime),
+                          icon: Icons.phone_android,
+                          color: Colors.blue,
+                        ),
+                        const SizedBox(height: 12),
+                        _buildDetailItem(
+                          context,
+                          label: '백그라운드 시간',
+                          value: _formatDuration(stats.backgroundTime),
+                          icon: Icons.settings_backup_restore,
+                          color: Colors.orange,
+                        ),
+                        const SizedBox(height: 12),
+                        _buildDetailItem(
+                          context,
+                          label: '총 사용 시간',
+                          value: _formatDuration(stats.totalUsageTime),
+                          icon: Icons.access_time,
+                          color: Colors.purple,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    // 배터리 소모 정보
+                    _buildDetailSection(
+                      context,
+                      title: '🔋 배터리 소모',
+                      children: [
+                        _buildDetailItem(
+                          context,
+                          label: '백그라운드 소모 비율',
+                          value: '${stats.backgroundConsumptionPercent.toStringAsFixed(1)}%',
+                          icon: Icons.battery_alert,
+                          color: stats.backgroundConsumptionPercent > 30
+                              ? Colors.red
+                              : stats.backgroundConsumptionPercent > 15
+                                  ? Colors.orange
+                                  : Colors.green,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    // 최고 사용 앱
+                    if (stats.topAppName != '없음' && stats.topAppPercent > 0)
+                      _buildDetailSection(
+                        context,
+                        title: '🏆 최고 사용 앱',
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Icon(
+                                    Icons.apps,
+                                    color: Theme.of(context).colorScheme.primary,
+                                    size: 24,
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        stats.topAppName,
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          color: Theme.of(context).colorScheme.onSurface,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        '전체 스크린타임의 ${stats.topAppPercent.toStringAsFixed(1)}%',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    // 데이터가 없는 경우
+                    if (stats.screenTime.inMilliseconds == 0)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 32),
+                        child: Center(
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.info_outline,
+                                size: 48,
+                                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                '이 날짜에는 사용 데이터가 없습니다',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    // 하단 여백
+                    const SizedBox(height: 32),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 상세 정보 섹션 위젯
+  Widget _buildDetailSection(
+    BuildContext context, {
+    required String title,
+    required List<Widget> children,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
+        ),
+        const SizedBox(height: 12),
+        ...children,
+      ],
+    );
+  }
+
+  /// 상세 정보 아이템 위젯
+  Widget _buildDetailItem(
+    BuildContext context, {
+    required String label,
+    required String value,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: color.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              icon,
+              color: color,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 요일 이름 가져오기
+  String _getWeekdayName(DateTime date) {
+    const weekdays = ['월요일', '화요일', '수요일', '목요일', '금요일', '토요일', '일요일'];
+    return weekdays[date.weekday - 1];
   }
 }
 
