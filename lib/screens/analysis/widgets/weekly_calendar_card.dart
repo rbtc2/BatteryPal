@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../../models/app_usage_models.dart';
-import '../../../models/battery_insight_model.dart';
 import '../../../services/daily_usage_stats_service.dart';
-import '../../../services/battery_insight_service.dart';
 
 /// 주간 달력 카드 위젯
 /// 최근 7일간의 스크린타임을 달력 형태로 표시
-/// 주간 통계 및 배터리 관점 인사이트 포함
+/// 주간 통계 포함
 class WeeklyCalendarCard extends StatefulWidget {
   final VoidCallback? onRefresh;
   
@@ -23,7 +21,6 @@ class _WeeklyCalendarCardState extends State<WeeklyCalendarCard> {
   final AppUsageManager _appUsageManager = AppUsageManager();
   List<DailyUsageStats> _weeklyStats = [];
   ScreenTimeSummary? _todaySummary;
-  List<BatteryInsight> _insights = [];
   bool _isLoading = true;
   
   // 캐시 관리
@@ -63,16 +60,9 @@ class _WeeklyCalendarCardState extends State<WeeklyCalendarCard> {
         todaySummary: todaySummary,
       );
       
-      // 배터리 인사이트 생성
-      final insights = BatteryInsightService.generateWeeklyInsights(
-        todaySummary: todaySummary,
-        weeklyStats: weeklyStats,
-      );
-      
       setState(() {
         _todaySummary = todaySummary;
         _weeklyStats = weeklyStats;
-        _insights = insights;
         _isLoading = false;
         _lastLoadTime = DateTime.now();
       });
@@ -219,18 +209,7 @@ class _WeeklyCalendarCardState extends State<WeeklyCalendarCard> {
                   const SizedBox(height: 16),
                   // 주간 통계
                   _buildWeeklyStats(context),
-                  // 인사이트 섹션
-                  if (_insights.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    Divider(
-                      height: 1,
-                      thickness: 1,
-                      color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.1),
-                    ),
-                    const SizedBox(height: 16),
-                    _buildInsightsSection(context),
-                    const SizedBox(height: 16),
-                  ],
+                  const SizedBox(height: 16),
                 ],
               ),
             ),
@@ -728,106 +707,6 @@ class _WeeklyCalendarCardState extends State<WeeklyCalendarCard> {
                     overflow: TextOverflow.ellipsis,
                   )
                 : const SizedBox.shrink(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// 배터리 인사이트 섹션
-  Widget _buildInsightsSection(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // 제목
-        Text(
-          '💡 배터리 관점 인사이트',
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.bold,
-            color: Theme.of(context).colorScheme.onSurface,
-          ),
-        ),
-        const SizedBox(height: 12),
-        // 인사이트 리스트
-        ..._insights.map((insight) => Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: _buildInsightItem(context, insight),
-        )),
-      ],
-    );
-  }
-
-  /// 인사이트 아이템 위젯
-  Widget _buildInsightItem(BuildContext context, BatteryInsight insight) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: insight.color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: insight.color.withValues(alpha: 0.3),
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 아이콘
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: insight.color.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              insight.icon,
-              color: insight.color,
-              size: 20,
-            ),
-          ),
-          const SizedBox(width: 12),
-          // 내용
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // 제목
-                Text(
-                  insight.title,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 4),
-                // 메시지
-                Text(
-                  insight.message,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 4),
-                // 권장사항
-                Text(
-                  insight.recommendation,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                    fontStyle: FontStyle.italic,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
           ),
         ],
       ),
