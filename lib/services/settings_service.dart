@@ -4,6 +4,18 @@ import '../models/app_models.dart';
 
 /// 설정 데이터를 관리하는 서비스
 class SettingsService extends ChangeNotifier {
+  // 싱글톤 인스턴스
+  static SettingsService? _instance;
+  
+  // 싱글톤 인스턴스 가져오기
+  factory SettingsService() {
+    _instance ??= SettingsService._internal();
+    return _instance!;
+  }
+  
+  // 내부 생성자
+  SettingsService._internal();
+  
   AppSettings _appSettings = AppSettings(
     notificationsEnabled: true,
     batteryNotificationsEnabled: true,
@@ -446,5 +458,15 @@ class SettingsService extends ChangeNotifier {
   /// 자동 저장 (비동기, 에러 무시)
   void _autoSave() {
     saveSettings().catchError((e) => debugPrint('자동 저장 실패: $e'));
+  }
+
+  /// dispose 오버라이드 - 싱글톤이므로 아무것도 하지 않음
+  /// 각 화면에서 dispose를 호출해도 인스턴스와 리스너는 유지됨
+  @override
+  // ignore: must_call_super
+  void dispose() {
+    // 싱글톤이므로 dispose를 호출해도 인스턴스와 리스너를 유지
+    // 앱이 종료될 때까지 설정 서비스는 유지되어야 함
+    // super.dispose()를 호출하지 않음 (의도적으로 무시)
   }
 }
