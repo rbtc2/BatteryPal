@@ -40,11 +40,15 @@ class RealAppUsageData {
     final minutes = totalTimeInForeground.inMinutes % 60;
     
     if (hours > 0) {
-      return '${hours}h ${minutes}m';
+      if (minutes > 0) {
+        return '${hours}시간 ${minutes}분';
+      } else {
+        return '${hours}시간';
+      }
     } else if (minutes > 0) {
-      return '${minutes}m';
+      return '${minutes}분';
     } else {
-      return '${totalTimeInForeground.inSeconds}s';
+      return '${totalTimeInForeground.inSeconds}초';
     }
   }
   
@@ -54,11 +58,15 @@ class RealAppUsageData {
     final minutes = backgroundTime.inMinutes % 60;
     
     if (hours > 0) {
-      return '${hours}h ${minutes}m';
+      if (minutes > 0) {
+        return '${hours}시간 ${minutes}분';
+      } else {
+        return '${hours}시간';
+      }
     } else if (minutes > 0) {
-      return '${minutes}m';
+      return '${minutes}분';
     } else {
-      return '${backgroundTime.inSeconds}s';
+      return '${backgroundTime.inSeconds}초';
     }
   }
   
