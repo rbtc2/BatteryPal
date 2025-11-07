@@ -299,6 +299,11 @@ class AppBatteryUsageCardState extends State<AppBatteryUsageCard> {
           )
         : app.formattedBatteryPercent;
     
+    // 선택된 타입에 따른 시간 표시
+    final selectedTime = _selectedUsageType == UsageType.foreground
+        ? app.formattedScreenTime
+        : app.formattedBackgroundTime;
+    
     return Container(
       padding: EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -311,7 +316,7 @@ class AppBatteryUsageCardState extends State<AppBatteryUsageCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 앱 이름 + 퍼센트
+          // 앱 이름 + 시간 + 퍼센트
           Row(
             children: [
               // 앱 아이콘 또는 색상 점
@@ -362,13 +367,28 @@ class AppBatteryUsageCardState extends State<AppBatteryUsageCard> {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              Text(
-                formattedPercent,
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: app.color,
-                ),
+              // 시간 + 퍼센트 (세로 배치)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    selectedTime,
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: app.color,
+                    ),
+                  ),
+                  Text(
+                    formattedPercent,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
