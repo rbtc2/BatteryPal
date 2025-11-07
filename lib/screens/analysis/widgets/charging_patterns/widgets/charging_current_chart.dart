@@ -21,7 +21,7 @@ class ChargingCurrentChart extends StatefulWidget {
 }
 
 class _ChargingCurrentChartState extends State<ChargingCurrentChart> {
-  String _selectedTab = '오늘'; // '오늘', '어제', '이번 주'
+  String _selectedTab = '오늘'; // '오늘', '어제', '2일 전'
   List<ChargingDataPoint> _chartData = [];
   bool _isLoading = true;
   DateTime? _selectedDate;
@@ -66,9 +66,8 @@ class _ChargingCurrentChartState extends State<ChargingCurrentChart> {
         case '어제':
           targetDate = DateTime.now().subtract(Duration(days: 1));
           break;
-        case '이번 주':
-          // 이번 주는 오늘 데이터만 표시 (향후 개선 가능)
-          targetDate = DateTime.now();
+        case '2일 전':
+          targetDate = DateTime.now().subtract(Duration(days: 2));
           break;
         case '선택':
           // 수동으로 선택한 날짜 사용
@@ -200,7 +199,7 @@ class _ChargingCurrentChartState extends State<ChargingCurrentChart> {
                 SizedBox(width: 8),
                 _buildTabButton('어제'),
                 SizedBox(width: 8),
-                _buildTabButton('이번 주'),
+                _buildTabButton('2일 전'),
                 Spacer(),
                 InkWell(
                   onTap: _showDatePicker,
