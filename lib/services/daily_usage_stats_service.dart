@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 import '../models/app_usage_models.dart';
 
 /// 일일 사용 통계 데이터 모델
@@ -53,6 +54,8 @@ class DailyUsageStats {
 class DailyUsageStatsService {
   static const String _prefsKey = 'daily_usage_stats';
   static const String _lastSavedDateKey = 'last_saved_date';
+  static const String _weeklyHistoryPrefix = 'daily_usage_history_';
+  static const int _maxHistoryDays = 7; // 최근 7일 데이터만 유지
 
   /// 어제 데이터 가져오기 (각 필드를 개별 저장)
   static Future<DailyUsageStats?> getYesterdayStatsImproved() async {
@@ -181,6 +184,9 @@ class DailyUsageStatsService {
         // 같은 날짜이면, 오늘의 최종 데이터를 임시로 저장 (내일 자정에 어제 데이터로 사용)
         // 이렇게 하면 자정에 앱이 실행되지 않아도 다음에 앱이 시작될 때 어제 데이터를 저장할 수 있습니다.
         await _saveTodayDataForTomorrow(summary, today);
+        
+        // 오늘 데이터를 주간 히스토리에 저장 (실시간 업데이트)
+        await saveTodayToHistory(summary);
       }
     } catch (e) {
       debugPrint('어제 데이터 저장 체크 실패: $e');
@@ -237,9 +243,101 @@ class DailyUsageStatsService {
       await prefs.setString('${_prefsKey}_topAppName', topAppName);
       await prefs.setDouble('${_prefsKey}_topAppPercent', topAppPercent);
       
+      // 주간 히스토리에 저장
+      await saveDailyStatsToHistory(
+        date: yesterdayDate,
+        screenTime: summary.totalScreenTime,
+        backgroundTime: summary.backgroundTime,
+        totalUsageTime: summary.totalUsageTime,
+        backgroundConsumptionPercent: summary.backgroundConsumptionPercent,
+        topAppName: topAppName,
+        topAppPercent: topAppPercent,
+      );
+      
       debugPrint('DailyUsageStatsService: 어제 데이터 저장 완료 - $topAppName (${topAppPercent.toStringAsFixed(1)}%)');
     } catch (e) {
       debugPrint('어제 데이터 저장 실패: $e');
+    }
+  }
+
+  /// 일일 데이터를 주간 히스토리에 저장
+  /// 날짜별 키 구조: daily_usage_history_YYYY-MM-DD
+  static Future<void> saveDailyStatsToHistory({
+    required DateTime date,
+    required Duration screenTime,
+    required Duration backgroundTime,
+    required Duration totalUsageTime,
+    required double backgroundConsumptionPercent,
+    required String topAppName,
+    required double topAppPercent,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      
+      // 날짜 키 생성 (YYYY-MM-DD 형식)
+      final dateKey = _getDateKey(date);
+      final historyKey = '$_weeklyHistoryPrefix$dateKey';
+      
+      // JSON 형태로 저장
+      final statsJson = {
+        'date': date.toIso8601String(),
+        'screenTime': screenTime.inMilliseconds,
+        'backgroundTime': backgroundTime.inMilliseconds,
+        'totalUsageTime': totalUsageTime.inMilliseconds,
+        'backgroundConsumptionPercent': backgroundConsumptionPercent,
+        'topAppName': topAppName,
+        'topAppPercent': topAppPercent,
+      };
+      
+      await prefs.setString(historyKey, jsonEncode(statsJson));
+      
+      // 오래된 데이터 정리 (최근 7일만 유지)
+      await _cleanupOldHistory();
+      
+      debugPrint('DailyUsageStatsService: 주간 히스토리 저장 완료 - $dateKey');
+    } catch (e) {
+      debugPrint('주간 히스토리 저장 실패: $e');
+    }
+  }
+
+  /// 날짜를 키 형식으로 변환 (YYYY-MM-DD)
+  static String _getDateKey(DateTime date) {
+    return '${date.year.toString().padLeft(4, '0')}-'
+           '${date.month.toString().padLeft(2, '0')}-'
+           '${date.day.toString().padLeft(2, '0')}';
+  }
+
+  /// 오래된 히스토리 데이터 정리 (최근 7일만 유지)
+  static Future<void> _cleanupOldHistory() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final now = DateTime.now();
+      final cutoffDate = now.subtract(Duration(days: _maxHistoryDays));
+      
+      // 모든 키 가져오기
+      final allKeys = prefs.getKeys();
+      final historyKeys = allKeys.where((key) => 
+        key.startsWith(_weeklyHistoryPrefix)
+      ).toList();
+      
+      // 오래된 데이터 삭제
+      for (final key in historyKeys) {
+        try {
+          final dateStr = key.replaceFirst(_weeklyHistoryPrefix, '');
+          final date = DateTime.parse(dateStr);
+          
+          if (date.isBefore(cutoffDate)) {
+            await prefs.remove(key);
+            debugPrint('DailyUsageStatsService: 오래된 데이터 삭제 - $dateStr');
+          }
+        } catch (e) {
+          // 파싱 실패 시 해당 키 삭제
+          await prefs.remove(key);
+          debugPrint('DailyUsageStatsService: 잘못된 키 삭제 - $key');
+        }
+      }
+    } catch (e) {
+      debugPrint('히스토리 정리 실패: $e');
     }
   }
 
@@ -304,6 +402,124 @@ class DailyUsageStatsService {
       }
     } catch (e) {
       debugPrint('앱 시작 시 어제 데이터 체크 실패: $e');
+    }
+  }
+
+  /// 최근 7일 데이터 가져오기 (주간 달력용)
+  /// 오늘을 포함하여 최근 7일 데이터를 반환
+  /// 오늘 데이터는 실시간으로 가져오고, 나머지는 히스토리에서 가져옴
+  static Future<List<DailyUsageStats>> getWeeklyStats({
+    ScreenTimeSummary? todaySummary,
+  }) async {
+    try {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      
+      final List<DailyUsageStats> weeklyStats = [];
+      
+      // 최근 7일 데이터 조회 (오늘 포함)
+      for (int i = 0; i < 7; i++) {
+        final date = today.subtract(Duration(days: i));
+        final dateOnly = DateTime(date.year, date.month, date.day);
+        
+        // 오늘 데이터는 실시간 데이터 사용
+        if (dateOnly.isAtSameMomentAs(today) && todaySummary != null) {
+          final topAppName = todaySummary.topApps.isNotEmpty 
+              ? todaySummary.topApps.first.appName 
+              : '없음';
+          final topAppPercent = todaySummary.topApps.isNotEmpty 
+              ? todaySummary.topApps.first.batteryPercent 
+              : 0.0;
+          
+          weeklyStats.add(DailyUsageStats(
+            date: dateOnly,
+            screenTime: todaySummary.totalScreenTime,
+            backgroundTime: todaySummary.backgroundTime,
+            totalUsageTime: todaySummary.totalUsageTime,
+            backgroundConsumptionPercent: todaySummary.backgroundConsumptionPercent,
+            topAppName: topAppName,
+            topAppPercent: topAppPercent,
+          ));
+        } else {
+          // 과거 데이터는 히스토리에서 조회
+          final stats = await getDateStats(date);
+          if (stats != null) {
+            weeklyStats.add(stats);
+          }
+        }
+      }
+      
+      // 날짜 순서대로 정렬 (오래된 날짜부터)
+      weeklyStats.sort((a, b) => a.date.compareTo(b.date));
+      
+      return weeklyStats;
+    } catch (e) {
+      debugPrint('주간 데이터 가져오기 실패: $e');
+      return [];
+    }
+  }
+
+  /// 특정 날짜의 데이터 가져오기
+  /// 주간 달력에서 특정 날짜 클릭 시 사용
+  static Future<DailyUsageStats?> getDateStats(DateTime date) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final dateOnly = DateTime(date.year, date.month, date.day);
+      final dateKey = _getDateKey(dateOnly);
+      final historyKey = '$_weeklyHistoryPrefix$dateKey';
+      
+      // 주간 히스토리에서 조회
+      final historyJson = prefs.getString(historyKey);
+      if (historyJson != null) {
+        final statsMap = jsonDecode(historyJson) as Map<String, dynamic>;
+        return DailyUsageStats(
+          date: DateTime.parse(statsMap['date'] as String),
+          screenTime: Duration(milliseconds: statsMap['screenTime'] as int),
+          backgroundTime: Duration(milliseconds: statsMap['backgroundTime'] as int? ?? 0),
+          totalUsageTime: Duration(milliseconds: statsMap['totalUsageTime'] as int? ?? statsMap['screenTime'] as int),
+          backgroundConsumptionPercent: statsMap['backgroundConsumptionPercent'] as double? ?? 0.0,
+          topAppName: statsMap['topAppName'] as String? ?? '없음',
+          topAppPercent: statsMap['topAppPercent'] as double? ?? 0.0,
+        );
+      }
+      
+      // 주간 히스토리에 없으면, 어제 데이터와 비교하여 조회
+      // (오늘 데이터는 실시간으로 가져와야 하므로 여기서는 히스토리만 조회)
+      return null;
+    } catch (e) {
+      debugPrint('날짜별 데이터 가져오기 실패: $e');
+      return null;
+    }
+  }
+
+  /// 오늘의 데이터를 주간 히스토리에 임시 저장
+  /// 매일 데이터 업데이트 시 호출하여 최신 데이터 유지
+  static Future<void> saveTodayToHistory(ScreenTimeSummary summary) async {
+    try {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      
+      // 상위 앱 정보 추출
+      final topAppName = summary.topApps.isNotEmpty 
+          ? summary.topApps.first.appName 
+          : '없음';
+      final topAppPercent = summary.topApps.isNotEmpty 
+          ? summary.topApps.first.batteryPercent 
+          : 0.0;
+      
+      await saveDailyStatsToHistory(
+        date: today,
+        screenTime: summary.totalScreenTime,
+        backgroundTime: summary.backgroundTime,
+        totalUsageTime: summary.totalUsageTime,
+        backgroundConsumptionPercent: summary.backgroundConsumptionPercent,
+        topAppName: topAppName,
+        topAppPercent: topAppPercent,
+      );
+      
+      debugPrint('DailyUsageStatsService: 오늘 데이터 히스토리 저장 완료');
+    } catch (e) {
+      debugPrint('오늘 데이터 히스토리 저장 실패: $e');
     }
   }
 }
