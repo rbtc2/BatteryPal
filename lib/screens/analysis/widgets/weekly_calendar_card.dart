@@ -239,7 +239,7 @@ class _WeeklyCalendarCardState extends State<WeeklyCalendarCard> {
     );
   }
 
-  /// 요일 헤더 위젯 (월~일)
+  /// 요일 헤더 위젯 (항상 월~일로 고정)
   Widget _buildWeekdayHeader(BuildContext context) {
     const weekdays = ['월', '화', '수', '목', '금', '토', '일'];
     
@@ -261,7 +261,7 @@ class _WeeklyCalendarCardState extends State<WeeklyCalendarCard> {
     );
   }
 
-  /// 달력 그리드 위젯 (7일)
+  /// 달력 그리드 위젯 (7일, 요일에 맞춰 배치)
   Widget _buildCalendarGrid(BuildContext context) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
@@ -272,12 +272,27 @@ class _WeeklyCalendarCardState extends State<WeeklyCalendarCard> {
       weekDates.add(today.subtract(Duration(days: i)));
     }
     
+    // 첫 번째 날짜의 요일 인덱스 (월요일=0, 일요일=6)
+    final firstDateWeekday = weekDates.first.weekday - 1;
+    
+    // 요일 헤더는 항상 7개 (월~일)
     return Row(
-      children: weekDates.map((date) {
-        return Expanded(
-          child: _buildDateCell(context, date, today),
-        );
-      }).toList(),
+      children: List.generate(7, (index) {
+        // 해당 인덱스에 맞는 날짜 찾기
+        final dateIndex = index - firstDateWeekday;
+        
+        if (dateIndex >= 0 && dateIndex < weekDates.length) {
+          // 날짜가 있으면 날짜 셀 표시
+          return Expanded(
+            child: _buildDateCell(context, weekDates[dateIndex], today),
+          );
+        } else {
+          // 날짜가 없으면 빈 칸
+          return const Expanded(
+            child: SizedBox(),
+          );
+        }
+      }),
     );
   }
 
