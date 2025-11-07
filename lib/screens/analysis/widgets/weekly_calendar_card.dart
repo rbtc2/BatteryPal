@@ -658,18 +658,22 @@ class _WeeklyCalendarCardState extends State<WeeklyCalendarCard> {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          if (subtitle.isNotEmpty) ...[
-            const SizedBox(height: 2),
-            Text(
-              subtitle,
-              style: TextStyle(
-                fontSize: 10,
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
+          // subtitle이 없어도 동일한 높이를 유지하기 위해 항상 공간 확보
+          const SizedBox(height: 2),
+          SizedBox(
+            height: 14, // subtitle 텍스트 높이와 동일하게 고정
+            child: subtitle.isNotEmpty
+                ? Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  )
+                : const SizedBox.shrink(),
+          ),
         ],
       ),
     );
