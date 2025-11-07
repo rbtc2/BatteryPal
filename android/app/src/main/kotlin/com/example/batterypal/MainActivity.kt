@@ -384,7 +384,7 @@ class MainActivity : FlutterActivity() {
                     val hasUsage = usage.totalTimeInForeground > 0
                     isUsedToday && hasUsage
                 }
-                .map { usage ->
+                .mapNotNull { usage ->
                 // PackageManager를 사용하여 실제 앱 이름 가져오기
                 var appName = usage.packageName
                 var appIcon = ""
@@ -415,13 +415,12 @@ class MainActivity : FlutterActivity() {
                     } catch (e: Exception) {
                         // 아이콘 가져오기 실패 시 빈 문자열
                         appIcon = ""
-                        android.util.Log.w("BatteryPal", "앱 아이콘 가져오기 실패 (${usage.packageName}): ${e.message}")
+                        android.util.Log.d("BatteryPal", "앱 아이콘 가져오기 실패 (${usage.packageName}): ${e.message}")
                     }
                 } catch (e: android.content.pm.PackageManager.NameNotFoundException) {
-                    // 앱이 설치되지 않았거나 제거된 경우
-                    val parts = usage.packageName.split('.')
-                    appName = if (parts.isNotEmpty()) parts.last() else usage.packageName
-                    android.util.Log.w("BatteryPal", "앱을 찾을 수 없음 (${usage.packageName})")
+                    // 앱이 설치되지 않았거나 제거된 경우 - 결과에서 제외
+                    android.util.Log.d("BatteryPal", "앱을 찾을 수 없음 (제거된 앱): ${usage.packageName}")
+                    return@mapNotNull null // 제거된 앱은 결과에서 제외
                 } catch (e: Exception) {
                     // 기타 예외 발생 시
                     val parts = usage.packageName.split('.')
