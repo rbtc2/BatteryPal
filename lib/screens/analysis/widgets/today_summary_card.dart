@@ -178,16 +178,36 @@ class TodaySummaryCardState extends State<TodaySummaryCard> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Column(
                 children: [
-                  // 큰 스크린타임 숫자
-                  Text(
-                    _summary!.formattedTotalScreenTime,
-                    style: TextStyle(
-                      fontSize: 48,
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.primary,
-                      height: 1.2,
+                  // 큰 스크린타임 숫자 (미묘한 그라데이션 효과)
+                  ShaderMask(
+                    shaderCallback: (bounds) {
+                      final primaryColor = Theme.of(context).colorScheme.primary;
+                      // 미묘한 그라데이션: primary에서 약간 더 밝고 포화된 색으로
+                      final hsl = HSLColor.fromColor(primaryColor);
+                      final lighterColor = hsl
+                          .withLightness((hsl.lightness + 0.08).clamp(0.0, 1.0))
+                          .withSaturation((hsl.saturation + 0.05).clamp(0.0, 1.0))
+                          .toColor();
+                      
+                      return LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          primaryColor,
+                          lighterColor,
+                        ],
+                      ).createShader(bounds);
+                    },
+                    child: Text(
+                      _summary!.formattedTotalScreenTime,
+                      style: TextStyle(
+                        fontSize: 48,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white, // ShaderMask를 위해 흰색 사용
+                        height: 1.2,
+                      ),
+                      textAlign: TextAlign.center,
                     ),
-                    textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 8),
                   // 어제 대비 변화량
