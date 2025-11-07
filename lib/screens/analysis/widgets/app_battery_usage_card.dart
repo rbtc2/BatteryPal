@@ -18,8 +18,10 @@ class AppBatteryUsageCard extends StatefulWidget {
 class AppBatteryUsageCardState extends State<AppBatteryUsageCard> {
   final AppUsageManager _appUsageManager = AppUsageManager();
   List<RealAppUsageData> _apps = [];
+  ScreenTimeSummary? _summary; // 비율 계산에 사용
   bool _isLoading = true;
   bool _showAll = false;
+  UsageType _selectedUsageType = UsageType.foreground;
   
   @override
   void initState() {
@@ -40,6 +42,7 @@ class AppBatteryUsageCardState extends State<AppBatteryUsageCard> {
       
       final summary = await _appUsageManager.getScreenTimeSummary();
       setState(() {
+        _summary = summary;
         _apps = summary.topApps;
         _isLoading = false;
       });
@@ -59,12 +62,42 @@ class AppBatteryUsageCardState extends State<AppBatteryUsageCard> {
 
   @override
   Widget build(BuildContext context) {
+    // 선택된 타입에 따라 정렬된 앱 리스트
+    List<RealAppUsageData> sortedApps;
+    if (_summary != null) {
+      sortedApps = List<RealAppUsageData>.from(_apps);
+      sortedApps.sort((a, b) {
+        final aPercent = a.getPercentByType(
+          _selectedUsageType,
+          _summary!.totalScreenTime,
+          _summary!.backgroundTime,
+        );
+        final bPercent = b.getPercentByType(
+          _selectedUsageType,
+          _summary!.totalScreenTime,
+          _summary!.backgroundTime,
+        );
+        return bPercent.compareTo(aPercent); // 내림차순 정렬
+      });
+    } else {
+      sortedApps = _apps;
+    }
+    
     // 기타 앱들의 배터리 소모 비율 계산
-    final displayedApps = _showAll ? _apps : _apps.take(4).toList();
-    final displayedAppsPercent = displayedApps.fold<double>(
-      0.0,
-      (sum, app) => sum + app.batteryPercent,
-    );
+    final displayedApps = _showAll ? sortedApps : sortedApps.take(4).toList();
+    final displayedAppsPercent = _summary != null
+        ? displayedApps.fold<double>(
+            0.0,
+            (sum, app) => sum + app.getPercentByType(
+              _selectedUsageType,
+              _summary!.totalScreenTime,
+              _summary!.backgroundTime,
+            ),
+          )
+        : displayedApps.fold<double>(
+            0.0,
+            (sum, app) => sum + app.batteryPercent,
+          );
     final otherAppsPercent = _showAll ? 0.0 : (100.0 - displayedAppsPercent).clamp(0.0, 100.0);
     
     return Container(
@@ -98,7 +131,9 @@ class AppBatteryUsageCardState extends State<AppBatteryUsageCard> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        '앱별 사용 시간 비율 (오늘)',
+                        _selectedUsageType == UsageType.foreground
+                            ? '포그라운드 사용량 (오늘)'
+                            : '백그라운드 사용량 (오늘)',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -108,7 +143,9 @@ class AppBatteryUsageCardState extends State<AppBatteryUsageCard> {
                         overflow: TextOverflow.ellipsis,
                       ),
                       Text(
-                        '스크린 타임 기준 비율 (실제 배터리 소모와 다를 수 있음)',
+                        _selectedUsageType == UsageType.foreground
+                            ? '화면이 켜져 있고 앱을 직접 사용하는 시간'
+                            : '앱이 실행 중이지만 화면에 보이지 않는 시간',
                         style: TextStyle(
                           fontSize: 11,
                           color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
@@ -143,6 +180,33 @@ class AppBatteryUsageCardState extends State<AppBatteryUsageCard> {
               ],
             ),
           ),
+          
+          // SegmentedButton (포그라운드/백그라운드 선택)
+          if (!_isLoading && _apps.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: SegmentedButton<UsageType>(
+                segments: const [
+                  ButtonSegment<UsageType>(
+                    value: UsageType.foreground,
+                    label: Text('포그라운드'),
+                    icon: Icon(Icons.phone_android, size: 16),
+                  ),
+                  ButtonSegment<UsageType>(
+                    value: UsageType.background,
+                    label: Text('백그라운드'),
+                    icon: Icon(Icons.apps, size: 16),
+                  ),
+                ],
+                selected: {_selectedUsageType},
+                onSelectionChanged: (Set<UsageType> newSelection) {
+                  setState(() {
+                    _selectedUsageType = newSelection.first;
+                    _showAll = false; // 타입 변경 시 리스트 초기화
+                  });
+                },
+              ),
+            ),
           
           // 로딩 또는 앱 리스트
           if (_isLoading)
@@ -199,7 +263,7 @@ class AppBatteryUsageCardState extends State<AppBatteryUsageCard> {
                   
                   // "기타" 또는 "전체 보기" 버튼
                   if (!_showAll && otherAppsPercent > 0)
-                    _buildOtherAppsItem(context, otherAppsPercent)
+                    _buildOtherAppsItem(context, otherAppsPercent, sortedApps.length)
                   else if (_showAll)
                     SizedBox(height: 4),
                 ],
@@ -213,6 +277,22 @@ class AppBatteryUsageCardState extends State<AppBatteryUsageCard> {
   }
   
   Widget _buildAppItem(BuildContext context, RealAppUsageData app) {
+    // 선택된 타입에 따른 비율 계산
+    final percent = _summary != null
+        ? app.getPercentByType(
+            _selectedUsageType,
+            _summary!.totalScreenTime,
+            _summary!.backgroundTime,
+          )
+        : app.batteryPercent;
+    final formattedPercent = _summary != null
+        ? app.getFormattedPercentByType(
+            _selectedUsageType,
+            _summary!.totalScreenTime,
+            _summary!.backgroundTime,
+          )
+        : app.formattedBatteryPercent;
+    
     return Container(
       padding: EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -277,7 +357,7 @@ class AppBatteryUsageCardState extends State<AppBatteryUsageCard> {
                 ),
               ),
               Text(
-                app.formattedBatteryPercent,
+                formattedPercent,
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
@@ -293,7 +373,7 @@ class AppBatteryUsageCardState extends State<AppBatteryUsageCard> {
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
-              value: (app.batteryPercent / 100).clamp(0.0, 1.0),
+              value: (percent / 100).clamp(0.0, 1.0),
               minHeight: 8,
               backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
               valueColor: AlwaysStoppedAnimation<Color>(app.color),
@@ -363,7 +443,8 @@ class AppBatteryUsageCardState extends State<AppBatteryUsageCard> {
     );
   }
   
-  Widget _buildOtherAppsItem(BuildContext context, double percent) {
+  Widget _buildOtherAppsItem(BuildContext context, double percent, int totalAppsCount) {
+    final otherAppsCount = (totalAppsCount - 4).clamp(0, totalAppsCount);
     return InkWell(
       onTap: () {
         setState(() {
@@ -393,7 +474,7 @@ class AppBatteryUsageCardState extends State<AppBatteryUsageCard> {
             SizedBox(width: 8),
             Expanded(
               child: Text(
-                '기타 (${(_apps.length - 4).clamp(0, _apps.length)}개 앱)',
+                '기타 ($otherAppsCount개 앱)',
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.bold,

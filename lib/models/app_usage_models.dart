@@ -2,6 +2,14 @@ import 'package:flutter/material.dart';
 import '../services/app_usage_service.dart';
 import '../services/daily_usage_stats_service.dart';
 
+/// 사용 시간 타입 (포그라운드/백그라운드)
+enum UsageType {
+  /// 포그라운드 사용 시간
+  foreground,
+  /// 백그라운드 사용 시간
+  background,
+}
+
 /// 실제 앱 사용 데이터 모델 (기존 _AppUsageData 대체)
 class RealAppUsageData {
   final String packageName;
@@ -56,6 +64,50 @@ class RealAppUsageData {
   
   /// 배터리 사용량을 포맷팅된 문자열로 반환
   String get formattedBatteryPercent => '${batteryPercent.toStringAsFixed(1)}%';
+  
+  /// 포그라운드 사용 시간 비율 계산 (전체 포그라운드 시간 대비)
+  /// 
+  /// [totalForegroundTime] 전체 포그라운드 시간
+  double getForegroundPercent(Duration totalForegroundTime) {
+    if (totalForegroundTime.inMilliseconds == 0) return 0.0;
+    return (totalTimeInForeground.inMilliseconds / totalForegroundTime.inMilliseconds) * 100;
+  }
+  
+  /// 백그라운드 사용 시간 비율 계산 (전체 백그라운드 시간 대비)
+  /// 
+  /// [totalBackgroundTime] 전체 백그라운드 시간
+  double getBackgroundPercent(Duration totalBackgroundTime) {
+    if (totalBackgroundTime.inMilliseconds == 0) return 0.0;
+    return (backgroundTime.inMilliseconds / totalBackgroundTime.inMilliseconds) * 100;
+  }
+  
+  /// 선택된 타입에 따른 비율 계산
+  /// 
+  /// [usageType] 사용 시간 타입 (포그라운드/백그라운드)
+  /// [totalForegroundTime] 전체 포그라운드 시간
+  /// [totalBackgroundTime] 전체 백그라운드 시간
+  double getPercentByType(
+    UsageType usageType,
+    Duration totalForegroundTime,
+    Duration totalBackgroundTime,
+  ) {
+    switch (usageType) {
+      case UsageType.foreground:
+        return getForegroundPercent(totalForegroundTime);
+      case UsageType.background:
+        return getBackgroundPercent(totalBackgroundTime);
+    }
+  }
+  
+  /// 선택된 타입에 따른 비율을 포맷팅된 문자열로 반환
+  String getFormattedPercentByType(
+    UsageType usageType,
+    Duration totalForegroundTime,
+    Duration totalBackgroundTime,
+  ) {
+    final percent = getPercentByType(usageType, totalForegroundTime, totalBackgroundTime);
+    return '${percent.toStringAsFixed(1)}%';
+  }
   
   /// 앱 사용량 데이터를 JSON으로 변환
   Map<String, dynamic> toJson() {
