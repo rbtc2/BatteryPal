@@ -127,11 +127,6 @@ class ProUpgradeScreen extends StatelessWidget {
         proText: '상세 분석 및 트렌드',
       ),
       _FeatureItem(
-        title: '앱 사용량 분석',
-        freeText: '상위 5개 앱만',
-        proText: '모든 앱 분석',
-      ),
-      _FeatureItem(
         title: '자동 최적화',
         freeText: '없음',
         proText: '스마트 최적화',
