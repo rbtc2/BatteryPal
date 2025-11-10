@@ -4,6 +4,7 @@ import '../models/charging_session_models.dart';
 import '../services/charging_session_service.dart';
 import '../utils/time_slot_utils.dart';
 import 'charging_session_list_item.dart';
+import 'charging_session_detail_dialog.dart';
 
 /// 섹션 3: 통계 + 세션 기록 카드
 /// 
@@ -42,6 +43,16 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
       // 서비스 초기화
       await _sessionService.initialize();
       
+      // 초기 데이터 로드 (동기 버전으로 빠르게 표시)
+      final initialSessions = _sessionService.getTodaySessions();
+      if (mounted) {
+        setState(() {
+          _todaySessions = initialSessions;
+          _calculateStats(initialSessions);
+          _isLoading = false;
+        });
+      }
+      
       // 세션 스트림 구독
       _sessionsSubscription = _sessionService.sessionsStream.listen(
         (sessions) {
@@ -53,27 +64,35 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
             });
           }
         },
-        onError: (error) {
+        onError: (error, stackTrace) {
           debugPrint('세션 스트림 오류: $error');
+          debugPrint('스택 트레이스: $stackTrace');
           if (mounted) {
             setState(() {
               _isLoading = false;
             });
           }
         },
+        cancelOnError: false, // 에러 발생 시에도 스트림 유지
       );
       
-      // 초기 데이터 로드
-      final initialSessions = _sessionService.getTodaySessions();
-      if (mounted) {
-        setState(() {
-          _todaySessions = initialSessions;
-          _calculateStats(initialSessions);
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
+      // 비동기로 최신 데이터도 로드 (백그라운드)
+      _sessionService.getTodaySessionsAsync().then((latestSessions) {
+        if (mounted) {
+          setState(() {
+            _todaySessions = latestSessions;
+            _calculateStats(latestSessions);
+            _isLoading = false;
+          });
+        }
+      }).catchError((e) {
+        debugPrint('최신 세션 로드 실패: $e');
+        // 에러 발생해도 기존 데이터는 유지
+      });
+      
+    } catch (e, stackTrace) {
       debugPrint('서비스 초기화 실패: $e');
+      debugPrint('스택 트레이스: $stackTrace');
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -301,7 +320,8 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
                     return ChargingSessionListItem(
                       session: session,
                       onTap: () {
-                        // 세션 상세 정보 다이얼로그 표시 (추후 구현)
+                        // 세션 상세 정보 다이얼로그 표시
+                        ChargingSessionDetailDialog.show(context, session);
                       },
                     );
                   }).toList(),

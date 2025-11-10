@@ -2,9 +2,11 @@
 // 세션 데이터를 메모리 및 데이터베이스에 저장하고 관리하는 서비스
 
 import 'dart:async';
+import 'dart:convert'; // JSON 인코딩/디코딩용
 import 'package:flutter/material.dart';
 import '../../../../../services/battery_history_database_service.dart';
 import '../models/charging_session_models.dart';
+import '../config/charging_session_config.dart';
 
 /// 충전 세션 저장소 서비스 (싱글톤)
 /// 
@@ -56,6 +58,9 @@ class ChargingSessionStorage {
       // 오늘 날짜의 세션 데이터 로드
       await _loadTodaySessions();
       
+      // 오래된 메모리 데이터 정리 (7일 이전 데이터 제거)
+      _cleanupOldMemoryData();
+      
       _isInitialized = true;
       debugPrint('ChargingSessionStorage: 초기화 완료');
       
@@ -63,6 +68,35 @@ class ChargingSessionStorage {
       debugPrint('ChargingSessionStorage: 초기화 실패 - $e');
       debugPrint('스택 트레이스: $stackTrace');
       rethrow;
+    }
+  }
+  
+  /// 오래된 메모리 데이터 정리 (7일 이전 데이터 제거)
+  void _cleanupOldMemoryData() {
+    if (_isDisposed) return;
+    
+    try {
+      final now = DateTime.now();
+      final cutoffDate = now.subtract(Duration(days: ChargingSessionConfig.sessionRetentionDays));
+      final cutoffDateKey = _getDateKey(cutoffDate);
+      
+      final keysToRemove = <String>[];
+      for (final dateKey in _dailySessions.keys) {
+        if (dateKey.compareTo(cutoffDateKey) < 0) {
+          keysToRemove.add(dateKey);
+        }
+      }
+      
+      for (final key in keysToRemove) {
+        _dailySessions.remove(key);
+        debugPrint('ChargingSessionStorage: 오래된 메모리 데이터 제거 - $key');
+      }
+      
+      if (keysToRemove.isNotEmpty) {
+        debugPrint('ChargingSessionStorage: ${keysToRemove.length}개 날짜의 오래된 메모리 데이터 정리 완료');
+      }
+    } catch (e) {
+      debugPrint('ChargingSessionStorage: 메모리 데이터 정리 실패 - $e');
     }
   }
   
@@ -185,6 +219,31 @@ class ChargingSessionStorage {
     } catch (e, stackTrace) {
       debugPrint('ChargingSessionStorage: 오늘 세션 조회 실패 - $e');
       debugPrint('스택 트레이스: $stackTrace');
+      return [];
+    }
+  }
+  
+  /// 오늘 날짜의 세션 목록 가져오기 (동기 버전 - 메모리에서만)
+  /// DB에서 로드하지 않고 메모리에 있는 데이터만 반환
+  List<ChargingSessionRecord> getTodaySessionsSync() {
+    if (_isDisposed || !_isInitialized) {
+      return [];
+    }
+    
+    try {
+      final today = DateTime.now();
+      final todayKey = _getDateKey(today);
+      
+      // 메모리에 있으면 반환
+      if (_dailySessions.containsKey(todayKey)) {
+        return List.unmodifiable(_dailySessions[todayKey]!);
+      }
+      
+      // 메모리에 없으면 빈 리스트 반환 (비동기 로드는 호출자가 처리)
+      return [];
+      
+    } catch (e) {
+      debugPrint('ChargingSessionStorage: 오늘 세션 동기 조회 실패 - $e');
       return [];
     }
   }
@@ -509,33 +568,63 @@ class ChargingSessionStorage {
   
   /// ChargingSessionRecord를 Map으로 변환 (DB 저장용)
   Map<String, dynamic> _sessionToMap(ChargingSessionRecord session) {
-    return {
-      'id': session.id,
-      'start_time': session.startTime.millisecondsSinceEpoch,
-      'end_time': session.endTime.millisecondsSinceEpoch,
-      'start_battery_level': session.startBatteryLevel,
-      'end_battery_level': session.endBatteryLevel,
-      'battery_change': session.batteryChange,
-      'duration_ms': session.duration.inMilliseconds,
-      'avg_current': session.avgCurrent,
-      'avg_temperature': session.avgTemperature,
-      'max_current': session.maxCurrent,
-      'min_current': session.minCurrent,
-      'efficiency': session.efficiency,
-      'time_slot': session.timeSlot.name,
-      'session_title': session.sessionTitle,
-      'speed_changes': session.speedChanges.map((e) => e.toJson()).toList(),
-      'icon': session.icon,
-      'color': session.color.toARGB32(),
-      'battery_capacity': session.batteryCapacity,
-      'battery_voltage': session.batteryVoltage,
-      'is_valid': session.isValid ? 1 : 0,
-    };
+    try {
+      // speed_changes를 JSON 문자열로 변환
+      final speedChangesJson = session.speedChanges.map((e) => e.toJson()).toList();
+      
+      return {
+        'id': session.id,
+        'start_time': session.startTime.millisecondsSinceEpoch,
+        'end_time': session.endTime.millisecondsSinceEpoch,
+        'start_battery_level': session.startBatteryLevel,
+        'end_battery_level': session.endBatteryLevel,
+        'battery_change': session.batteryChange,
+        'duration_ms': session.duration.inMilliseconds,
+        'avg_current': session.avgCurrent,
+        'avg_temperature': session.avgTemperature,
+        'max_current': session.maxCurrent,
+        'min_current': session.minCurrent,
+        'efficiency': session.efficiency,
+        'time_slot': session.timeSlot.name,
+        'session_title': session.sessionTitle,
+        'speed_changes': speedChangesJson, // List<Map> 형태로 전달 (DB 서비스에서 JSON 변환)
+        'icon': session.icon,
+        'color': session.color.toARGB32(),
+        'battery_capacity': session.batteryCapacity,
+        'battery_voltage': session.batteryVoltage,
+        'is_valid': session.isValid ? 1 : 0,
+      };
+    } catch (e, stackTrace) {
+      debugPrint('ChargingSessionStorage: 세션 Map 변환 실패 - $e');
+      debugPrint('스택 트레이스: $stackTrace');
+      rethrow;
+    }
   }
   
   /// Map을 ChargingSessionRecord로 변환 (DB 조회용)
   ChargingSessionRecord? _mapToSession(Map<String, dynamic> map) {
     try {
+      // speed_changes 파싱 (JSON 문자열 또는 List)
+      List<CurrentChangeEvent> speedChanges = [];
+      try {
+        final speedChangesData = map['speed_changes'];
+        if (speedChangesData is String) {
+          // JSON 문자열인 경우
+          final decoded = jsonDecode(speedChangesData) as List<dynamic>;
+          speedChanges = decoded
+              .map((e) => CurrentChangeEvent.fromJson(e as Map<String, dynamic>))
+              .toList();
+        } else if (speedChangesData is List) {
+          // 이미 List인 경우
+          speedChanges = speedChangesData
+              .map((e) => CurrentChangeEvent.fromJson(e as Map<String, dynamic>))
+              .toList();
+        }
+      } catch (e) {
+        debugPrint('ChargingSessionStorage: speed_changes 파싱 실패 - $e');
+        speedChanges = []; // 파싱 실패 시 빈 리스트
+      }
+      
       return ChargingSessionRecord(
         id: map['id'] as String,
         startTime: DateTime.fromMillisecondsSinceEpoch(map['start_time'] as int),
@@ -554,9 +643,7 @@ class ChargingSessionStorage {
           orElse: () => TimeSlot.morning,
         ),
         sessionTitle: map['session_title'] as String,
-        speedChanges: (map['speed_changes'] as List<dynamic>)
-            .map((e) => CurrentChangeEvent.fromJson(e as Map<String, dynamic>))
-            .toList(),
+        speedChanges: speedChanges,
         icon: map['icon'] as String,
         color: Color(map['color'] as int),
         batteryCapacity: map['battery_capacity'] as int?,

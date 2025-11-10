@@ -91,9 +91,6 @@ class ChargingSessionService {
   
   // ==================== 세션 목록 관리 ====================
   
-  /// 오늘 날짜의 완료된 세션 목록
-  final List<ChargingSessionRecord> _todaySessions = [];
-  
   /// 세션 변경 스트림 (UI 업데이트용)
   final StreamController<List<ChargingSessionRecord>> _sessionsController = 
       StreamController<List<ChargingSessionRecord>>.broadcast();
@@ -102,9 +99,32 @@ class ChargingSessionService {
   Stream<List<ChargingSessionRecord>> get sessionsStream => 
       _sessionsController.stream;
   
-  /// 오늘 날짜의 세션 목록 가져오기
+  /// 오늘 날짜의 세션 목록 가져오기 (동기)
+  /// 메모리에 있는 데이터만 반환 (빠른 접근용)
   List<ChargingSessionRecord> getTodaySessions() {
-    return List.unmodifiable(_todaySessions);
+    if (!_isInitialized || _isDisposed) {
+      return [];
+    }
+    try {
+      return _storageService.getTodaySessionsSync();
+    } catch (e) {
+      debugPrint('ChargingSessionService: 오늘 세션 조회 실패 - $e');
+      return [];
+    }
+  }
+  
+  /// 오늘 날짜의 세션 목록 가져오기 (비동기)
+  /// DB에서도 로드하여 최신 데이터 반환
+  Future<List<ChargingSessionRecord>> getTodaySessionsAsync() async {
+    if (!_isInitialized || _isDisposed) {
+      return [];
+    }
+    try {
+      return await _storageService.getTodaySessions();
+    } catch (e) {
+      debugPrint('ChargingSessionService: 오늘 세션 조회 실패 - $e');
+      return [];
+    }
   }
   
   /// 현재 진행 중인 세션 가져오기
@@ -165,24 +185,34 @@ class ChargingSessionService {
     
     _isDisposed = true;
     
-    // 현재 세션이 있으면 종료 처리 (dispose는 동기 함수이므로 unawaited 사용)
-    if (_sessionState == SessionState.active) {
-      _endSession(); // dispose에서는 await하지 않음
-    }
-    
-    // 타이머 정리
+    // 타이머 정리 (먼저 정리하여 새로운 데이터 수집 방지)
     _dataCollectionTimer?.cancel();
     _dataCollectionTimer = null;
+    
+    // 종료 대기 타이머 정리
+    _endWaitTimer?.cancel();
+    _endWaitTimer = null;
     
     // 스트림 구독 해제
     _batteryInfoSubscription?.cancel();
     _batteryInfoSubscription = null;
     
-    // 스트림 컨트롤러 닫기
-    _sessionsController.close();
+    // 현재 세션이 있으면 종료 처리 (dispose는 동기 함수이므로 unawaited 사용)
+    if (_sessionState == SessionState.active || _sessionState == SessionState.ending) {
+      // 비동기 작업이지만 dispose에서는 await하지 않음
+      // _isDisposed 플래그로 _endSession 내부에서 추가 작업 방지
+      _endSession().catchError((e) {
+        debugPrint('ChargingSessionService: dispose 중 세션 종료 실패 - $e');
+      });
+    }
     
-    // Storage 서비스 정리
-    _storageService.dispose();
+    // 스트림 컨트롤러 닫기
+    if (!_sessionsController.isClosed) {
+      _sessionsController.close();
+    }
+    
+    // Storage 서비스 정리 (Storage는 싱글톤이므로 dispose하지 않음)
+    // _storageService.dispose(); // 주석 처리: 다른 곳에서 사용 중일 수 있음
     
     debugPrint('ChargingSessionService: dispose 완료');
   }
@@ -339,22 +369,36 @@ class ChargingSessionService {
     }
   }
   
+  /// 종료 대기 타이머
+  Timer? _endWaitTimer;
+  
   /// 종료 대기 타이머 시작
   void _startEndWaitTimer() {
+    // 기존 타이머가 있으면 취소
+    _endWaitTimer?.cancel();
+    
     _sessionEndWaitStartTime = DateTime.now();
-    Timer(ChargingSessionConfig.sessionEndWaitDuration, () {
+    _endWaitTimer = Timer(ChargingSessionConfig.sessionEndWaitDuration, () {
+      if (_isDisposed) {
+        return;
+      }
+      
       if (_sessionState == SessionState.ending && _sessionEndWaitStartTime != null) {
         // 대기 시간이 지났으면 세션 종료
         final waitDuration = DateTime.now().difference(_sessionEndWaitStartTime!);
         debugPrint('ChargingSessionService: 종료 대기 완료 (${waitDuration.inSeconds}초 대기)');
-        _endSession(); // Timer 콜백에서는 await 불가, unawaited로 처리
+        _endSession().catchError((e) {
+          debugPrint('ChargingSessionService: 종료 대기 타이머에서 세션 종료 실패 - $e');
+        });
       }
+      
+      _endWaitTimer = null;
     });
   }
   
   /// 세션 종료
   Future<void> _endSession() async {
-    if (_sessionState == SessionState.idle) {
+    if (_sessionState == SessionState.idle || _isDisposed) {
       return;
     }
     
@@ -364,6 +408,12 @@ class ChargingSessionService {
       // 데이터 수집 타이머 중지
       _stopDataCollectionTimer();
       
+      // dispose된 경우 추가 작업 중단
+      if (_isDisposed) {
+        _resetSession();
+        return;
+      }
+      
       // 마지막 배터리 정보 가져오기
       final endBatteryInfo = _batteryService.currentBatteryInfo;
       if (endBatteryInfo == null || _startBatteryInfo == null) {
@@ -372,23 +422,47 @@ class ChargingSessionService {
         return;
       }
       
+      // dispose된 경우 추가 작업 중단
+      if (_isDisposed) {
+        _resetSession();
+        return;
+      }
+      
       // 세션 데이터 분석 및 기록 생성
       final sessionRecord = await _createSessionRecord(endBatteryInfo);
       
-      if (sessionRecord != null && sessionRecord.validate()) {
+      // dispose된 경우 추가 작업 중단
+      if (_isDisposed || sessionRecord == null) {
+        _resetSession();
+        return;
+      }
+      
+      if (sessionRecord.validate()) {
         // 유효한 세션이면 저장소에 저장
-        final saved = await _storageService.saveSession(sessionRecord, saveToDatabase: true);
-        if (saved) {
-          _notifySessionsChanged();
-          debugPrint('ChargingSessionService: 세션 저장 완료 - ${sessionRecord.sessionTitle}');
-        } else {
-          debugPrint('ChargingSessionService: 세션 저장 실패 - ${sessionRecord.sessionTitle}');
+        try {
+          final saved = await _storageService.saveSession(sessionRecord, saveToDatabase: true);
+          if (saved && !_isDisposed) {
+            // 세션 목록 업데이트 알림
+            _notifySessionsChanged();
+            debugPrint('ChargingSessionService: 세션 저장 완료 - ${sessionRecord.sessionTitle}');
+          } else if (!saved) {
+            debugPrint('ChargingSessionService: 세션 저장 실패 - ${sessionRecord.sessionTitle}');
+            // 저장 실패해도 세션 목록은 업데이트 (메모리에만 있을 수 있음)
+            if (!_isDisposed) {
+              _notifySessionsChanged();
+            }
+          }
+        } catch (e, stackTrace) {
+          debugPrint('ChargingSessionService: 세션 저장 중 오류 발생 - $e');
+          debugPrint('스택 트레이스: $stackTrace');
+          // 저장 실패해도 세션 목록은 업데이트 시도
+          if (!_isDisposed) {
+            _notifySessionsChanged();
+          }
         }
       } else {
         debugPrint('ChargingSessionService: 세션이 유효하지 않아 저장하지 않습니다');
-        if (sessionRecord != null) {
-          debugPrint('ChargingSessionService: 세션 검증 실패 - duration: ${sessionRecord.duration.inMinutes}분, avgCurrent: ${sessionRecord.avgCurrent}mA, batteryChange: ${sessionRecord.batteryChange}%');
-        }
+        debugPrint('ChargingSessionService: 세션 검증 실패 - duration: ${sessionRecord.duration.inMinutes}분, avgCurrent: ${sessionRecord.avgCurrent}mA, batteryChange: ${sessionRecord.batteryChange}%');
       }
       
       // 세션 초기화
@@ -403,12 +477,18 @@ class ChargingSessionService {
   
   /// 세션 초기화
   void _resetSession() {
+    // 종료 대기 타이머 취소
+    _endWaitTimer?.cancel();
+    _endWaitTimer = null;
+    
+    // 모든 데이터 포인트 정리
+    _collectedDataPoints.clear();
+    _speedChanges.clear();
+    
     _sessionState = SessionState.idle;
     _currentSession = null;
     _sessionStartTime = null;
     _sessionEndWaitStartTime = null;
-    _collectedDataPoints.clear();
-    _speedChanges.clear();
     _previousCurrent = null;
     _previousCurrentTime = null;
     _startBatteryInfo = null;
@@ -476,7 +556,7 @@ class ChargingSessionService {
   
   /// 데이터 포인트 추가
   void _addDataPoint(BatteryInfo batteryInfo) {
-    if (_sessionStartTime == null) {
+    if (_sessionStartTime == null || _isDisposed) {
       return;
     }
     
@@ -488,6 +568,14 @@ class ChargingSessionService {
     );
     
     _collectedDataPoints.add(dataPoint);
+    
+    // 메모리 관리: 데이터 포인트 리스트 크기 제한
+    // 최대 1000개까지만 유지 (약 2.7시간 분량, 10초 간격 기준)
+    const maxDataPoints = 1000;
+    if (_collectedDataPoints.length > maxDataPoints) {
+      // 오래된 데이터 제거 (FIFO)
+      _collectedDataPoints.removeAt(0);
+    }
     
     // 전류 변화 감지
     _checkCurrentChange(batteryInfo);
@@ -714,10 +802,20 @@ class ChargingSessionService {
   }
   
   /// 세션 목록 변경 알림
-  void _notifySessionsChanged() async {
-    if (!_sessionsController.isClosed) {
+  void _notifySessionsChanged() {
+    if (!_sessionsController.isClosed && !_isDisposed) {
+      // 동기 메서드로 빠르게 알림
       final sessions = getTodaySessions();
       _sessionsController.add(sessions);
+      
+      // 비동기로 최신 데이터도 로드하여 업데이트 (백그라운드)
+      getTodaySessionsAsync().then((latestSessions) {
+        if (!_sessionsController.isClosed && !_isDisposed) {
+          _sessionsController.add(latestSessions);
+        }
+      }).catchError((e) {
+        debugPrint('ChargingSessionService: 최신 세션 로드 실패 - $e');
+      });
     }
   }
   
