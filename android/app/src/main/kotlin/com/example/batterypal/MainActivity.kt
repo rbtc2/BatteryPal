@@ -414,8 +414,9 @@ class MainActivity : FlutterActivity() {
                 capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> {
                     // 5G/4G/3G 구분 (Android 10+)
                     if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-                        val networkCapabilities = capabilities.getNetworkCapabilities(network)
-                        if (networkCapabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_NR) == true) {
+                        // NET_CAPABILITY_NR = 24 (API 29+)
+                        val is5G = capabilities.hasCapability(24) // NET_CAPABILITY_NR
+                        if (is5G) {
                             "5G"
                         } else {
                             "4G"
