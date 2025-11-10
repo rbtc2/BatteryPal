@@ -58,6 +58,12 @@ class ChargingCurrentHistoryService {
   static const Duration _minRecordingInterval = Duration(seconds: 1); // 최소 기록 간격
   static const Duration _chargingTimeInterval = Duration(seconds: 10); // 충전 중 시간 기반 기록 간격 (그래프 가로선 표시용)
   
+  // 날짜 변경 감지를 위한 마지막 저장 날짜 추적
+  String? _lastSavedDateKey;
+  
+  // 마지막 데이터 정리 실행 시간 (하루에 한 번만 실행)
+  DateTime? _lastCleanupTime;
+  
   /// 서비스 초기화
   /// 앱 시작 시 호출하여 BatteryService 스트림 구독 시작
   Future<void> initialize() async {
@@ -89,6 +95,18 @@ class ChargingCurrentHistoryService {
       
       // Phase 2: 기존 DB 데이터 로드 (오늘 데이터)
       await _loadTodayDataFromDatabase();
+      
+      // 날짜 변경 감지 및 과거 날짜 데이터 저장 (앱 시작 시)
+      final todayKey = _getDateKey(DateTime.now());
+      // 초기화 시에는 마지막 저장 날짜를 오늘로 설정하고, 
+      // 메모리에 과거 날짜 데이터가 있으면 저장
+      if (_lastSavedDateKey == null) {
+        _lastSavedDateKey = todayKey;
+      }
+      _checkDateChangeAndSave();
+      
+      // 7일 이상 된 데이터 자동 삭제 (초기화 시 한 번 실행)
+      _cleanupOldDatabaseData();
       
       // 현재 충전 상태 확인
       final currentInfo = _batteryService.currentBatteryInfo;
@@ -286,18 +304,26 @@ class ChargingCurrentHistoryService {
   }
   
   /// Phase 4: 오래된 메모리 데이터 정리 (메모리 최적화)
+  /// 메모리 정리 전에 DB에 저장되지 않은 데이터를 먼저 저장
   void _cleanupOldMemoryData() {
     if (_dailyData.length <= _maxMemoryDays) return;
+    
+    final now = DateTime.now();
+    final todayKey = _getDateKey(now);
+    
+    // 메모리 정리 전에 저장되지 않은 과거 날짜 데이터를 먼저 저장
+    _saveAllPastDatesToDatabase(todayKey);
     
     // 날짜별로 정렬하여 오래된 것부터 제거
     final sortedDates = _dailyData.keys.toList()..sort();
     final today = DateTime.now();
-    final todayKey = _getDateKey(today);
+    final todayKeyForCleanup = _getDateKey(today);
+    final yesterdayKey = _getDateKey(today.subtract(const Duration(days: 1)));
     
-    // 오늘과 어제를 제외하고 나머지 제거
+    // 오늘과 어제를 제외하고 나머지 제거 (이미 DB에 저장된 데이터)
     int removedCount = 0;
     for (final dateKey in sortedDates) {
-      if (dateKey != todayKey && dateKey != _getDateKey(today.subtract(const Duration(days: 1)))) {
+      if (dateKey != todayKeyForCleanup && dateKey != yesterdayKey) {
         _dailyData.remove(dateKey);
         removedCount++;
       }
@@ -402,10 +428,152 @@ class ChargingCurrentHistoryService {
     _batchSaveTimer?.cancel();
     _batchSaveTimer = Timer.periodic(_batchSaveInterval, (timer) {
       if (!_isDisposed && _isInitialized) {
+        // 날짜 변경 감지 및 과거 날짜 데이터 저장 (비동기)
+        _checkDateChangeAndSave();
+        // 오늘 데이터 저장
         _saveToDatabase();
+        // 7일 이상 된 데이터 정리 (하루에 한 번만 실행)
+        _checkAndCleanupOldData();
       }
     });
     debugPrint('ChargingCurrentHistoryService: 배치 저장 타이머 시작');
+  }
+  
+  /// 7일 이상 된 데이터 정리 체크 (하루에 한 번만 실행)
+  void _checkAndCleanupOldData() {
+    if (_isDisposed || !_isInitialized) return;
+    
+    final now = DateTime.now();
+    // 마지막 정리 시간이 없거나, 하루가 지났으면 정리 실행
+    if (_lastCleanupTime == null || 
+        now.difference(_lastCleanupTime!) >= const Duration(days: 1)) {
+      _lastCleanupTime = now;
+      _cleanupOldDatabaseData();
+    }
+  }
+  
+  /// 날짜 변경 감지 및 과거 날짜 데이터 저장 (7일 전까지)
+  void _checkDateChangeAndSave() {
+    if (_isDisposed || !_isInitialized) return;
+    
+    try {
+      final now = DateTime.now();
+      final todayKey = _getDateKey(now);
+      
+      // 마지막 저장 날짜가 없으면 오늘 날짜로 초기화
+      if (_lastSavedDateKey == null) {
+        _lastSavedDateKey = todayKey;
+        // 초기화 시에도 메모리에 있는 모든 과거 날짜 데이터 저장
+        _saveAllPastDatesToDatabase(todayKey);
+        return;
+      }
+      
+      // 날짜가 바뀌었는지 확인
+      if (_lastSavedDateKey != todayKey) {
+        debugPrint('ChargingCurrentHistoryService: 날짜 변경 감지 - $_lastSavedDateKey -> $todayKey');
+        
+        // 메모리에 있는 모든 과거 날짜 데이터 저장 (오늘 제외)
+        _saveAllPastDatesToDatabase(todayKey);
+        
+        // 오늘 날짜로 업데이트
+        _lastSavedDateKey = todayKey;
+      }
+    } catch (e, stackTrace) {
+      debugPrint('ChargingCurrentHistoryService: 날짜 변경 감지 실패 - $e');
+      debugPrint('스택 트레이스: $stackTrace');
+    }
+  }
+  
+  /// 메모리에 있는 모든 과거 날짜 데이터를 DB에 저장 (오늘 제외, 7일 전까지)
+  void _saveAllPastDatesToDatabase(String todayKey) {
+    if (_isDisposed || !_isInitialized) return;
+    
+    try {
+      final now = DateTime.now();
+      final cutoffDate = now.subtract(const Duration(days: 7)); // 7일 전
+      final cutoffDateKey = _getDateKey(cutoffDate);
+      
+      // 저장할 날짜 목록 (오늘 제외, 7일 전 이후만)
+      final datesToSave = <String>[];
+      for (final dateKey in _dailyData.keys) {
+        // 오늘 데이터는 제외
+        if (dateKey == todayKey) continue;
+        
+        // 7일 이전 데이터는 저장하지 않음 (나중에 삭제될 예정)
+        if (dateKey.compareTo(cutoffDateKey) < 0) {
+          // 7일 이전 데이터는 메모리에서만 제거 (DB에 저장하지 않음)
+          _dailyData.remove(dateKey);
+          debugPrint('ChargingCurrentHistoryService: 7일 이전 데이터 메모리에서 제거 ($dateKey)');
+          continue;
+        }
+        
+        datesToSave.add(dateKey);
+      }
+      
+      // 각 날짜의 데이터를 DB에 저장
+      for (final dateKey in datesToSave) {
+        final data = _dailyData[dateKey];
+        if (data != null && data.isNotEmpty) {
+          final dateKeyToSave = dateKey;
+          _saveDateDataToDatabase(dateKeyToSave, data).then((_) {
+            debugPrint('ChargingCurrentHistoryService: $dateKeyToSave 날짜 데이터 저장 완료 - ${data.length}개 포인트');
+            // 저장 완료 후 메모리에서 제거 (메모리 최적화)
+            // 단, 오늘과 어제는 유지
+            final today = DateTime.now();
+            final todayKey = _getDateKey(today);
+            final yesterdayKey = _getDateKey(today.subtract(const Duration(days: 1)));
+            if (dateKeyToSave != todayKey && dateKeyToSave != yesterdayKey) {
+              _dailyData.remove(dateKeyToSave);
+              debugPrint('ChargingCurrentHistoryService: 저장 완료 후 메모리에서 제거 ($dateKeyToSave)');
+            }
+          }).catchError((e) {
+            debugPrint('ChargingCurrentHistoryService: $dateKeyToSave 날짜 데이터 저장 실패 - $e');
+          });
+        }
+      }
+      
+      if (datesToSave.isNotEmpty) {
+        debugPrint('ChargingCurrentHistoryService: ${datesToSave.length}개 날짜 데이터 저장 시작');
+      }
+    } catch (e, stackTrace) {
+      debugPrint('ChargingCurrentHistoryService: 과거 날짜 데이터 저장 실패 - $e');
+      debugPrint('스택 트레이스: $stackTrace');
+    }
+  }
+  
+  /// 특정 날짜의 데이터를 DB에 저장
+  Future<void> _saveDateDataToDatabase(String dateKey, List<ChargingCurrentPoint> data) async {
+    if (_isDisposed || !_isInitialized) return;
+    if (data.isEmpty) return;
+    
+    try {
+      final pointsToSave = data.map((point) => {
+        'timestamp': point.timestamp,
+        'currentMa': point.currentMa,
+      }).toList();
+      
+      if (pointsToSave.isNotEmpty) {
+        await _databaseService.insertChargingCurrentPoints(pointsToSave);
+        debugPrint('ChargingCurrentHistoryService: $dateKey 날짜 데이터 ${pointsToSave.length}개 DB 저장 완료');
+      }
+    } catch (e, stackTrace) {
+      debugPrint('ChargingCurrentHistoryService: $dateKey 날짜 데이터 DB 저장 실패 - $e');
+      debugPrint('스택 트레이스: $stackTrace');
+    }
+  }
+  
+  /// 7일 이상 된 데이터 자동 삭제
+  void _cleanupOldDatabaseData() {
+    if (_isDisposed || !_isInitialized) return;
+    
+    // 비동기로 실행 (블로킹하지 않음)
+    _databaseService.cleanupOldChargingCurrentData().then((deletedCount) {
+      if (deletedCount > 0) {
+        debugPrint('ChargingCurrentHistoryService: 7일 이상 된 데이터 $deletedCount개 삭제 완료');
+      }
+    }).catchError((e) {
+      debugPrint('ChargingCurrentHistoryService: 오래된 데이터 삭제 실패 - $e');
+    });
   }
   
   /// Phase 2: 배치 저장 타이머 중지
@@ -491,7 +659,9 @@ class ChargingCurrentHistoryService {
     _isDisposed = true;
     _isCollecting = false;
     
-    // Phase 2: 마지막 저장
+    // Phase 2: 날짜 변경 체크 및 어제 데이터 저장
+    _checkDateChangeAndSave();
+    // Phase 2: 마지막 저장 (오늘 데이터)
     _saveToDatabase();
     
     // Phase 2: 배치 저장 타이머 중지
