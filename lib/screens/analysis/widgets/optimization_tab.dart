@@ -430,6 +430,7 @@ class _AutoOptimizationCardState extends State<AutoOptimizationCard> {
   final OptimizationSnapshotService _snapshotService = OptimizationSnapshotService();
   bool _hasSnapshot = false;
   bool _isLoading = false;
+  DateTime? _savedAt;
 
   @override
   void initState() {
@@ -441,10 +442,21 @@ class _AutoOptimizationCardState extends State<AutoOptimizationCard> {
   /// 저장된 스냅샷이 있는지 확인
   Future<void> _checkSnapshot() async {
     final hasSnapshot = await _snapshotService.hasAutoOptimizationSnapshot();
-    if (mounted) {
-      setState(() {
-        _hasSnapshot = hasSnapshot;
-      });
+    if (hasSnapshot) {
+      final savedAt = await _snapshotService.getSavedAt();
+      if (mounted) {
+        setState(() {
+          _hasSnapshot = true;
+          _savedAt = savedAt;
+        });
+      }
+    } else {
+      if (mounted) {
+        setState(() {
+          _hasSnapshot = false;
+          _savedAt = null;
+        });
+      }
     }
   }
 
@@ -537,6 +549,28 @@ class _AutoOptimizationCardState extends State<AutoOptimizationCard> {
                     ],
                   ],
                 ),
+                // 저장 시간 표시
+                if (_hasSnapshot && _savedAt != null) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.access_time,
+                        size: 12,
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '저장 시간: ${_formatSavedTime(_savedAt!)}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
@@ -669,10 +703,14 @@ class _AutoOptimizationCardState extends State<AutoOptimizationCard> {
 
       if (mounted) {
         if (success) {
+          final savedAt = await _snapshotService.getSavedAt();
+          if (!mounted) return;
           setState(() {
             _hasSnapshot = true;
+            _savedAt = savedAt;
           });
           
+          if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: const Row(
@@ -688,6 +726,7 @@ class _AutoOptimizationCardState extends State<AutoOptimizationCard> {
             ),
           );
         } else {
+          if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Row(
@@ -805,6 +844,22 @@ class _AutoOptimizationCardState extends State<AutoOptimizationCard> {
     }
   }
 
+  /// 저장 시간 포맷팅
+  String _formatSavedTime(DateTime savedAt) {
+    final now = DateTime.now();
+    final difference = now.difference(savedAt);
+
+    if (difference.inDays > 0) {
+      return '${difference.inDays}일 전';
+    } else if (difference.inHours > 0) {
+      return '${difference.inHours}시간 전';
+    } else if (difference.inMinutes > 0) {
+      return '${difference.inMinutes}분 전';
+    } else {
+      return '방금 전';
+    }
+  }
+
   List<OptimizationItem> _getAutoOptimizationItems() {
     return [
       OptimizationItem(
@@ -888,6 +943,11 @@ class _ManualOptimizationCardState extends State<ManualOptimizationCard> {
     }
   }
 
+  /// 저장된 이전 값이 하나라도 있는지 확인
+  bool _hasAnyPreviousValue() {
+    return _previousValues.values.any((value) => value != null);
+  }
+
   @override
   Widget build(BuildContext context) {
     final manualItems = _getManualOptimizationItems();
@@ -942,6 +1002,41 @@ class _ManualOptimizationCardState extends State<ManualOptimizationCard> {
                     color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
                 ),
+                // 사용자 안내 메시지
+                if (_hasAnyPreviousValue()) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.blue[50]!.withValues(alpha: Theme.of(context).brightness == Brightness.dark ? 0.2 : 1.0),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: Colors.blue[200]!.withValues(alpha: 0.5),
+                      ),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.info_outline,
+                          size: 16,
+                          color: Colors.blue[700],
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '항목을 클릭하면 현재 설정 값이 자동으로 저장됩니다. 이전 값은 복원 시 참고하세요.',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.blue[700],
+                              height: 1.3,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -1043,31 +1138,68 @@ class _ManualOptimizationCardState extends State<ManualOptimizationCard> {
             if (previousValue != null) ...[
               const SizedBox(height: 8),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                 decoration: BoxDecoration(
                   color: Colors.orange[50]!.withValues(alpha: Theme.of(context).brightness == Brightness.dark ? 0.2 : 1.0),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: Colors.orange[300]!.withValues(alpha: 0.5),
+                    color: Colors.orange[300]!.withValues(alpha: 0.6),
+                    width: 1.5,
                   ),
                 ),
                 child: Row(
-                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      Icons.history,
-                      size: 14,
-                      color: Colors.orange[700],
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      '이전 값: $previousValue',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.orange[700],
-                        fontStyle: FontStyle.italic,
-                        fontWeight: FontWeight.w500,
+                    Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.orange[200]!.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(4),
                       ),
+                      child: Icon(
+                        Icons.history,
+                        size: 14,
+                        color: Colors.orange[800],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '이전 값',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.orange[700],
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            previousValue,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.orange[800],
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // 삭제 버튼
+                    IconButton(
+                      icon: Icon(
+                        Icons.close,
+                        size: 16,
+                        color: Colors.orange[700],
+                      ),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(
+                        minWidth: 24,
+                        minHeight: 24,
+                      ),
+                      onPressed: () => _clearPreviousValue(item.id),
+                      tooltip: '이전 값 삭제',
                     ),
                   ],
                 ),
@@ -1109,9 +1241,9 @@ class _ManualOptimizationCardState extends State<ManualOptimizationCard> {
             final minutes = timeout ~/ 60;
             final seconds = timeout % 60;
             if (minutes > 0) {
-              currentValue = seconds > 0 ? '${minutes}분 ${seconds}초' : '${minutes}분';
+              currentValue = seconds > 0 ? '$minutes분 $seconds초' : '$minutes분';
             } else {
-              currentValue = '${seconds}초';
+              currentValue = '$seconds초';
             }
           } else {
             currentValue = '알 수 없음';
@@ -1137,17 +1269,90 @@ class _ManualOptimizationCardState extends State<ManualOptimizationCard> {
     }
   }
 
-  void _openSettings(BuildContext context, OptimizationItem item) async {
-    // 항목 클릭 전에 현재 시스템 설정 값 읽기 및 저장
-    await _readAndSaveCurrentValue(item);
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('${item.title} 설정 화면으로 이동합니다'),
-        duration: const Duration(seconds: 1),
-        behavior: SnackBarBehavior.floating,
+  /// 이전 값 삭제
+  Future<void> _clearPreviousValue(String itemId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('이전 값 삭제'),
+        content: const Text('저장된 이전 값을 삭제하시겠습니까?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('삭제'),
+          ),
+        ],
       ),
     );
+
+    if (confirmed == true) {
+      await _snapshotService.clearManualSettingPreviousValue(itemId);
+      if (mounted) {
+        setState(() {
+          _previousValues[itemId] = null;
+        });
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white, size: 20),
+                SizedBox(width: 8),
+                Text('이전 값이 삭제되었습니다'),
+              ],
+            ),
+            duration: Duration(seconds: 1),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    }
+  }
+
+  void _openSettings(BuildContext context, OptimizationItem item) async {
+    // 항목 클릭 전에 현재 시스템 설정 값 읽기 및 저장
+    final savedValue = await _readAndSaveCurrentValue(item);
+    
+    // 저장 성공 시 피드백
+    if (savedValue != null && mounted) {
+      ScaffoldMessenger.of(this.context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle, color: Colors.white, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '현재 설정 값이 저장되었습니다: $savedValue',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Colors.green[600],
+        ),
+      );
+    }
+    
+    // 시스템 설정 화면으로 이동 안내
+    await Future.delayed(const Duration(milliseconds: 500));
+    if (mounted) {
+      ScaffoldMessenger.of(this.context).showSnackBar(
+        SnackBar(
+          content: Text('${item.title} 설정 화면으로 이동합니다'),
+          duration: const Duration(seconds: 1),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   List<OptimizationItem> _getManualOptimizationItems() {

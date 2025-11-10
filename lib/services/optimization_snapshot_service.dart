@@ -55,7 +55,7 @@ class OptimizationSnapshotService {
       // 각 항목의 상태 불러오기
       final Map<String, bool> states = {};
       for (final itemId in itemIds) {
-        final value = prefs.getBool('${_autoOptimizationKey}_${itemId}');
+        final value = prefs.getBool('${_autoOptimizationKey}_$itemId');
         if (value != null) {
           states[itemId] = value;
         }
@@ -111,7 +111,7 @@ class OptimizationSnapshotService {
       if (itemIds != null) {
         // 각 항목의 상태 삭제
         for (final itemId in itemIds) {
-          await prefs.remove('${_autoOptimizationKey}_${itemId}');
+          await prefs.remove('${_autoOptimizationKey}_$itemId');
         }
         await prefs.remove('${_autoOptimizationKey}_items');
       }
