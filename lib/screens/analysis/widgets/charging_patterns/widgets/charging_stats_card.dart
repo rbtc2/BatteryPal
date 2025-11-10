@@ -1,6 +1,15 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import '../models/charging_session_models.dart';
+import '../services/charging_session_service.dart';
+import '../utils/time_slot_utils.dart';
+import 'charging_session_list_item.dart';
 
 /// 섹션 3: 통계 + 세션 기록 카드
+/// 
+/// 실제 충전 세션 데이터를 표시하는 카드
+/// - 주간 통계 (평균 속도, 충전 횟수, 주 시간대)
+/// - 오늘의 충전 세션 목록
 class ChargingStatsCard extends StatefulWidget {
   const ChargingStatsCard({super.key});
 
@@ -10,6 +19,109 @@ class ChargingStatsCard extends StatefulWidget {
 
 class _ChargingStatsCardState extends State<ChargingStatsCard> {
   bool _isSessionsExpanded = false;
+  
+  final ChargingSessionService _sessionService = ChargingSessionService();
+  StreamSubscription<List<ChargingSessionRecord>>? _sessionsSubscription;
+  
+  List<ChargingSessionRecord> _todaySessions = [];
+  bool _isLoading = true;
+  
+  // 통계 데이터
+  double _avgCurrent = 0.0;
+  int _sessionCount = 0;
+  String _mainTimeSlot = '-';
+  
+  @override
+  void initState() {
+    super.initState();
+    _initializeService();
+  }
+  
+  Future<void> _initializeService() async {
+    try {
+      // 서비스 초기화
+      await _sessionService.initialize();
+      
+      // 세션 스트림 구독
+      _sessionsSubscription = _sessionService.sessionsStream.listen(
+        (sessions) {
+          if (mounted) {
+            setState(() {
+              _todaySessions = sessions;
+              _calculateStats(sessions);
+              _isLoading = false;
+            });
+          }
+        },
+        onError: (error) {
+          debugPrint('세션 스트림 오류: $error');
+          if (mounted) {
+            setState(() {
+              _isLoading = false;
+            });
+          }
+        },
+      );
+      
+      // 초기 데이터 로드
+      final initialSessions = _sessionService.getTodaySessions();
+      if (mounted) {
+        setState(() {
+          _todaySessions = initialSessions;
+          _calculateStats(initialSessions);
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('서비스 초기화 실패: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+  
+  void _calculateStats(List<ChargingSessionRecord> sessions) {
+    if (sessions.isEmpty) {
+      _avgCurrent = 0.0;
+      _sessionCount = 0;
+      _mainTimeSlot = '-';
+      return;
+    }
+    
+    // 평균 전류 계산
+    final totalCurrent = sessions.fold<double>(
+      0.0,
+      (sum, session) => sum + session.avgCurrent,
+    );
+    _avgCurrent = totalCurrent / sessions.length;
+    
+    // 세션 개수
+    _sessionCount = sessions.length;
+    
+    // 주 시간대 계산 (가장 많은 세션이 있는 시간대)
+    final timeSlotCounts = <TimeSlot, int>{};
+    for (final session in sessions) {
+      timeSlotCounts[session.timeSlot] = 
+          (timeSlotCounts[session.timeSlot] ?? 0) + 1;
+    }
+    
+    if (timeSlotCounts.isNotEmpty) {
+      final mainSlot = timeSlotCounts.entries.reduce(
+        (a, b) => a.value > b.value ? a : b,
+      ).key;
+      _mainTimeSlot = TimeSlotUtils.getTimeSlotName(mainSlot);
+    } else {
+      _mainTimeSlot = '-';
+    }
+  }
+  
+  @override
+  void dispose() {
+    _sessionsSubscription?.cancel();
+    super.dispose();
+  }
   
   @override
   Widget build(BuildContext context) {
@@ -53,10 +165,10 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
                   child: _buildEnhancedStatCard(
                     context,
                     title: '평균속도',
-                    mainValue: '1,350',
+                    mainValue: _isLoading ? '...' : _avgCurrent.toStringAsFixed(0),
                     unit: 'mA',
-                    subValue: '🟧 일반',
-                    trend: '+12%',
+                    subValue: _getCurrentSpeedType(_avgCurrent),
+                    trend: '', // 추후 주간 비교 데이터 추가 시 사용
                     trendColor: Colors.green,
                     icon: Icons.speed,
                   ),
@@ -66,11 +178,11 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
                   child: _buildEnhancedStatCard(
                     context,
                     title: '충전횟수',
-                    mainValue: '16회',
-                    unit: '(주간)',
-                    subValue: '일 2.3회',
-                    trend: '-2회',
-                    trendColor: Colors.red,
+                    mainValue: _isLoading ? '...' : '$_sessionCount회',
+                    unit: '(오늘)',
+                    subValue: _sessionCount > 0 ? '일 평균 ${(_sessionCount / 1).toStringAsFixed(1)}회' : '없음',
+                    trend: '', // 추후 주간 비교 데이터 추가 시 사용
+                    trendColor: Colors.blue,
                     icon: Icons.battery_charging_full,
                   ),
                 ),
@@ -79,9 +191,9 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
                   child: _buildEnhancedStatCard(
                     context,
                     title: '주시간대',
-                    mainValue: '저녁9시',
+                    mainValue: _isLoading ? '...' : _mainTimeSlot,
                     unit: '',
-                    subValue: '18-22시',
+                    subValue: _mainTimeSlot != '-' ? TimeSlotUtils.getTimeSlotRange(_getMainTimeSlot()) : '없음',
                     trend: '안정',
                     trendColor: Colors.blue,
                     icon: Icons.access_time,
@@ -136,7 +248,7 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        '3건',
+                        '${_todaySessions.length}건',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
@@ -151,61 +263,50 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
           
           // 세션 기록 리스트 (펼쳤을 때만 표시)
           if (_isSessionsExpanded) ...[
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  _buildEnhancedSessionItem(
-                    context,
-                    icon: '🌙',
-                    title: '새벽 충전',
-                    timeRange: '02:15 - 07:00',
-                    batteryChange: '15% → 100%',
-                    duration: '4시간 45분',
-                    avgCurrent: '650mA',
-                    efficiency: '85%',
-                    temperature: '28°C',
-                    speedChanges: [
-                      '02:15 저속 시작',
-                      '04:30 급속 전환 ⚡',
-                      '06:00 트리클 모드',
+            if (_isLoading)
+              Padding(
+                padding: const EdgeInsets.all(32),
+                child: Center(
+                  child: CircularProgressIndicator(),
+                ),
+              )
+            else if (_todaySessions.isEmpty)
+              Padding(
+                padding: const EdgeInsets.all(32),
+                child: Center(
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.battery_charging_full,
+                        size: 48,
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+                      ),
+                      SizedBox(height: 16),
+                      Text(
+                        '오늘 충전 세션이 없습니다',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                        ),
+                      ),
                     ],
-                    color: Colors.blue[400]!,
-                    isExpanded: false,
                   ),
-                  SizedBox(height: 12),
-                  _buildEnhancedSessionItem(
-                    context,
-                    icon: '⚡',
-                    title: '아침 급속 충전',
-                    timeRange: '09:00 - 10:15',
-                    batteryChange: '25% → 85%',
-                    duration: '1시간 15분',
-                    avgCurrent: '2,100mA',
-                    efficiency: '92%',
-                    temperature: '32°C',
-                    speedChanges: [],
-                    color: Colors.red[400]!,
-                    isExpanded: false,
-                  ),
-                  SizedBox(height: 12),
-                  _buildEnhancedSessionItem(
-                    context,
-                    icon: '🔌',
-                    title: '저녁 보충 충전',
-                    timeRange: '18:30 - 19:00',
-                    batteryChange: '45% → 75%',
-                    duration: '30분',
-                    avgCurrent: '1,000mA',
-                    efficiency: '88%',
-                    temperature: '26°C',
-                    speedChanges: [],
-                    color: Colors.orange[400]!,
-                    isExpanded: false,
-                  ),
-                ],
+                ),
+              )
+            else
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: _todaySessions.map((session) {
+                    return ChargingSessionListItem(
+                      session: session,
+                      onTap: () {
+                        // 세션 상세 정보 다이얼로그 표시 (추후 구현)
+                      },
+                    );
+                  }).toList(),
+                ),
               ),
-            ),
           ],
         ],
       ),
@@ -368,277 +469,32 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
     if (trend.startsWith('-')) return Icons.trending_down;
     return Icons.trending_flat;
   }
+  
+  /// 전류 속도 타입 반환
+  String _getCurrentSpeedType(double current) {
+    if (current >= 1500) return '⚡ 급속';
+    if (current >= 500) return '🟧 일반';
+    return '🔵 저속';
+  }
+  
+  /// 주 시간대 TimeSlot 반환
+  TimeSlot _getMainTimeSlot() {
+    if (_todaySessions.isEmpty) return TimeSlot.morning;
+    
+    final timeSlotCounts = <TimeSlot, int>{};
+    for (final session in _todaySessions) {
+      timeSlotCounts[session.timeSlot] = 
+          (timeSlotCounts[session.timeSlot] ?? 0) + 1;
+    }
+    
+    if (timeSlotCounts.isNotEmpty) {
+      return timeSlotCounts.entries.reduce(
+        (a, b) => a.value > b.value ? a : b,
+      ).key;
+    }
+    
+    return TimeSlot.morning;
+  }
 
-  Widget _buildEnhancedSessionItem(
-    BuildContext context, {
-    required String icon,
-    required String title,
-    required String timeRange,
-    required String batteryChange,
-    required String duration,
-    required String avgCurrent,
-    required String efficiency,
-    required String temperature,
-    required List<String> speedChanges,
-    required Color color,
-    required bool isExpanded,
-  }) {
-    return Container(
-      constraints: BoxConstraints(
-        minHeight: 180, // 최소 높이 지정
-      ),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            color.withValues(alpha: 0.1),
-            color.withValues(alpha: 0.05),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border(
-          left: BorderSide(
-            color: color,
-            width: 4,
-          ),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: color.withValues(alpha: 0.1),
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 헤더: 아이콘 + 제목 + 시간 + 효율성
-          Row(
-            children: [
-              Container(
-                padding: EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(icon, style: TextStyle(fontSize: 20)),
-              ),
-              SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.onSurface,
-                      ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      timeRange,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: _getEfficiencyColor(efficiency).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  '효율 $efficiency',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: _getEfficiencyColor(efficiency),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          
-          SizedBox(height: 16),
-          
-          // 주요 정보 그리드 (고정 높이로 일관성 확보)
-          IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  child: _buildEnhancedInfoItem(context, batteryChange, '배터리 변화', Colors.green),
-                ),
-                SizedBox(width: 8),
-                Expanded(
-                  child: _buildEnhancedInfoItem(context, duration, '충전 시간', Colors.blue),
-                ),
-                SizedBox(width: 8),
-                Expanded(
-                  child: _buildEnhancedInfoItem(context, avgCurrent, '평균 전류', color),
-                ),
-              ],
-            ),
-          ),
-          
-          SizedBox(height: 12),
-          
-          // 온도 정보
-          Row(
-            children: [
-              Icon(Icons.thermostat, size: 16, color: Colors.orange),
-              SizedBox(width: 4),
-              Expanded(
-                child: Text(
-                  '평균 온도: $temperature',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              if (speedChanges.isNotEmpty)
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    '${speedChanges.length}회 변경',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: color,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-            ],
-          ),
-          
-          // 속도 변경 이력 (있을 경우)
-          if (speedChanges.isNotEmpty) ...[
-            SizedBox(height: 12),
-            Container(
-              padding: EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: color.withValues(alpha: 0.3),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.timeline, size: 14, color: color),
-                      SizedBox(width: 6),
-                      Text(
-                        '속도 변경 이력',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 8),
-                  ...speedChanges.map((change) => Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 4,
-                          height: 4,
-                          decoration: BoxDecoration(
-                            color: color,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            change,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  )),
-                ],
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-  
-  Color _getEfficiencyColor(String efficiency) {
-    final value = int.parse(efficiency.replaceAll('%', ''));
-    if (value >= 90) return Colors.green;
-    if (value >= 80) return Colors.orange;
-    return Colors.red;
-  }
-  
-  Widget _buildEnhancedInfoItem(BuildContext context, String value, String label, Color color) {
-    return Container(
-      height: 60, // 고정 높이 설정
-      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: color.withValues(alpha: 0.3),
-        ),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 9,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-            ),
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
-    );
-  }
+  // 기존 _buildEnhancedSessionItem 메서드는 제거됨 (ChargingSessionListItem 사용)
 }

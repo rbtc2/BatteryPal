@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
@@ -138,16 +139,70 @@ class BatteryHistoryDatabaseService {
       CREATE INDEX idx_data_quality ON ${BatteryHistoryDatabaseConfig.tableName} (data_quality)
     ''');
     
+    // 충전 세션 테이블 생성 (버전 2)
+    await _createChargingSessionsTable(db);
+    
     debugPrint('데이터베이스 테이블 생성 완료');
+  }
+  
+  /// 충전 세션 테이블 생성
+  Future<void> _createChargingSessionsTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS charging_sessions (
+        id TEXT PRIMARY KEY,
+        start_time INTEGER NOT NULL,
+        end_time INTEGER NOT NULL,
+        start_battery_level REAL NOT NULL,
+        end_battery_level REAL NOT NULL,
+        battery_change REAL NOT NULL,
+        duration_ms INTEGER NOT NULL,
+        avg_current REAL NOT NULL,
+        avg_temperature REAL NOT NULL,
+        max_current INTEGER NOT NULL,
+        min_current INTEGER NOT NULL,
+        efficiency REAL NOT NULL,
+        time_slot TEXT NOT NULL,
+        session_title TEXT NOT NULL,
+        speed_changes TEXT NOT NULL,
+        icon TEXT NOT NULL,
+        color INTEGER NOT NULL,
+        battery_capacity INTEGER,
+        battery_voltage INTEGER,
+        is_valid INTEGER NOT NULL DEFAULT 1,
+        created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+      )
+    ''');
+    
+    // 인덱스 생성
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_session_start_time ON charging_sessions (start_time)
+    ''');
+    
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_session_date ON charging_sessions (start_time, time_slot)
+    ''');
+    
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_session_time_slot ON charging_sessions (time_slot)
+    ''');
+    
+    debugPrint('충전 세션 테이블 생성 완료');
   }
 
   /// 데이터베이스 업그레이드 시 실행
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     debugPrint('데이터베이스 업그레이드: $oldVersion -> $newVersion');
     
+    // 버전별 마이그레이션
+    if (oldVersion < 2) {
+      // 버전 2: charging_sessions 테이블 추가
+      debugPrint('데이터베이스 업그레이드: 버전 2 - charging_sessions 테이블 추가');
+      await _createChargingSessionsTable(db);
+    }
+    
     // 향후 버전 업그레이드 로직 추가
-    if (oldVersion < newVersion) {
-      // 마이그레이션 로직 구현
+    if (oldVersion < newVersion && oldVersion >= 2) {
+      // 추가 마이그레이션 로직
     }
   }
 
@@ -742,5 +797,185 @@ class BatteryHistoryDatabaseService {
       collectionMethod: map['collection_method'] as String,
       dataQuality: map['data_quality'] as double,
     );
+  }
+  
+  // ==================== 충전 세션 관련 메서드 ====================
+  
+  /// 충전 세션 저장
+  Future<void> insertChargingSession(Map<String, dynamic> sessionMap) async {
+    await initialization;
+    if (_database == null) throw Exception('데이터베이스가 초기화되지 않았습니다');
+    
+    try {
+      // speed_changes를 JSON 문자열로 변환
+      final speedChangesJson = sessionMap['speed_changes'];
+      if (speedChangesJson is List) {
+        sessionMap['speed_changes'] = jsonEncode(speedChangesJson);
+      }
+      
+      await _database!.insert(
+        'charging_sessions',
+        sessionMap,
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+      debugPrint('충전 세션 저장 완료: ${sessionMap['id']}');
+    } catch (e, stackTrace) {
+      debugPrint('충전 세션 저장 실패: $e');
+      debugPrint('스택 트레이스: $stackTrace');
+      rethrow;
+    }
+  }
+  
+  /// 여러 충전 세션 일괄 저장
+  Future<void> insertChargingSessions(List<Map<String, dynamic>> sessionMaps) async {
+    await initialization;
+    if (_database == null) throw Exception('데이터베이스가 초기화되지 않았습니다');
+    
+    if (sessionMaps.isEmpty) return;
+    
+    try {
+      // 트랜잭션을 사용하여 성능 최적화
+      await _database!.transaction((txn) async {
+        final batch = txn.batch();
+        
+        for (final sessionMap in sessionMaps) {
+          // speed_changes를 JSON 문자열로 변환
+          final speedChangesJson = sessionMap['speed_changes'];
+          if (speedChangesJson is List) {
+            sessionMap['speed_changes'] = jsonEncode(speedChangesJson);
+          }
+          
+          batch.insert(
+            'charging_sessions',
+            sessionMap,
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
+        }
+        
+        await batch.commit();
+        debugPrint('${sessionMaps.length}개 충전 세션 일괄 저장 완료 (트랜잭션)');
+      });
+    } catch (e, stackTrace) {
+      debugPrint('충전 세션 일괄 저장 실패: $e');
+      debugPrint('스택 트레이스: $stackTrace');
+      rethrow;
+    }
+  }
+  
+  /// 특정 날짜의 충전 세션 조회
+  Future<List<Map<String, dynamic>>> getChargingSessionsByDate(DateTime date) async {
+    await initialization;
+    if (_database == null) throw Exception('데이터베이스가 초기화되지 않았습니다');
+    
+    try {
+      // 해당 날짜의 시작 시간 (00:00:00)
+      final startOfDay = DateTime(date.year, date.month, date.day);
+      // 해당 날짜의 끝 시간 (23:59:59.999)
+      final endOfDay = DateTime(date.year, date.month, date.day, 23, 59, 59, 999);
+      
+      final results = await _database!.query(
+        'charging_sessions',
+        where: 'start_time >= ? AND start_time <= ?',
+        whereArgs: [startOfDay.millisecondsSinceEpoch, endOfDay.millisecondsSinceEpoch],
+        orderBy: 'start_time ASC',
+      );
+      
+      // speed_changes를 JSON에서 파싱
+      for (final result in results) {
+        if (result['speed_changes'] is String) {
+          try {
+            result['speed_changes'] = jsonDecode(result['speed_changes'] as String);
+          } catch (e) {
+            debugPrint('speed_changes JSON 파싱 실패: $e');
+            result['speed_changes'] = [];
+          }
+        }
+      }
+      
+      debugPrint('${results.length}개의 충전 세션 조회 완료 (날짜: ${date.toString().split(' ')[0]})');
+      
+      return results;
+    } catch (e, stackTrace) {
+      debugPrint('충전 세션 조회 실패: $e');
+      debugPrint('스택 트레이스: $stackTrace');
+      rethrow;
+    }
+  }
+  
+  /// 세션 ID로 충전 세션 조회
+  Future<Map<String, dynamic>?> getChargingSessionById(String sessionId) async {
+    await initialization;
+    if (_database == null) throw Exception('데이터베이스가 초기화되지 않았습니다');
+    
+    try {
+      final results = await _database!.query(
+        'charging_sessions',
+        where: 'id = ?',
+        whereArgs: [sessionId],
+        limit: 1,
+      );
+      
+      if (results.isEmpty) {
+        return null;
+      }
+      
+      final result = results.first;
+      
+      // speed_changes를 JSON에서 파싱
+      if (result['speed_changes'] is String) {
+        try {
+          result['speed_changes'] = jsonDecode(result['speed_changes'] as String);
+        } catch (e) {
+          debugPrint('speed_changes JSON 파싱 실패: $e');
+          result['speed_changes'] = [];
+        }
+      }
+      
+      return result;
+    } catch (e, stackTrace) {
+      debugPrint('충전 세션 ID로 조회 실패: $e');
+      debugPrint('스택 트레이스: $stackTrace');
+      rethrow;
+    }
+  }
+  
+  /// 7일 이상 된 충전 세션 데이터 삭제
+  Future<int> cleanupOldChargingSessions() async {
+    await initialization;
+    if (_database == null) throw Exception('데이터베이스가 초기화되지 않았습니다');
+    
+    final cutoffDays = 7; // ChargingSessionConfig.sessionRetentionDays와 동일
+    final cutoffTime = DateTime.now().subtract(Duration(days: cutoffDays));
+    final cutoffTimestamp = cutoffTime.millisecondsSinceEpoch;
+    
+    try {
+      // 삭제 전 행 수 확인
+      final beforeCount = await _database!.rawQuery('''
+        SELECT COUNT(*) as count FROM charging_sessions
+      ''');
+      
+      // 7일 이상 된 세션 데이터 삭제
+      await _database!.delete(
+        'charging_sessions',
+        where: 'start_time < ?',
+        whereArgs: [cutoffTimestamp],
+      );
+      
+      // 삭제 후 행 수 확인
+      final afterCount = await _database!.rawQuery('''
+        SELECT COUNT(*) as count FROM charging_sessions
+      ''');
+      
+      final before = Sqflite.firstIntValue(beforeCount) ?? 0;
+      final after = Sqflite.firstIntValue(afterCount) ?? 0;
+      final deletedCount = before - after;
+      
+      debugPrint('$deletedCount개의 오래된 충전 세션 데이터 정리 완료 ($cutoffDays일 이상)');
+      return deletedCount;
+    } catch (e, stackTrace) {
+      debugPrint('오래된 충전 세션 데이터 정리 실패: $e');
+      debugPrint('스택 트레이스: $stackTrace');
+      rethrow;
+    }
   }
 }

@@ -100,9 +100,7 @@ class ChargingCurrentHistoryService {
       final todayKey = _getDateKey(DateTime.now());
       // 초기화 시에는 마지막 저장 날짜를 오늘로 설정하고, 
       // 메모리에 과거 날짜 데이터가 있으면 저장
-      if (_lastSavedDateKey == null) {
-        _lastSavedDateKey = todayKey;
-      }
+      _lastSavedDateKey ??= todayKey;
       _checkDateChangeAndSave();
       
       // 7일 이상 된 데이터 자동 삭제 (초기화 시 한 번 실행)

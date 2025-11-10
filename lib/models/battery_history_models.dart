@@ -427,7 +427,8 @@ class BatteryHistoryDatabaseConfig {
   static const String databaseName = 'battery_history.db';
   
   /// 데이터베이스 버전
-  static const int databaseVersion = 1;
+  /// 버전 2: charging_sessions 테이블 추가
+  static const int databaseVersion = 2;
   
   /// 테이블 이름
   static const String tableName = 'battery_history';
