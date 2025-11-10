@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../services/optimization_snapshot_service.dart';
+import '../../../services/system_settings_service.dart';
 
 /// 최적화 탭 - 재설계된 UI/UX
 /// 
@@ -425,11 +427,25 @@ class AutoOptimizationCard extends StatefulWidget {
 
 class _AutoOptimizationCardState extends State<AutoOptimizationCard> {
   late List<OptimizationItem> _autoItems;
+  final OptimizationSnapshotService _snapshotService = OptimizationSnapshotService();
+  bool _hasSnapshot = false;
+  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
     _autoItems = _getAutoOptimizationItems();
+    _checkSnapshot();
+  }
+
+  /// 저장된 스냅샷이 있는지 확인
+  Future<void> _checkSnapshot() async {
+    final hasSnapshot = await _snapshotService.hasAutoOptimizationSnapshot();
+    if (mounted) {
+      setState(() {
+        _hasSnapshot = hasSnapshot;
+      });
+    }
   }
 
   @override
@@ -483,6 +499,43 @@ class _AutoOptimizationCardState extends State<AutoOptimizationCard> {
                     fontSize: 13,
                     color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
+                ),
+                const SizedBox(height: 12),
+                // 저장/복원 버튼
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _isLoading ? null : _saveCurrentSettings,
+                        icon: _isLoading
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.save, size: 18),
+                        label: const Text('현재 설정 저장'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        ),
+                      ),
+                    ),
+                    if (_hasSnapshot) ...[
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: _isLoading ? null : _restoreSavedSettings,
+                          icon: const Icon(Icons.restore, size: 18),
+                          label: const Text('저장된 설정 복원'),
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            backgroundColor: Colors.green[600],
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ],
             ),
@@ -598,6 +651,160 @@ class _AutoOptimizationCardState extends State<AutoOptimizationCard> {
     );
   }
 
+  /// 현재 설정 저장
+  Future<void> _saveCurrentSettings() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // 현재 모든 항목의 상태를 Map으로 변환
+      final Map<String, bool> states = {};
+      for (final item in _autoItems) {
+        states[item.id] = item.isEnabled;
+      }
+
+      // 스냅샷 저장
+      final success = await _snapshotService.saveAutoOptimizationSnapshot(states);
+
+      if (mounted) {
+        if (success) {
+          setState(() {
+            _hasSnapshot = true;
+          });
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Row(
+                children: [
+                  Icon(Icons.check_circle, color: Colors.white, size: 20),
+                  SizedBox(width: 8),
+                  Text('현재 설정이 저장되었습니다'),
+                ],
+              ),
+              duration: const Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: Colors.green[600],
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.error, color: Colors.white, size: 20),
+                  SizedBox(width: 8),
+                  Text('설정 저장에 실패했습니다'),
+                ],
+              ),
+              duration: Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('오류 발생: $e'),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  /// 저장된 설정 복원
+  Future<void> _restoreSavedSettings() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // 저장된 스냅샷 불러오기
+      final savedStates = await _snapshotService.loadAutoOptimizationSnapshot();
+
+      if (savedStates == null || savedStates.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.info, color: Colors.white, size: 20),
+                  SizedBox(width: 8),
+                  Text('저장된 설정이 없습니다'),
+                ],
+              ),
+              duration: Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+        return;
+      }
+
+      // 저장된 상태로 복원
+      int restoredCount = 0;
+      for (final item in _autoItems) {
+        if (savedStates.containsKey(item.id)) {
+          final savedValue = savedStates[item.id]!;
+          if (item.isEnabled != savedValue) {
+            item.isEnabled = savedValue;
+            restoredCount++;
+          }
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          // UI 업데이트를 위해 setState 호출
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                Text('저장된 설정으로 복원되었습니다 ($restoredCount개 항목)'),
+              ],
+            ),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.green[600],
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('복원 실패: $e'),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
   List<OptimizationItem> _getAutoOptimizationItems() {
     return [
       OptimizationItem(
@@ -650,8 +857,36 @@ class _AutoOptimizationCardState extends State<AutoOptimizationCard> {
 }
 
 /// 섹션 3: 수동 설정 항목
-class ManualOptimizationCard extends StatelessWidget {
+class ManualOptimizationCard extends StatefulWidget {
   const ManualOptimizationCard({super.key});
+
+  @override
+  State<ManualOptimizationCard> createState() => _ManualOptimizationCardState();
+}
+
+class _ManualOptimizationCardState extends State<ManualOptimizationCard> {
+  final OptimizationSnapshotService _snapshotService = OptimizationSnapshotService();
+  final SystemSettingsService _systemSettingsService = SystemSettingsService();
+  final Map<String, String?> _previousValues = {}; // 항목별 이전 값 캐시
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPreviousValues();
+  }
+
+  /// 저장된 이전 값 불러오기
+  Future<void> _loadPreviousValues() async {
+    final manualItems = _getManualOptimizationItems();
+    for (final item in manualItems) {
+      final previousValue = await _snapshotService.getManualSettingPreviousValue(item.id);
+      if (mounted) {
+        setState(() {
+          _previousValues[item.id] = previousValue;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -729,6 +964,8 @@ class ManualOptimizationCard extends StatelessWidget {
   }
 
   Widget _buildManualItem(BuildContext context, OptimizationItem item) {
+    final previousValue = _previousValues[item.id];
+    
     return InkWell(
       onTap: () => _openSettings(context, item),
       borderRadius: BorderRadius.circular(12),
@@ -741,68 +978,169 @@ class ManualOptimizationCard extends StatelessWidget {
             color: Colors.blue[400]!.withValues(alpha: 0.3),
           ),
         ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 아이콘
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.blue[400]!.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(
-                item.icon,
-                color: Colors.blue[600],
-                size: 24,
-              ),
-            ),
-            
-            const SizedBox(width: 12),
-            
-            // 정보
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.title,
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+            Row(
+              children: [
+                // 아이콘
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.blue[400]!.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    item.currentStatus,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  child: Icon(
+                    item.icon,
+                    color: Colors.blue[600],
+                    size: 24,
                   ),
-                ],
+                ),
+                
+                const SizedBox(width: 12),
+                
+                // 정보
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.title,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        item.currentStatus,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                
+                const SizedBox(width: 12),
+                
+                // 화살표 아이콘
+                Icon(
+                  Icons.arrow_forward_ios,
+                  color: Colors.blue[600],
+                  size: 16,
+                ),
+              ],
+            ),
+            
+            // 이전 값 표시 (있는 경우)
+            if (previousValue != null) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.orange[50]!.withValues(alpha: Theme.of(context).brightness == Brightness.dark ? 0.2 : 1.0),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: Colors.orange[300]!.withValues(alpha: 0.5),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.history,
+                      size: 14,
+                      color: Colors.orange[700],
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '이전 값: $previousValue',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.orange[700],
+                        fontStyle: FontStyle.italic,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            
-            const SizedBox(width: 12),
-            
-            // 화살표 아이콘
-            Icon(
-              Icons.arrow_forward_ios,
-              color: Colors.blue[600],
-              size: 16,
-            ),
+            ],
           ],
         ),
       ),
     );
   }
 
-  void _openSettings(BuildContext context, OptimizationItem item) {
+  /// 항목 클릭 전 현재 시스템 설정 값 읽기 및 저장
+  Future<String?> _readAndSaveCurrentValue(OptimizationItem item) async {
+    try {
+      String currentValue;
+      
+      // 항목별로 현재 시스템 설정 값 읽기
+      switch (item.id) {
+        case 'battery_saver':
+          final enabled = await _systemSettingsService.isBatterySaverEnabled();
+          currentValue = enabled == true ? '켜짐' : '꺼짐';
+          break;
+        case 'network_optimize':
+          final type = await _systemSettingsService.getNetworkConnectionType();
+          currentValue = type ?? '알 수 없음';
+          break;
+        case 'location_save':
+          final status = await _systemSettingsService.getLocationServiceStatus();
+          currentValue = status ?? '알 수 없음';
+          break;
+        case 'sync_frequency':
+          final status = await _systemSettingsService.getSyncStatus();
+          currentValue = status ?? '알 수 없음';
+          break;
+        case 'screen_timeout':
+          final timeout = await _systemSettingsService.getScreenTimeout();
+          if (timeout != null && timeout > 0) {
+            // 초를 분:초 형식으로 변환
+            final minutes = timeout ~/ 60;
+            final seconds = timeout % 60;
+            if (minutes > 0) {
+              currentValue = seconds > 0 ? '${minutes}분 ${seconds}초' : '${minutes}분';
+            } else {
+              currentValue = '${seconds}초';
+            }
+          } else {
+            currentValue = '알 수 없음';
+          }
+          break;
+        default:
+          // 기본값은 currentStatus 사용
+          currentValue = item.currentStatus;
+      }
+      
+      // 이전 값 저장
+      await _snapshotService.saveManualSettingPreviousValue(item.id, currentValue);
+      if (mounted) {
+        setState(() {
+          _previousValues[item.id] = currentValue;
+        });
+      }
+      
+      return currentValue;
+    } catch (e) {
+      debugPrint('현재 값 읽기 실패: $e');
+      return null;
+    }
+  }
+
+  void _openSettings(BuildContext context, OptimizationItem item) async {
+    // 항목 클릭 전에 현재 시스템 설정 값 읽기 및 저장
+    await _readAndSaveCurrentValue(item);
+    
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('${item.title} 설정 화면으로 이동합니다'),

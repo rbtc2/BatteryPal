@@ -6,17 +6,26 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.BatteryManager
 import android.os.Bundle
+import android.provider.Settings
+import android.location.LocationManager
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.content.ContentResolver
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.example.batterypal/battery"
+    private val SYSTEM_SETTINGS_CHANNEL = "com.example.batterypal/system_settings"
     private var batteryReceiver: BroadcastReceiver? = null
     private var methodChannel: MethodChannel? = null
+    private var systemSettingsChannel: MethodChannel? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        
+        // 배터리 채널 설정
         methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
         methodChannel?.setMethodCallHandler { call, result ->
             when (call.method) {
@@ -47,6 +56,40 @@ class MainActivity : FlutterActivity() {
                 "getChargingCurrentOnly" -> {
                     val chargingCurrent = getChargingCurrentOnly()
                     result.success(chargingCurrent)
+                }
+                else -> {
+                    result.notImplemented()
+                }
+            }
+        }
+        
+        // 시스템 설정 채널 설정
+        systemSettingsChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, SYSTEM_SETTINGS_CHANNEL)
+        systemSettingsChannel?.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "getScreenBrightness" -> {
+                    val brightness = getScreenBrightness()
+                    result.success(brightness)
+                }
+                "getLocationServiceStatus" -> {
+                    val status = getLocationServiceStatus()
+                    result.success(status)
+                }
+                "getNetworkConnectionType" -> {
+                    val type = getNetworkConnectionType()
+                    result.success(type)
+                }
+                "getScreenTimeout" -> {
+                    val timeout = getScreenTimeout()
+                    result.success(timeout)
+                }
+                "isBatterySaverEnabled" -> {
+                    val enabled = isBatterySaverEnabled()
+                    result.success(enabled)
+                }
+                "getSyncStatus" -> {
+                    val status = getSyncStatus()
+                    result.success(status)
                 }
                 else -> {
                     result.notImplemented()
@@ -316,6 +359,131 @@ class MainActivity : FlutterActivity() {
         } catch (e: Exception) {
             android.util.Log.e("BatteryPal", "충전 전류만 가져오기 실패", e)
             return -1
+        }
+    }
+
+    // ========== 시스템 설정 읽기 메서드들 ==========
+
+    /// 화면 밝기 읽기 (0-100)
+    private fun getScreenBrightness(): Int {
+        return try {
+            val brightness = Settings.System.getInt(
+                contentResolver,
+                Settings.System.SCREEN_BRIGHTNESS
+            )
+            // Android의 밝기 값은 0-255 범위이므로 0-100으로 변환
+            val percentage = (brightness * 100) / 255
+            android.util.Log.d("BatteryPal", "화면 밝기: $percentage% (원본: $brightness)")
+            percentage
+        } catch (e: Exception) {
+            android.util.Log.e("BatteryPal", "화면 밝기 읽기 실패", e)
+            -1
+        }
+    }
+
+    /// 위치 서비스 상태 읽기
+    private fun getLocationServiceStatus(): String {
+        return try {
+            val locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+            val isGpsEnabled = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)
+            val isNetworkEnabled = locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
+            
+            val status = when {
+                isGpsEnabled && isNetworkEnabled -> "고정밀도"
+                isGpsEnabled -> "GPS만"
+                isNetworkEnabled -> "네트워크만"
+                else -> "꺼짐"
+            }
+            android.util.Log.d("BatteryPal", "위치 서비스 상태: $status")
+            status
+        } catch (e: Exception) {
+            android.util.Log.e("BatteryPal", "위치 서비스 상태 읽기 실패", e)
+            "알 수 없음"
+        }
+    }
+
+    /// 네트워크 연결 타입 읽기
+    private fun getNetworkConnectionType(): String {
+        return try {
+            val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            val network = connectivityManager.activeNetwork ?: return "없음"
+            val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return "없음"
+            
+            val type = when {
+                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "Wi-Fi"
+                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> {
+                    // 5G/4G/3G 구분 (Android 10+)
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                        val networkCapabilities = capabilities.getNetworkCapabilities(network)
+                        if (networkCapabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_NR) == true) {
+                            "5G"
+                        } else {
+                            "4G"
+                        }
+                    } else {
+                        "모바일 데이터"
+                    }
+                }
+                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> "이더넷"
+                else -> "없음"
+            }
+            android.util.Log.d("BatteryPal", "네트워크 연결 타입: $type")
+            type
+        } catch (e: Exception) {
+            android.util.Log.e("BatteryPal", "네트워크 연결 타입 읽기 실패", e)
+            "알 수 없음"
+        }
+    }
+
+    /// 화면 시간 초과 읽기 (초 단위)
+    private fun getScreenTimeout(): Int {
+        return try {
+            val timeout = Settings.System.getInt(
+                contentResolver,
+                Settings.System.SCREEN_OFF_TIMEOUT
+            )
+            // 밀리초를 초로 변환
+            val seconds = timeout / 1000
+            android.util.Log.d("BatteryPal", "화면 시간 초과: ${seconds}초 (원본: ${timeout}ms)")
+            seconds
+        } catch (e: Exception) {
+            android.util.Log.e("BatteryPal", "화면 시간 초과 읽기 실패", e)
+            -1
+        }
+    }
+
+    /// 배터리 세이버 모드 상태 읽기
+    private fun isBatterySaverEnabled(): Boolean {
+        return try {
+            val powerManager = getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+            val isEnabled = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+                powerManager.isPowerSaveMode
+            } else {
+                false
+            }
+            android.util.Log.d("BatteryPal", "배터리 세이버 모드: $isEnabled")
+            isEnabled
+        } catch (e: Exception) {
+            android.util.Log.e("BatteryPal", "배터리 세이버 모드 상태 읽기 실패", e)
+            false
+        }
+    }
+
+    /// 동기화 상태 읽기
+    private fun getSyncStatus(): String {
+        return try {
+            val isSyncEnabled = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+                ContentResolver.getMasterSyncAutomatically()
+            } else {
+                // API 21 미만에서는 기본값 반환
+                true
+            }
+            val status = if (isSyncEnabled) "자동 동기화 켜짐" else "자동 동기화 꺼짐"
+            android.util.Log.d("BatteryPal", "동기화 상태: $status")
+            status
+        } catch (e: Exception) {
+            android.util.Log.e("BatteryPal", "동기화 상태 읽기 실패", e)
+            "알 수 없음"
         }
     }
 }
