@@ -12,11 +12,13 @@ import '../../utils/app_utils.dart';
 class HomeTab extends StatefulWidget {
   final bool isProUser;
   final VoidCallback onProToggle;
+  final VoidCallback? onNavigateToOptimization;
 
   const HomeTab({
     super.key,
     required this.isProUser,
     required this.onProToggle,
+    this.onNavigateToOptimization,
   });
 
   @override
@@ -255,8 +257,8 @@ class _HomeTabState extends State<HomeTab> {
               child: SingleChildScrollView(
                 child: QuickActionsCard(
                   onBoost: _handleOptimization,
-                  onAnalysis: () {
-                    // 분석 탭으로 이동 (추후 구현)
+                  onAnalysis: widget.onNavigateToOptimization ?? () {
+                    // 기본 동작 (분석 탭으로 이동)
                     SnackBarUtils.showInfo(context, '분석 탭으로 이동합니다');
                   },
                   isProUser: widget.isProUser,

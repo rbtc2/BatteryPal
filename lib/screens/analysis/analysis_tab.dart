@@ -8,11 +8,13 @@ import '../../utils/dialog_utils.dart';
 class AnalysisTab extends StatefulWidget {
   final bool isProUser;
   final VoidCallback onProToggle;
+  final int initialTabIndex;
 
   const AnalysisTab({
     super.key,
     required this.isProUser,
     required this.onProToggle,
+    this.initialTabIndex = 0,
   });
 
   @override
@@ -25,7 +27,20 @@ class _AnalysisTabState extends State<AnalysisTab> with TickerProviderStateMixin
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(
+      length: 3,
+      vsync: this,
+      initialIndex: widget.initialTabIndex,
+    );
+  }
+
+  @override
+  void didUpdateWidget(AnalysisTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // initialTabIndex가 변경되면 TabController 업데이트
+    if (oldWidget.initialTabIndex != widget.initialTabIndex) {
+      _tabController.animateTo(widget.initialTabIndex);
+    }
   }
 
   @override

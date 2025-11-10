@@ -18,13 +18,32 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   // Pro 모드 상태 관리 (실제 결제 시스템과 연동 예정)
   // ignore: prefer_final_fields
   bool _isProUser = false;
+  
+  // 분석 탭의 초기 탭 인덱스 (최적화 탭으로 이동할 때 사용)
+  int _analysisTabInitialIndex = 0;
 
   // 3개 탭 페이지들 (Pro 상태 전달)
   List<Widget> get _pages => [
-    HomeTab(isProUser: _isProUser, onProToggle: _handleProUpgrade),
-    AnalysisTab(isProUser: _isProUser, onProToggle: _handleProUpgrade),
+    HomeTab(
+      isProUser: _isProUser,
+      onProToggle: _handleProUpgrade,
+      onNavigateToOptimization: navigateToAnalysisOptimization,
+    ),
+    AnalysisTab(
+      isProUser: _isProUser,
+      onProToggle: _handleProUpgrade,
+      initialTabIndex: _analysisTabInitialIndex,
+    ),
     SettingsTab(isProUser: _isProUser, onProToggle: _handleProUpgrade),
   ];
+  
+  /// 분석 탭의 최적화 탭으로 이동
+  void navigateToAnalysisOptimization() {
+    setState(() {
+      _analysisTabInitialIndex = 2; // 최적화 탭 인덱스
+      _currentIndex = 1; // 분석 탭으로 이동
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -35,6 +54,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         onTap: (index) {
           setState(() {
             _currentIndex = index;
+            // 분석 탭을 직접 선택할 때는 기본 탭(배터리 탭)으로 리셋
+            if (index == 1) {
+              _analysisTabInitialIndex = 0;
+            }
           });
         },
         type: BottomNavigationBarType.fixed,

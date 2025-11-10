@@ -41,9 +41,9 @@ class QuickActionsCard extends StatelessWidget {
             Expanded(
               child: _buildActionButton(
                 context,
-                icon: Icons.analytics,
-                title: '분석',
-                subtitle: '상세보기',
+                icon: Icons.tune,
+                title: '최적화 분석',
+                subtitle: '최적화 현황',
                 color: Colors.purple,
                 onTap: onAnalysis,
               ),
