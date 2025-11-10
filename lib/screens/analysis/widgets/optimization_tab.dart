@@ -573,7 +573,7 @@ class _AutoOptimizationCardState extends State<AutoOptimizationCard> {
           Switch(
             value: item.isEnabled,
             onChanged: (value) => _toggleItem(item),
-            activeColor: Colors.green[600],
+            activeThumbColor: Colors.green[600],
           ),
         ],
       ),

@@ -41,6 +41,10 @@ class _ChargingPatternsTabState extends State<ChargingPatternsTab>
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   
+  // Pull-to-Refresh를 위한 GlobalKey
+  final GlobalKey _chartKey = GlobalKey();
+  final GlobalKey _statsKey = GlobalKey();
+  
   @override
   void initState() {
     super.initState();
@@ -64,77 +68,119 @@ class _ChargingPatternsTabState extends State<ChargingPatternsTab>
     super.dispose();
   }
 
+  /// Pull-to-Refresh 콜백
+  /// 모든 데이터를 새로고침합니다.
+  Future<void> _onRefresh() async {
+    // 각 위젯의 State에 접근하여 refresh 메서드 호출 (동적 호출)
+    final chartState = _chartKey.currentState;
+    final statsState = _statsKey.currentState;
+    
+    final futures = <Future>[];
+    
+    // ChargingCurrentChart의 refresh 메서드 호출
+    if (chartState != null) {
+      try {
+        final refreshMethod = (chartState as dynamic).refresh;
+        if (refreshMethod != null && refreshMethod is Function) {
+          futures.add(refreshMethod());
+        }
+      } catch (e) {
+        debugPrint('ChargingCurrentChart refresh 호출 실패: $e');
+      }
+    }
+    
+    // ChargingStatsCard의 refresh 메서드 호출
+    if (statsState != null) {
+      try {
+        final refreshMethod = (statsState as dynamic).refresh;
+        if (refreshMethod != null && refreshMethod is Function) {
+          futures.add(refreshMethod());
+        }
+      } catch (e) {
+        debugPrint('ChargingStatsCard refresh 호출 실패: $e');
+      }
+    }
+    
+    await Future.wait(futures);
+  }
+
   @override
   Widget build(BuildContext context) {
     return FadeTransition(
       opacity: _fadeAnimation,
-      child: SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-            // 섹션 1: 인사이트 카드
-            SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(-1.0, 0.0),
-                end: Offset.zero,
-              ).animate(CurvedAnimation(
-                parent: _animationController,
-                curve: const Interval(0.0, 0.3, curve: Curves.easeOut),
-              )),
-              child: InsightCard(),
-            ),
-            
-            SizedBox(height: 16),
-            
-            // 섹션 2: 충전 전류 그래프 (메인)
-            SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(0.0, 1.0),
-                end: Offset.zero,
-              ).animate(CurvedAnimation(
-                parent: _animationController,
-                curve: const Interval(0.2, 0.6, curve: Curves.easeOut),
-              )),
-              child: ChargingCurrentChart(
-                isProUser: widget.isProUser,
-                onProUpgrade: widget.onProUpgrade,
+      child: RefreshIndicator(
+        onRefresh: _onRefresh,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              // 섹션 1: 인사이트 카드
+              SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(-1.0, 0.0),
+                  end: Offset.zero,
+                ).animate(CurvedAnimation(
+                  parent: _animationController,
+                  curve: const Interval(0.0, 0.3, curve: Curves.easeOut),
+                )),
+                child: InsightCard(),
               ),
-            ),
-            
-            SizedBox(height: 16),
-            
-            // 섹션 3: 통계 + 세션 기록
-            SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(1.0, 0.0),
-                end: Offset.zero,
-              ).animate(CurvedAnimation(
-                parent: _animationController,
-                curve: const Interval(0.4, 0.8, curve: Curves.easeOut),
-              )),
-              child: ChargingStatsCard(),
-            ),
-            
-            // Pro 사용자 전용 추가 섹션
-            if (widget.isProUser) ...[
+              
               SizedBox(height: 16),
+              
+              // 섹션 2: 충전 전류 그래프 (메인)
               SlideTransition(
                 position: Tween<Offset>(
                   begin: const Offset(0.0, 1.0),
                   end: Offset.zero,
                 ).animate(CurvedAnimation(
                   parent: _animationController,
-                  curve: const Interval(0.6, 1.0, curve: Curves.easeOut),
+                  curve: const Interval(0.2, 0.6, curve: Curves.easeOut),
                 )),
-                child: ProExclusiveSection(),
+                child: ChargingCurrentChart(
+                  key: _chartKey,
+                  isProUser: widget.isProUser,
+                  onProUpgrade: widget.onProUpgrade,
+                ),
               ),
-            ],
-            
-            // 하단 여백
-            SizedBox(height: 32),
+              
+              SizedBox(height: 16),
+              
+              // 섹션 3: 통계 + 세션 기록
+              SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(1.0, 0.0),
+                  end: Offset.zero,
+                ).animate(CurvedAnimation(
+                  parent: _animationController,
+                  curve: const Interval(0.4, 0.8, curve: Curves.easeOut),
+                )),
+                child: ChargingStatsCard(
+                  key: _statsKey,
+                ),
+              ),
+              
+              // Pro 사용자 전용 추가 섹션
+              if (widget.isProUser) ...[
+                SizedBox(height: 16),
+                SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0.0, 1.0),
+                    end: Offset.zero,
+                  ).animate(CurvedAnimation(
+                    parent: _animationController,
+                    curve: const Interval(0.6, 1.0, curve: Curves.easeOut),
+                  )),
+                  child: ProExclusiveSection(),
+                ),
               ],
-            ),
+              
+              // 하단 여백
+              SizedBox(height: 32),
+            ],
           ),
+        ),
+      ),
     );
   }
 

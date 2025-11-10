@@ -53,6 +53,12 @@ class _ChargingCurrentChartState extends State<ChargingCurrentChart> {
     });
   }
 
+  /// Pull-to-Refresh를 위한 public 메서드
+  /// 현재 선택된 날짜의 차트 데이터를 새로고침합니다.
+  Future<void> refresh() async {
+    await _loadChartData();
+  }
+
   Future<void> _loadChartData() async {
     setState(() {
       _isLoading = true;

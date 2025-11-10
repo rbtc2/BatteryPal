@@ -249,6 +249,12 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
     _refreshTimer = null;
   }
   
+  /// Pull-to-Refresh를 위한 public 메서드
+  /// 현재 선택된 날짜의 세션 데이터를 강제로 새로고침합니다.
+  Future<void> refresh() async {
+    await _loadSessionsByDate(_getCurrentDate(), forceRefresh: true);
+  }
+  
   void _calculateStats(List<ChargingSessionRecord> sessions) {
     if (sessions.isEmpty) {
       _avgCurrent = 0.0;
