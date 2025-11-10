@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/charging_session_models.dart';
 import '../services/charging_session_service.dart';
+import '../services/charging_session_storage.dart';
 import '../utils/time_slot_utils.dart';
 import 'charging_session_list_item.dart';
 import 'charging_session_detail_dialog.dart';
@@ -9,8 +10,8 @@ import 'charging_session_detail_dialog.dart';
 /// 섹션 3: 통계 + 세션 기록 카드
 /// 
 /// 실제 충전 세션 데이터를 표시하는 카드
-/// - 주간 통계 (평균 속도, 충전 횟수, 주 시간대)
-/// - 오늘의 충전 세션 목록
+/// - 날짜별 통계 (평균 속도, 충전 횟수, 주 시간대)
+/// - 날짜별 충전 세션 목록
 class ChargingStatsCard extends StatefulWidget {
   const ChargingStatsCard({super.key});
 
@@ -22,43 +23,53 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
   bool _isSessionsExpanded = false;
   
   final ChargingSessionService _sessionService = ChargingSessionService();
+  final ChargingSessionStorage _storageService = ChargingSessionStorage();
   StreamSubscription<List<ChargingSessionRecord>>? _sessionsSubscription;
   
-  List<ChargingSessionRecord> _todaySessions = [];
+  // 자동 새로고침 타이머
+  Timer? _refreshTimer;
+  
+  // 날짜 선택 관련 상태 변수
+  String _selectedTab = '오늘'; // '오늘', '어제', '2일 전', '선택'
+  DateTime? _selectedDate; // 수동 선택한 날짜
+  
+  // 현재 선택한 날짜의 세션 데이터
+  List<ChargingSessionRecord> _currentSessions = [];
   bool _isLoading = true;
   
-  // 통계 데이터
+  // 통계 데이터 (현재 선택한 날짜 기준)
   double _avgCurrent = 0.0;
   int _sessionCount = 0;
   String _mainTimeSlot = '-';
+  
+  // 성능 최적화: 날짜별 데이터 캐싱 (최근 7일만)
+  final Map<String, List<ChargingSessionRecord>> _dateCache = {};
+  static const int _maxCacheDays = 7;
   
   @override
   void initState() {
     super.initState();
     _initializeService();
+    // 자동 새로고침 시작 (오늘 탭일 때만)
+    _startAutoRefresh();
   }
   
   Future<void> _initializeService() async {
     try {
       // 서비스 초기화
       await _sessionService.initialize();
+      await _storageService.initialize();
       
-      // 초기 데이터 로드 (동기 버전으로 빠르게 표시)
-      final initialSessions = _sessionService.getTodaySessions();
-      if (mounted) {
-        setState(() {
-          _todaySessions = initialSessions;
-          _calculateStats(initialSessions);
-          _isLoading = false;
-        });
-      }
+      // 초기 데이터 로드 (오늘 날짜로 초기화)
+      _selectedDate = DateTime.now();
+      await _loadSessionsByDate(_getCurrentDate());
       
-      // 세션 스트림 구독
+      // 세션 스트림 구독 (오늘 탭일 때만 자동 업데이트)
       _sessionsSubscription = _sessionService.sessionsStream.listen(
         (sessions) {
-          if (mounted) {
+          if (mounted && _selectedTab == '오늘') {
             setState(() {
-              _todaySessions = sessions;
+              _currentSessions = sessions;
               _calculateStats(sessions);
               _isLoading = false;
             });
@@ -76,20 +87,6 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
         cancelOnError: false, // 에러 발생 시에도 스트림 유지
       );
       
-      // 비동기로 최신 데이터도 로드 (백그라운드)
-      _sessionService.getTodaySessionsAsync().then((latestSessions) {
-        if (mounted) {
-          setState(() {
-            _todaySessions = latestSessions;
-            _calculateStats(latestSessions);
-            _isLoading = false;
-          });
-        }
-      }).catchError((e) {
-        debugPrint('최신 세션 로드 실패: $e');
-        // 에러 발생해도 기존 데이터는 유지
-      });
-      
     } catch (e, stackTrace) {
       debugPrint('서비스 초기화 실패: $e');
       debugPrint('스택 트레이스: $stackTrace');
@@ -101,6 +98,157 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
     }
   }
   
+  /// 날짜별 세션 데이터 로드
+  Future<void> _loadSessionsByDate(DateTime date, {bool forceRefresh = false}) async {
+    if (!mounted) return;
+    
+    // 날짜를 날짜만으로 정규화 (시간 제거)
+    final normalizedDate = DateTime(date.year, date.month, date.day);
+    final dateKey = _getDateKey(normalizedDate);
+    
+    // 캐시 확인 (오늘이 아니고 강제 새로고침이 아닐 때만)
+    final today = DateTime.now();
+    final todayNormalized = DateTime(today.year, today.month, today.day);
+    final isToday = normalizedDate.isAtSameMomentAs(todayNormalized);
+    
+    if (!forceRefresh && !isToday && _dateCache.containsKey(dateKey)) {
+      // 캐시된 데이터 사용
+      final cachedSessions = _dateCache[dateKey]!;
+      if (mounted) {
+        setState(() {
+          _currentSessions = cachedSessions;
+          _calculateStats(cachedSessions);
+          _isLoading = false;
+        });
+      }
+      return;
+    }
+    
+    setState(() {
+      _isLoading = true;
+    });
+    
+    try {
+      List<ChargingSessionRecord> sessions = [];
+      
+      // 오늘 날짜인 경우 ChargingSessionService 사용 (실시간 업데이트)
+      if (isToday) {
+        // 동기 버전으로 빠르게 표시
+        sessions = _sessionService.getTodaySessions();
+        
+        // 먼저 동기 데이터로 UI 업데이트
+        if (mounted) {
+          setState(() {
+            _currentSessions = sessions;
+            _calculateStats(sessions);
+            _isLoading = false;
+          });
+        }
+        
+        // 비동기로 최신 데이터도 로드 (백그라운드)
+        _sessionService.getTodaySessionsAsync().then((latestSessions) {
+          if (mounted && _selectedTab == '오늘' && _getCurrentDate().isAtSameMomentAs(todayNormalized)) {
+            // 오늘 데이터는 캐시하지 않음 (항상 최신 데이터 필요)
+            // 날짜가 변경되지 않았을 때만 업데이트
+            setState(() {
+              _currentSessions = latestSessions;
+              _calculateStats(latestSessions);
+              _isLoading = false;
+            });
+          }
+        }).catchError((e) {
+          debugPrint('최신 세션 로드 실패: $e');
+          // 에러 발생해도 기존 데이터는 유지
+        });
+      } else {
+        // 오늘이 아닌 경우 ChargingSessionStorage에서 직접 조회
+        sessions = await _storageService.getSessionsByDate(normalizedDate);
+        
+        // 캐시에 저장 (최근 7일만)
+        _dateCache[dateKey] = sessions;
+        _cleanupOldCache();
+        
+        // UI 업데이트
+        if (mounted) {
+          setState(() {
+            _currentSessions = sessions;
+            _calculateStats(sessions);
+            _isLoading = false;
+          });
+        }
+      }
+      
+    } catch (e, stackTrace) {
+      debugPrint('날짜별 세션 로드 실패: $e');
+      debugPrint('스택 트레이스: $stackTrace');
+      if (mounted) {
+        setState(() {
+          _currentSessions = [];
+          _calculateStats([]);
+          _isLoading = false;
+        });
+      }
+    }
+  }
+  
+  /// 날짜 키 생성 (캐싱용)
+  String _getDateKey(DateTime date) {
+    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  }
+  
+  /// 오래된 캐시 정리 (7일 이전 데이터 제거)
+  void _cleanupOldCache() {
+    final now = DateTime.now();
+    final cutoffDate = now.subtract(Duration(days: _maxCacheDays));
+    final cutoffKey = _getDateKey(cutoffDate);
+    
+    final keysToRemove = <String>[];
+    for (final key in _dateCache.keys) {
+      if (key.compareTo(cutoffKey) < 0) {
+        keysToRemove.add(key);
+      }
+    }
+    
+    for (final key in keysToRemove) {
+      _dateCache.remove(key);
+    }
+    
+    if (keysToRemove.isNotEmpty) {
+      debugPrint('ChargingStatsCard: 오래된 캐시 ${keysToRemove.length}개 정리 완료');
+    }
+  }
+  
+  /// 자동 새로고침 시작
+  void _startAutoRefresh() {
+    _refreshTimer?.cancel();
+    
+    // 오늘 탭일 때만 자동 새로고침
+    if (_selectedTab == '오늘') {
+      _refreshTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+        if (!mounted) {
+          timer.cancel();
+          _refreshTimer = null;
+          return;
+        }
+        
+        // 오늘 탭일 때만 자동 새로고침 (수동 선택한 날짜는 자동 새로고침 안 함)
+        if (_selectedTab == '오늘') {
+          _loadSessionsByDate(_getCurrentDate(), forceRefresh: true);
+        } else {
+          // 탭이 변경되었으면 타이머 중지
+          timer.cancel();
+          _refreshTimer = null;
+        }
+      });
+    }
+  }
+  
+  /// 자동 새로고침 중지
+  void _stopAutoRefresh() {
+    _refreshTimer?.cancel();
+    _refreshTimer = null;
+  }
+  
   void _calculateStats(List<ChargingSessionRecord> sessions) {
     if (sessions.isEmpty) {
       _avgCurrent = 0.0;
@@ -109,19 +257,29 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
       return;
     }
     
-    // 평균 전류 계산
-    final totalCurrent = sessions.fold<double>(
-      0.0,
-      (sum, session) => sum + session.avgCurrent,
-    );
-    _avgCurrent = totalCurrent / sessions.length;
+    // 유효한 세션만 필터링 (null 체크)
+    final validSessions = sessions.where((s) => s.isValid).toList();
     
-    // 세션 개수
-    _sessionCount = sessions.length;
+    if (validSessions.isEmpty) {
+      _avgCurrent = 0.0;
+      _sessionCount = 0;
+      _mainTimeSlot = '-';
+      return;
+    }
+    
+    // 평균 전류 계산 (유효한 세션만)
+    final totalCurrent = validSessions.fold<double>(
+      0.0,
+      (sum, session) => sum + (session.avgCurrent.isFinite ? session.avgCurrent : 0.0),
+    );
+    _avgCurrent = totalCurrent > 0 ? (totalCurrent / validSessions.length) : 0.0;
+    
+    // 세션 개수 (유효한 세션만)
+    _sessionCount = validSessions.length;
     
     // 주 시간대 계산 (가장 많은 세션이 있는 시간대)
     final timeSlotCounts = <TimeSlot, int>{};
-    for (final session in sessions) {
+    for (final session in validSessions) {
       timeSlotCounts[session.timeSlot] = 
           (timeSlotCounts[session.timeSlot] ?? 0) + 1;
     }
@@ -138,7 +296,17 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
   
   @override
   void dispose() {
+    // 타이머 정리
+    _refreshTimer?.cancel();
+    _refreshTimer = null;
+    
+    // 스트림 구독 해제
     _sessionsSubscription?.cancel();
+    _sessionsSubscription = null;
+    
+    // 캐시 정리
+    _dateCache.clear();
+    
     // 주의: ChargingSessionService는 싱글톤이므로 여기서 dispose하지 않음
     // 서비스는 앱 전체에서 사용되므로 위젯이 dispose되어도 유지됨
     super.dispose();
@@ -165,7 +333,7 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
                 Text('📈', style: TextStyle(fontSize: 24)),
                 SizedBox(width: 12),
                 Text(
-                  '주간 충전 분석',
+                  '충전 분석',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -175,6 +343,47 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
               ],
             ),
           ),
+          
+          // 날짜 선택 영역
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                _buildTabButton(context, '오늘'),
+                SizedBox(width: 8),
+                _buildTabButton(context, '어제'),
+                SizedBox(width: 8),
+                _buildTabButton(context, '2일 전'),
+                Spacer(),
+                InkWell(
+                  onTap: _showDatePicker,
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.calendar_today, size: 14),
+                        SizedBox(width: 6),
+                        Text(
+                          _selectedDate != null
+                              ? '${_selectedDate!.year}.${_selectedDate!.month.toString().padLeft(2, '0')}.${_selectedDate!.day.toString().padLeft(2, '0')}'
+                              : DateTime.now().toString().split(' ')[0].replaceAll('-', '.'),
+                          style: TextStyle(fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          SizedBox(height: 16),
           
           // 통계 카드 3개 (가로 배치)
           Padding(
@@ -186,9 +395,9 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
                   child: _buildEnhancedStatCard(
                     context,
                     title: '평균속도',
-                    mainValue: _isLoading ? '...' : _avgCurrent.toStringAsFixed(0),
+                    mainValue: _isLoading ? '...' : (_avgCurrent > 0 ? _avgCurrent.toStringAsFixed(0) : '0'),
                     unit: 'mA',
-                    subValue: _getCurrentSpeedType(_avgCurrent),
+                    subValue: _avgCurrent > 0 ? _getCurrentSpeedType(_avgCurrent) : '데이터 없음',
                     trend: '', // 추후 주간 비교 데이터 추가 시 사용
                     trendColor: Colors.green,
                     icon: Icons.speed,
@@ -200,8 +409,8 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
                     context,
                     title: '충전횟수',
                     mainValue: _isLoading ? '...' : '$_sessionCount회',
-                    unit: '(오늘)',
-                    subValue: _sessionCount > 0 ? '일 평균 ${(_sessionCount / 1).toStringAsFixed(1)}회' : '없음',
+                    unit: _getDateUnitText(),
+                    subValue: _sessionCount > 0 ? '${_getDateDisplayText()} 기준' : '없음',
                     trend: '', // 추후 주간 비교 데이터 추가 시 사용
                     trendColor: Colors.blue,
                     icon: Icons.battery_charging_full,
@@ -253,7 +462,7 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '충전 세션 기록 (오늘) ${_isSessionsExpanded ? '' : '보기'}',
+                      '충전 세션 기록 (${_getDateDisplayText()}) ${_isSessionsExpanded ? '' : '보기'}',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -269,7 +478,7 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        '${_todaySessions.length}건',
+                        '${_currentSessions.length}건',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
@@ -288,14 +497,28 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
               Padding(
                 padding: const EdgeInsets.all(32),
                 child: Center(
-                  child: CircularProgressIndicator(),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(),
+                      SizedBox(height: 16),
+                      Text(
+                        '${_getDateDisplayText()} 데이터 로딩 중...',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               )
-            else if (_todaySessions.isEmpty)
+            else if (_currentSessions.isEmpty)
               Padding(
                 padding: const EdgeInsets.all(32),
                 child: Center(
                   child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
                         Icons.battery_charging_full,
@@ -304,11 +527,22 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
                       ),
                       SizedBox(height: 16),
                       Text(
-                        '오늘 충전 세션이 없습니다',
+                        '${_getDateDisplayText()} 충전 세션이 없습니다',
                         style: TextStyle(
                           fontSize: 14,
+                          fontWeight: FontWeight.w500,
                           color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                         ),
+                        textAlign: TextAlign.center,
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        '해당 날짜에 기록된 충전 세션이 없습니다',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                        ),
+                        textAlign: TextAlign.center,
                       ),
                     ],
                   ),
@@ -316,17 +550,46 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
               )
             else
               Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: Column(
-                  children: _todaySessions.map((session) {
-                    return ChargingSessionListItem(
-                      session: session,
-                      onTap: () {
-                        // 세션 상세 정보 다이얼로그 표시
-                        ChargingSessionDetailDialog.show(context, session);
-                      },
-                    );
-                  }).toList(),
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 날짜 헤더 (선택 사항)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.calendar_today,
+                            size: 16,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                          SizedBox(width: 6),
+                          Text(
+                            '${_getDateDisplayText()} - ${_currentSessions.length}개 세션',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // 세션 목록
+                    ..._currentSessions.map((session) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: ChargingSessionListItem(
+                          session: session,
+                          onTap: () {
+                            // 세션 상세 정보 다이얼로그 표시
+                            ChargingSessionDetailDialog.show(context, session);
+                          },
+                        ),
+                      );
+                    }).toList(),
+                  ],
                 ),
               ),
           ],
@@ -501,10 +764,10 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
   
   /// 주 시간대 TimeSlot 반환
   TimeSlot _getMainTimeSlot() {
-    if (_todaySessions.isEmpty) return TimeSlot.morning;
+    if (_currentSessions.isEmpty) return TimeSlot.morning;
     
     final timeSlotCounts = <TimeSlot, int>{};
-    for (final session in _todaySessions) {
+    for (final session in _currentSessions) {
       timeSlotCounts[session.timeSlot] = 
           (timeSlotCounts[session.timeSlot] ?? 0) + 1;
     }
@@ -516,6 +779,190 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
     }
     
     return TimeSlot.morning;
+  }
+  
+  /// 현재 선택한 날짜 가져오기
+  DateTime _getCurrentDate() {
+    switch (_selectedTab) {
+      case '어제':
+        return DateTime.now().subtract(const Duration(days: 1));
+      case '2일 전':
+        return DateTime.now().subtract(const Duration(days: 2));
+      case '선택':
+        return _selectedDate ?? DateTime.now();
+      case '오늘':
+      default:
+        return DateTime.now();
+    }
+  }
+  
+  /// 선택한 날짜의 표시 텍스트 가져오기
+  String _getDateDisplayText() {
+    switch (_selectedTab) {
+      case '오늘':
+        return '오늘';
+      case '어제':
+        return '어제';
+      case '2일 전':
+        return '2일 전';
+      case '선택':
+        if (_selectedDate != null) {
+          return '${_selectedDate!.year}.${_selectedDate!.month.toString().padLeft(2, '0')}.${_selectedDate!.day.toString().padLeft(2, '0')}';
+        }
+        return '선택';
+      default:
+        return '오늘';
+    }
+  }
+  
+  /// 통계 카드의 날짜 단위 텍스트 가져오기
+  String _getDateUnitText() {
+    switch (_selectedTab) {
+      case '오늘':
+        return '(오늘)';
+      case '어제':
+        return '(어제)';
+      case '2일 전':
+        return '(2일 전)';
+      case '선택':
+        if (_selectedDate != null) {
+          return '(${_selectedDate!.month.toString().padLeft(2, '0')}.${_selectedDate!.day.toString().padLeft(2, '0')})';
+        }
+        return '(선택)';
+      default:
+        return '(오늘)';
+    }
+  }
+  
+  /// 탭 버튼 빌드 (ChargingCurrentChart와 동일한 스타일)
+  Widget _buildTabButton(BuildContext context, String label) {
+    final isSelected = _selectedTab == label;
+    return InkWell(
+      onTap: () {
+        if (!mounted) return;
+        
+        setState(() {
+          _selectedTab = label;
+          // 탭 변경 시 날짜 업데이트
+          if (label != '선택') {
+            switch (label) {
+              case '어제':
+                _selectedDate = DateTime.now().subtract(const Duration(days: 1));
+                break;
+              case '2일 전':
+                _selectedDate = DateTime.now().subtract(const Duration(days: 2));
+                break;
+              case '오늘':
+              default:
+                _selectedDate = DateTime.now();
+                break;
+            }
+          }
+        });
+        // 날짜별 데이터 로드
+        _loadSessionsByDate(_getCurrentDate());
+        // 자동 새로고침 재시작 (오늘 탭일 때만)
+        _startAutoRefresh();
+      },
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected 
+              ? Theme.of(context).colorScheme.primaryContainer
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isSelected
+                ? Theme.of(context).colorScheme.primary
+                : Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            color: isSelected
+                ? Theme.of(context).colorScheme.primary
+                : Theme.of(context).colorScheme.onSurface,
+          ),
+        ),
+      ),
+    );
+  }
+  
+  /// 날짜 선택 다이얼로그 표시
+  /// 오늘로부터 7일 전까지의 날짜만 선택 가능
+  Future<void> _showDatePicker() async {
+    if (!mounted) return;
+    
+    final now = DateTime.now();
+    // 날짜만 비교하기 위해 시간 제거
+    final today = DateTime(now.year, now.month, now.day);
+    final firstDate = today.subtract(const Duration(days: 7)); // 7일 전
+    final lastDate = today; // 오늘
+    
+    // 초기 날짜 설정 (선택된 날짜가 없으면 오늘)
+    final initialDate = _selectedDate ?? today;
+    
+    // 날짜가 범위를 벗어나면 today로 설정
+    final safeInitialDate = initialDate.isBefore(firstDate) || initialDate.isAfter(lastDate)
+        ? today
+        : initialDate;
+    
+    final selectedDate = await showDatePicker(
+      context: context,
+      initialDate: safeInitialDate,
+      firstDate: firstDate,
+      lastDate: lastDate,
+      helpText: '날짜 선택 (최근 7일)',
+      cancelText: '취소',
+      confirmText: '확인',
+      selectableDayPredicate: (date) {
+        // 선택 가능한 날짜 범위 체크 (7일 전 ~ 오늘)
+        final dateOnly = DateTime(date.year, date.month, date.day);
+        final daysDiff = today.difference(dateOnly).inDays;
+        return daysDiff >= 0 && daysDiff <= 7;
+      },
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: Theme.of(context).colorScheme.primary,
+              onPrimary: Theme.of(context).colorScheme.onPrimary,
+              surface: Theme.of(context).colorScheme.surface,
+              onSurface: Theme.of(context).colorScheme.onSurface,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    
+    if (!mounted) return;
+    
+    if (selectedDate != null) {
+      // 날짜만 사용 (시간 제거)
+      final selectedDateOnly = DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
+      
+      // 선택한 날짜가 범위를 벗어나지 않는지 확인
+      final daysDiff = today.difference(selectedDateOnly).inDays;
+      if (daysDiff < 0 || daysDiff > 7) {
+        debugPrint('ChargingStatsCard: 선택한 날짜가 범위를 벗어남 - $selectedDateOnly');
+        return;
+      }
+      
+      setState(() {
+        _selectedDate = selectedDateOnly;
+        _selectedTab = '선택'; // 탭을 '선택'으로 변경하여 수동 선택임을 표시
+      });
+      
+      // 날짜별 데이터 로드
+      _loadSessionsByDate(selectedDateOnly);
+      // 수동 선택한 날짜는 자동 새로고침 중지
+      _stopAutoRefresh();
+    }
   }
 
   // 기존 _buildEnhancedSessionItem 메서드는 제거됨 (ChargingSessionListItem 사용)
