@@ -588,7 +588,7 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
                           },
                         ),
                       );
-                    }).toList(),
+                    }),
                   ],
                 ),
               ),
