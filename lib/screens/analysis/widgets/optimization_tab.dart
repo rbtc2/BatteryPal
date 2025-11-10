@@ -606,7 +606,7 @@ class _AutoOptimizationCardState extends State<AutoOptimizationCard> {
         currentStatus: '현재 실행 중: 15개 앱',
         effect: '+25분',
         icon: Icons.apps,
-        isEnabled: true,
+        isEnabled: false,
         isAutomatic: true,
       ),
       OptimizationItem(
@@ -615,7 +615,7 @@ class _AutoOptimizationCardState extends State<AutoOptimizationCard> {
         currentStatus: '사용 가능: 1.2GB / 4GB',
         effect: '+15분',
         icon: Icons.memory,
-        isEnabled: true,
+        isEnabled: false,
         isAutomatic: true,
       ),
       OptimizationItem(
@@ -633,7 +633,7 @@ class _AutoOptimizationCardState extends State<AutoOptimizationCard> {
         currentStatus: '실행 중: 8개 서비스',
         effect: '+20분',
         icon: Icons.settings_power,
-        isEnabled: true,
+        isEnabled: false,
         isAutomatic: true,
       ),
       OptimizationItem(
