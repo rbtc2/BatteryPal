@@ -672,5 +672,21 @@ class ChargingSessionStorage {
   List<String> getStoredDateKeys() {
     return List.unmodifiable(_dailySessions.keys);
   }
+
+  /// 저장소 상태 검증 (디버깅 및 통합 테스트용)
+  Map<String, dynamic> getStorageStatus() {
+    final todayKey = _getDateKey(DateTime.now());
+    return {
+      'isInitialized': _isInitialized,
+      'isDisposed': _isDisposed,
+      'storedDateCount': _dailySessions.length,
+      'storedDateKeys': List.unmodifiable(_dailySessions.keys),
+      'todaySessionCount': _dailySessions[todayKey]?.length ?? 0,
+      'totalSessionsInMemory': _dailySessions.values.fold<int>(
+        0,
+        (sum, sessions) => sum + sessions.length,
+      ),
+    };
+  }
 }
 

@@ -139,6 +139,8 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
   @override
   void dispose() {
     _sessionsSubscription?.cancel();
+    // 주의: ChargingSessionService는 싱글톤이므로 여기서 dispose하지 않음
+    // 서비스는 앱 전체에서 사용되므로 위젯이 dispose되어도 유지됨
     super.dispose();
   }
   

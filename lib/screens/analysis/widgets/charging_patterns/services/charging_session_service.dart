@@ -820,15 +820,32 @@ class ChargingSessionService {
   }
   
   // ==================== 유틸리티 ====================
-  
+
   /// 초기화 상태 확인
   bool get isInitialized => _isInitialized;
-  
+
   /// 현재 세션 상태 확인
   SessionState get sessionState => _sessionState;
-  
+
   /// 세션 진행 중인지 확인
   bool get isSessionActive => _sessionState == SessionState.active;
+
+  /// 서비스 상태 검증 (디버깅 및 통합 테스트용)
+  Map<String, dynamic> getServiceStatus() {
+    return {
+      'isInitialized': _isInitialized,
+      'isDisposed': _isDisposed,
+      'sessionState': _sessionState.name,
+      'isSessionActive': _sessionState == SessionState.active,
+      'hasCurrentSession': _currentSession != null,
+      'collectedDataPoints': _collectedDataPoints.length,
+      'speedChanges': _speedChanges.length,
+      'hasDataCollectionTimer': _dataCollectionTimer != null,
+      'hasEndWaitTimer': _endWaitTimer != null,
+      'lastSavedDateKey': _lastSavedDateKey,
+      'wasCharging': _wasCharging,
+    };
+  }
 }
 
 // ==================== 내부 데이터 클래스 ====================
