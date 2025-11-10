@@ -263,8 +263,9 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
       return;
     }
     
-    // 유효한 세션만 필터링 (null 체크)
-    final validSessions = sessions.where((s) => s.isValid).toList();
+    // 유효한 세션만 필터링 (5분 이상 충전된 세션만 포함)
+    // validate() 메서드를 호출하여 실제로 5분 이상인 세션만 필터링
+    final validSessions = sessions.where((s) => s.validate()).toList();
     
     if (validSessions.isEmpty) {
       _avgCurrent = 0.0;
@@ -484,7 +485,7 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        '${_currentSessions.length}건',
+                        '${_currentSessions.where((s) => s.validate()).length}건',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
@@ -572,7 +573,7 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
                           ),
                           SizedBox(width: 6),
                           Text(
-                            '${_getDateDisplayText()} - ${_currentSessions.length}개 세션',
+                            '${_getDateDisplayText()} - ${_currentSessions.where((s) => s.validate()).length}개 세션',
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
@@ -582,8 +583,8 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
                         ],
                       ),
                     ),
-                    // 세션 목록
-                    ..._currentSessions.map((session) {
+                    // 세션 목록 (5분 이상인 세션만 표시)
+                    ..._currentSessions.where((s) => s.validate()).map((session) {
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 8),
                         child: ChargingSessionListItem(
@@ -770,10 +771,11 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
   
   /// 주 시간대 TimeSlot 반환
   TimeSlot _getMainTimeSlot() {
-    if (_currentSessions.isEmpty) return TimeSlot.morning;
+    final validSessions = _currentSessions.where((s) => s.validate()).toList();
+    if (validSessions.isEmpty) return TimeSlot.morning;
     
     final timeSlotCounts = <TimeSlot, int>{};
-    for (final session in _currentSessions) {
+    for (final session in validSessions) {
       timeSlotCounts[session.timeSlot] = 
           (timeSlotCounts[session.timeSlot] ?? 0) + 1;
     }
