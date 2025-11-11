@@ -186,8 +186,8 @@ class ChargingSessionRecord {
       return false;
     }
     
-    // 2. 최소 충전 시간 검증 (5분)
-    if (duration.inMinutes < 5) {
+    // 2. 최소 충전 시간 검증 (3분)
+    if (duration.inMinutes < 3) {
       return false;
     }
     
