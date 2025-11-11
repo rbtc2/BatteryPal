@@ -60,7 +60,7 @@ class SystemSettingsService {
     try {
       debugPrint('시스템 설정: 화면 시간 초과 읽기 요청');
       final int timeout = await _channel.invokeMethod('getScreenTimeout');
-      debugPrint('시스템 설정: 화면 시간 초과 = ${timeout}초');
+      debugPrint('시스템 설정: 화면 시간 초과 = $timeout초');
       return timeout;
     } catch (e) {
       debugPrint('화면 시간 초과 읽기 실패: $e');
@@ -95,6 +95,40 @@ class SystemSettingsService {
     } catch (e) {
       debugPrint('동기화 상태 읽기 실패: $e');
       return null;
+    }
+  }
+
+  /// 화면 밝기 설정 (0-100)
+  /// 
+  /// [brightness] 0-100 범위의 밝기 값
+  /// Returns 설정 성공 여부
+  Future<bool> setScreenBrightness(int brightness) async {
+    try {
+      debugPrint('시스템 설정: 화면 밝기 설정 요청 - $brightness%');
+      final bool success = await _channel.invokeMethod(
+        'setScreenBrightness',
+        {'brightness': brightness},
+      );
+      debugPrint('시스템 설정: 화면 밝기 설정 결과 = $success');
+      return success;
+    } catch (e) {
+      debugPrint('화면 밝기 설정 실패: $e');
+      return false;
+    }
+  }
+
+  /// 시스템 설정 변경 권한 확인
+  /// 
+  /// Returns 권한이 있는지 여부
+  Future<bool> canWriteSettings() async {
+    try {
+      debugPrint('시스템 설정: 권한 확인 요청');
+      final bool canWrite = await _channel.invokeMethod('canWriteSettings');
+      debugPrint('시스템 설정: 권한 확인 결과 = $canWrite');
+      return canWrite;
+    } catch (e) {
+      debugPrint('권한 확인 실패: $e');
+      return false;
     }
   }
 }

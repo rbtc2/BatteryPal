@@ -91,6 +91,19 @@ class MainActivity : FlutterActivity() {
                     val status = getSyncStatus()
                     result.success(status)
                 }
+                "setScreenBrightness" -> {
+                    val brightness = call.argument<Int>("brightness")
+                    if (brightness != null) {
+                        val success = setScreenBrightness(brightness)
+                        result.success(success)
+                    } else {
+                        result.error("INVALID_ARGUMENT", "Brightness value is required", null)
+                    }
+                }
+                "canWriteSettings" -> {
+                    val canWrite = canWriteSettings()
+                    result.success(canWrite)
+                }
                 else -> {
                     result.notImplemented()
                 }
@@ -485,6 +498,52 @@ class MainActivity : FlutterActivity() {
         } catch (e: Exception) {
             android.util.Log.e("BatteryPal", "동기화 상태 읽기 실패", e)
             "알 수 없음"
+        }
+    }
+
+    /// 화면 밝기 설정 (0-100)
+    /// 
+    /// [brightness] 0-100 범위의 밝기 값
+    /// Returns 설정 성공 여부
+    private fun setScreenBrightness(brightness: Int): Boolean {
+        return try {
+            // 권한 확인
+            if (!canWriteSettings()) {
+                android.util.Log.w("BatteryPal", "화면 밝기 설정 권한이 없습니다")
+                return false
+            }
+
+            // 0-100을 0-255로 변환
+            val systemBrightness = (brightness * 255 / 100).coerceIn(0, 255)
+            
+            Settings.System.putInt(
+                contentResolver,
+                Settings.System.SCREEN_BRIGHTNESS,
+                systemBrightness
+            )
+            
+            android.util.Log.d("BatteryPal", "화면 밝기 설정: $brightness% (시스템 값: $systemBrightness)")
+            true
+        } catch (e: Exception) {
+            android.util.Log.e("BatteryPal", "화면 밝기 설정 실패", e)
+            false
+        }
+    }
+
+    /// 시스템 설정 변경 권한 확인
+    /// 
+    /// Returns 권한이 있는지 여부
+    private fun canWriteSettings(): Boolean {
+        return try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                Settings.System.canWrite(this)
+            } else {
+                // API 23 미만에서는 기본적으로 권한이 있음
+                true
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("BatteryPal", "권한 확인 실패", e)
+            false
         }
     }
 }

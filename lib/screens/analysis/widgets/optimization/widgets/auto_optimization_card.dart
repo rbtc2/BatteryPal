@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../models/optimization_models.dart';
 import '../../../../../widgets/common/common_widgets.dart';
+import '../../../../../services/settings_service.dart';
+import '../../../../../services/system_settings_service.dart';
+import '../../../../../services/permission_helper.dart';
 
 /// 섹션 2: 자동 최적화 설정
 /// 원클릭 최적화 버튼을 눌렀을 때 실행될 항목을 선택하는 토글만 제공
@@ -13,11 +16,23 @@ class AutoOptimizationCard extends StatefulWidget {
 
 class _AutoOptimizationCardState extends State<AutoOptimizationCard> {
   late List<OptimizationItem> _autoItems;
+  final SettingsService _settingsService = SettingsService();
 
   @override
   void initState() {
     super.initState();
     _autoItems = _getAutoOptimizationItems();
+    _loadSettings();
+  }
+
+  /// 설정에서 화면 밝기 자동 조절 상태 로드
+  void _loadSettings() {
+    final autoBrightnessEnabled = _settingsService.appSettings.autoBrightnessEnabled;
+    final brightnessItem = _autoItems.firstWhere(
+      (item) => item.id == 'brightness_auto',
+      orElse: () => _autoItems.first,
+    );
+    brightnessItem.isEnabled = autoBrightnessEnabled;
   }
 
   @override
@@ -118,22 +133,57 @@ class _AutoOptimizationCardState extends State<AutoOptimizationCard> {
     );
   }
 
-  void _toggleItem(OptimizationItem item) {
+  Future<void> _toggleItem(OptimizationItem item) async {
+    // 화면 밝기 자동 조절 토글인 경우 권한 확인
+    if (item.id == 'brightness_auto' && !item.isEnabled) {
+      // 토글을 켜려고 할 때 권한 확인
+      final systemSettingsService = SystemSettingsService();
+      final hasPermission = await systemSettingsService.canWriteSettings();
+      
+      if (!hasPermission) {
+        // 권한이 없으면 권한 요청 다이얼로그 표시
+        // mounted 체크 후 context 사용
+        if (!mounted) return;
+        final granted = await PermissionHelper.requestWriteSettingsPermission(context);
+        
+        if (!granted) {
+          // 권한이 아직 없으면 토글을 켜지 않음
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('화면 밝기 조절 권한이 필요합니다. 시스템 설정에서 권한을 허용해주세요.'),
+                duration: Duration(seconds: 2),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+          return;
+        }
+      }
+    }
+    
     setState(() {
       item.isEnabled = !item.isEnabled;
     });
     
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          item.isEnabled 
-              ? '자동 최적화에서 ${item.title} 포함' 
-              : '자동 최적화에서 ${item.title} 제외',
+    // 화면 밝기 자동 조절 설정 저장
+    if (item.id == 'brightness_auto') {
+      _settingsService.updateAutoBrightness(item.isEnabled);
+    }
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            item.isEnabled 
+                ? '자동 최적화에서 ${item.title} 포함' 
+                : '자동 최적화에서 ${item.title} 제외',
+          ),
+          duration: const Duration(seconds: 1),
+          behavior: SnackBarBehavior.floating,
         ),
-        duration: const Duration(seconds: 1),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+      );
+    }
   }
 
   List<OptimizationItem> _getAutoOptimizationItems() {

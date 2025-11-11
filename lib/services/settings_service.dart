@@ -27,6 +27,7 @@ class SettingsService extends ChangeNotifier {
     batteryThreshold: 20.0,
     smartChargingEnabled: false,
     backgroundAppRestriction: false,
+    autoBrightnessEnabled: false,
     chargingCompleteNotificationEnabled: false,
     
     // 충전 완료 알림 설정 기본값
@@ -79,6 +80,7 @@ class SettingsService extends ChangeNotifier {
       await prefs.setDouble('batteryThreshold', settingsJson['batteryThreshold'] as double);
       await prefs.setBool('smartChargingEnabled', settingsJson['smartChargingEnabled'] as bool);
       await prefs.setBool('backgroundAppRestriction', settingsJson['backgroundAppRestriction'] as bool);
+      await prefs.setBool('autoBrightnessEnabled', settingsJson['autoBrightnessEnabled'] as bool);
       await prefs.setBool('chargingCompleteNotificationEnabled', settingsJson['chargingCompleteNotificationEnabled'] as bool);
       
       // 충전 완료 알림 설정
@@ -123,6 +125,7 @@ class SettingsService extends ChangeNotifier {
         batteryThreshold: prefs.getDouble('batteryThreshold') ?? 20.0,
         smartChargingEnabled: prefs.getBool('smartChargingEnabled') ?? false,
         backgroundAppRestriction: prefs.getBool('backgroundAppRestriction') ?? false,
+        autoBrightnessEnabled: prefs.getBool('autoBrightnessEnabled') ?? false,
         chargingCompleteNotificationEnabled: prefs.getBool('chargingCompleteNotificationEnabled') ?? false,
         
         // 충전 완료 알림 설정
@@ -201,6 +204,16 @@ class SettingsService extends ChangeNotifier {
   void updateBackgroundAppRestriction(bool enabled) {
     _appSettings = _appSettings.copyWith(
       backgroundAppRestriction: enabled,
+      lastUpdated: DateTime.now(),
+    );
+    notifyListeners();
+    _autoSave();
+  }
+
+  /// 화면 밝기 자동 조절 설정 변경
+  void updateAutoBrightness(bool enabled) {
+    _appSettings = _appSettings.copyWith(
+      autoBrightnessEnabled: enabled,
       lastUpdated: DateTime.now(),
     );
     notifyListeners();
@@ -429,6 +442,7 @@ class SettingsService extends ChangeNotifier {
       batteryThreshold: 20.0,
       smartChargingEnabled: false,
       backgroundAppRestriction: false,
+      autoBrightnessEnabled: false,
       chargingCompleteNotificationEnabled: false,
       
       // 충전 완료 알림 설정 기본값

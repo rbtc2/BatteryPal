@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../services/home_lifecycle_manager.dart';
 import '../../services/settings_service.dart';
+import '../../services/system_settings_service.dart';
+import '../../services/permission_helper.dart';
 import '../../models/app_models.dart';
 import '../../widgets/home/battery_status_card.dart';
 import '../../widgets/home/quick_actions_card.dart';
@@ -274,8 +276,38 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   /// 배터리 최적화 처리
-  void _handleOptimization() {
+  Future<void> _handleOptimization() async {
+    // 화면 밝기 자동 조절이 활성화되어 있는지 확인
+    final autoBrightnessEnabled = _settingsService.appSettings.autoBrightnessEnabled;
+    
+    if (autoBrightnessEnabled) {
+      // 화면 밝기 자동 조절이 활성화되어 있으면 권한 확인
+      final systemSettingsService = SystemSettingsService();
+      final hasPermission = await systemSettingsService.canWriteSettings();
+      
+      if (!hasPermission) {
+        // 권한이 없으면 권한 요청 다이얼로그 표시
+        // mounted 체크 후 context 사용
+        if (!mounted) return;
+        final granted = await PermissionHelper.requestWriteSettingsPermission(context);
+        
+        if (!granted) {
+          // 권한이 아직 없으면 최적화를 계속 진행하지 않고 종료
+          if (mounted) {
+            SnackBarUtils.showInfo(
+              context,
+              '화면 밝기 조절 권한이 필요합니다. 시스템 설정에서 권한을 허용해주세요.',
+            );
+          }
+          return;
+        }
+      }
+    }
+    
+    // 권한이 있거나 화면 밝기 자동 조절이 비활성화되어 있으면 최적화 진행
     // Phase 5에서 실제 최적화 기능 구현 예정
-    SnackBarUtils.showSuccess(context, '배터리 최적화가 완료되었습니다!');
+    if (mounted) {
+      SnackBarUtils.showSuccess(context, '배터리 최적화가 완료되었습니다!');
+    }
   }
 }

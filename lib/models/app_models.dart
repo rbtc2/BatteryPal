@@ -425,6 +425,7 @@ class AppSettings {
   final double batteryThreshold;
   final bool smartChargingEnabled;
   final bool backgroundAppRestriction;
+  final bool autoBrightnessEnabled; // 화면 밝기 자동 조절 활성화
   final bool chargingCompleteNotificationEnabled; // 충전 완료 알림 활성화
   
   // 충전 완료 알림 설정
@@ -458,6 +459,7 @@ class AppSettings {
     this.batteryThreshold = 20.0,
     this.smartChargingEnabled = false,
     this.backgroundAppRestriction = false,
+    this.autoBrightnessEnabled = false, // 기본값: false
     this.chargingCompleteNotificationEnabled = false, // 기본값: false (Pro 기능)
     
     // 충전 완료 알림 설정 기본값
@@ -497,6 +499,7 @@ class AppSettings {
       'batteryThreshold': batteryThreshold,
       'smartChargingEnabled': smartChargingEnabled,
       'backgroundAppRestriction': backgroundAppRestriction,
+      'autoBrightnessEnabled': autoBrightnessEnabled,
       'chargingCompleteNotificationEnabled': chargingCompleteNotificationEnabled,
       
       // 충전 완료 알림 설정
@@ -534,6 +537,7 @@ class AppSettings {
       batteryThreshold: json['batteryThreshold']?.toDouble() ?? 20.0,
       smartChargingEnabled: json['smartChargingEnabled'] ?? false,
       backgroundAppRestriction: json['backgroundAppRestriction'] ?? false,
+      autoBrightnessEnabled: json['autoBrightnessEnabled'] ?? false,
       chargingCompleteNotificationEnabled: json['chargingCompleteNotificationEnabled'] ?? false,
       
       // 충전 완료 알림 설정
@@ -575,6 +579,7 @@ class AppSettings {
     double? batteryThreshold,
     bool? smartChargingEnabled,
     bool? backgroundAppRestriction,
+    bool? autoBrightnessEnabled,
     bool? chargingCompleteNotificationEnabled,
     
     // 충전 완료 알림 설정
@@ -608,6 +613,7 @@ class AppSettings {
       batteryThreshold: batteryThreshold ?? this.batteryThreshold,
       smartChargingEnabled: smartChargingEnabled ?? this.smartChargingEnabled,
       backgroundAppRestriction: backgroundAppRestriction ?? this.backgroundAppRestriction,
+      autoBrightnessEnabled: autoBrightnessEnabled ?? this.autoBrightnessEnabled,
       chargingCompleteNotificationEnabled: chargingCompleteNotificationEnabled ?? this.chargingCompleteNotificationEnabled,
       
       // 충전 완료 알림 설정
@@ -651,6 +657,7 @@ class AppSettings {
         other.batteryThreshold == batteryThreshold &&
         other.smartChargingEnabled == smartChargingEnabled &&
         other.backgroundAppRestriction == backgroundAppRestriction &&
+        other.autoBrightnessEnabled == autoBrightnessEnabled &&
         other.chargingCompleteNotificationEnabled == chargingCompleteNotificationEnabled &&
         other.batteryDisplayCycleSpeed == batteryDisplayCycleSpeed &&
         other.showChargingCurrent == showChargingCurrent &&
