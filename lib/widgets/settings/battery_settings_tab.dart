@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../../services/settings_service.dart';
 import '../../widgets/settings/settings_widgets.dart';
 import '../../widgets/common/common_widgets.dart';
-import '../../utils/dialog_utils.dart';
 
 /// 배터리 설정 탭 위젯
 class BatterySettingsTab extends StatelessWidget {
@@ -26,30 +25,6 @@ class BatterySettingsTab extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           child: Column(
             children: [
-              // 절전 모드 설정
-              _buildBatterySettingsCard(
-                context,
-                '절전 모드',
-                Icons.power_settings_new,
-                '배터리 수명을 연장하기 위한 절전 모드',
-                [
-                  SettingsSwitchItem(
-                    title: '절전 모드 활성화',
-                    subtitle: '화면 밝기 감소, 백그라운드 앱 제한',
-                    value: settingsService.appSettings.powerSaveModeEnabled,
-                    onChanged: settingsService.updatePowerSaveMode,
-                  ),
-                  SettingsSwitchItem(
-                    title: '백그라운드 앱 제한',
-                    subtitle: '사용하지 않는 앱의 백그라운드 활동 제한',
-                    value: settingsService.appSettings.backgroundAppRestriction,
-                    onChanged: settingsService.updateBackgroundAppRestriction,
-                  ),
-                ],
-              ),
-              
-              const SizedBox(height: 16),
-              
               // 배터리 알림 설정 (Pro 기능)
               _buildBatterySettingsCard(
                 context,
@@ -78,60 +53,6 @@ class BatterySettingsTab extends StatelessWidget {
                 ],
                 isProFeature: true,
                 isProUser: isProUser,
-              ),
-              
-              const SizedBox(height: 16),
-              
-              // 자동 최적화 설정
-              _buildBatterySettingsCard(
-                context,
-                '자동 최적화',
-                Icons.auto_fix_high,
-                '자동으로 배터리를 최적화하는 기능',
-                [
-                  SettingsSwitchItem(
-                    title: '자동 최적화 활성화',
-                    subtitle: '배터리 사용량이 높은 앱 자동 제한',
-                    value: settingsService.appSettings.autoOptimizationEnabled,
-                    onChanged: settingsService.updateAutoOptimization,
-                  ),
-                  SettingsSwitchItem(
-                    title: '스마트 충전',
-                    subtitle: '배터리 건강도를 고려한 충전 관리',
-                    value: settingsService.appSettings.smartChargingEnabled,
-                    onChanged: settingsService.updateSmartCharging,
-                  ),
-                ],
-              ),
-              
-              const SizedBox(height: 16),
-              
-              // 배터리 보호 설정
-              _buildBatterySettingsCard(
-                context,
-                '배터리 보호',
-                Icons.shield,
-                '배터리 건강도를 보호하는 설정',
-                [
-                  SettingsSwitchItem(
-                    title: '배터리 보호 활성화',
-                    subtitle: '과충전 방지 및 온도 모니터링',
-                    value: settingsService.appSettings.batteryProtectionEnabled,
-                    onChanged: settingsService.updateBatteryProtection,
-                  ),
-                  SettingsActionItem(
-                    title: '배터리 보정',
-                    subtitle: '배터리 수치 보정',
-                    icon: Icons.refresh,
-                    onTap: () => DialogUtils.showBatteryCalibrationStartDialog(context),
-                  ),
-                  SettingsActionItem(
-                    title: '배터리 진단',
-                    subtitle: '배터리 상태 진단',
-                    icon: Icons.health_and_safety,
-                    onTap: () => DialogUtils.showBatteryDiagnosticDialog(context),
-                  ),
-                ],
               ),
             ],
           ),
