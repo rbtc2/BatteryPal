@@ -42,35 +42,3 @@ class OptimizationItem {
   });
 }
 
-/// 개별 실행 상태 모델
-class ExecutionState {
-  final bool isExecuting; // 실행 중인지
-  final bool justCompleted; // 막 완료되었는지
-  final String? completionMessage; // "✓ 완료! +15분"
-
-  ExecutionState({
-    this.isExecuting = false,
-    this.justCompleted = false,
-    this.completionMessage,
-  });
-}
-
-/// 개별 실행 항목 데이터 모델
-class IndividualExecutionItem {
-  final String id;
-  final String title;
-  final String icon; // emoji
-  final String currentStatus; // "현재: 15개 실행 중"
-  final String lastExecuted; // "1시간 전"
-  final String effect; // "+25분"
-
-  IndividualExecutionItem({
-    required this.id,
-    required this.title,
-    required this.icon,
-    required this.currentStatus,
-    required this.lastExecuted,
-    required this.effect,
-  });
-}
-
