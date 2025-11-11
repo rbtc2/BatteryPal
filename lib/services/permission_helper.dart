@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'system_settings_service.dart';
 
 /// 권한 요청을 도와주는 헬퍼 클래스
 /// 
@@ -116,6 +117,9 @@ class PermissionHelper {
         content: const Text(
           '배터리를 절약하기 위해 화면 밝기를 자동으로 조절하려면\n'
           '시스템 설정 변경 권한이 필요합니다.\n\n'
+          '시스템 설정 화면에서 "권한 허용" 토글을 켜주세요.\n'
+          '만약 토글이 회색으로 비활성화되어 있다면, 기기 제조사의\n'
+          '보안 정책으로 인해 이 권한을 사용할 수 없을 수 있습니다.\n\n'
           '시스템 설정 화면으로 이동하시겠습니까?',
         ),
         actions: [
@@ -133,8 +137,10 @@ class PermissionHelper {
     );
 
     if (result == true) {
-      // 시스템 설정 화면으로 이동
-      await openAppSettings();
+      // WRITE_SETTINGS 권한 설정 화면으로 이동
+      // openAppSettings()가 아닌 특별한 설정 화면으로 이동해야 함
+      final systemSettingsService = SystemSettingsService();
+      await systemSettingsService.openWriteSettingsPermission();
       // 사용자가 설정에서 권한을 허용했는지 확인하려면 앱이 다시 포그라운드로 돌아올 때 확인해야 함
       return false; // 일단 false 반환 (사용자가 돌아온 후 다시 확인 필요)
     }

@@ -359,14 +359,6 @@ class _IndividualExecutionCardState extends State<IndividualExecutionCard> {
         lastExecuted: '45분 전',
         effect: '+18분',
       ),
-      IndividualExecutionItem(
-        id: 'brightness_auto',
-        title: '화면 밝기 조절',
-        icon: '☀️',
-        currentStatus: '현재: 80% → 권장: 40%',
-        lastExecuted: '실행 안 함',
-        effect: '+20분',
-      ),
     ];
   }
 }

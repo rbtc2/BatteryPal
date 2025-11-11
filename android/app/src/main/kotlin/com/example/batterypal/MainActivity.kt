@@ -104,6 +104,10 @@ class MainActivity : FlutterActivity() {
                     val canWrite = canWriteSettings()
                     result.success(canWrite)
                 }
+                "openWriteSettingsPermission" -> {
+                    openWriteSettingsPermission()
+                    result.success(true)
+                }
                 else -> {
                     result.notImplemented()
                 }
@@ -544,6 +548,26 @@ class MainActivity : FlutterActivity() {
         } catch (e: Exception) {
             android.util.Log.e("BatteryPal", "권한 확인 실패", e)
             false
+        }
+    }
+
+    /// 시스템 설정 변경 권한 설정 화면으로 이동
+    /// WRITE_SETTINGS 권한을 허용하기 위한 특별한 설정 화면으로 이동
+    private fun openWriteSettingsPermission() {
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                val intent = Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS).apply {
+                    data = android.net.Uri.parse("package:$packageName")
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                startActivity(intent)
+                android.util.Log.d("BatteryPal", "시스템 설정 변경 권한 설정 화면으로 이동")
+            } else {
+                // API 23 미만에서는 권한이 필요 없음
+                android.util.Log.d("BatteryPal", "API 23 미만에서는 권한이 필요 없습니다")
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("BatteryPal", "권한 설정 화면 열기 실패", e)
         }
     }
 }

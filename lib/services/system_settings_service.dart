@@ -131,5 +131,17 @@ class SystemSettingsService {
       return false;
     }
   }
+
+  /// 시스템 설정 변경 권한 설정 화면으로 이동
+  /// WRITE_SETTINGS 권한을 허용하기 위한 특별한 설정 화면으로 이동
+  Future<void> openWriteSettingsPermission() async {
+    try {
+      debugPrint('시스템 설정: 권한 설정 화면 열기 요청');
+      await _channel.invokeMethod('openWriteSettingsPermission');
+      debugPrint('시스템 설정: 권한 설정 화면 열기 완료');
+    } catch (e) {
+      debugPrint('권한 설정 화면 열기 실패: $e');
+    }
+  }
 }
 
