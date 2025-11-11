@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../services/settings_service.dart';
 import '../../widgets/settings/general_settings_tab.dart';
-import '../../widgets/settings/battery_settings_tab.dart';
+import '../../widgets/settings/features_settings_tab.dart';
 
 /// 설정 탭 화면
-/// 일반 설정과 배터리 설정을 탭으로 분리
+/// 일반 설정과 기능 설정을 탭으로 분리
 class SettingsTab extends StatefulWidget {
   final bool isProUser;
   final VoidCallback onProToggle;
@@ -52,8 +52,8 @@ class _SettingsTabState extends State<SettingsTab> {
                 text: '일반',
               ),
               Tab(
-                icon: Icon(Icons.battery_std),
-                text: '배터리',
+                icon: Icon(Icons.tune),
+                text: '기능',
               ),
             ],
             labelColor: Theme.of(context).colorScheme.primary,
@@ -68,7 +68,7 @@ class _SettingsTabState extends State<SettingsTab> {
               isProUser: widget.isProUser,
               onProToggle: widget.onProToggle,
             ),
-            BatterySettingsTab(
+            FeaturesSettingsTab(
               settingsService: _settingsService,
               isProUser: widget.isProUser,
               onProToggle: widget.onProToggle,

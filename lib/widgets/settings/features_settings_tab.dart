@@ -2,14 +2,15 @@ import 'package:flutter/material.dart';
 import '../../services/settings_service.dart';
 import '../../widgets/settings/settings_widgets.dart';
 import '../../widgets/common/common_widgets.dart';
+import '../../models/app_models.dart';
 
-/// 배터리 설정 탭 위젯
-class BatterySettingsTab extends StatelessWidget {
+/// 기능 설정 탭 위젯
+class FeaturesSettingsTab extends StatelessWidget {
   final SettingsService settingsService;
   final bool isProUser;
   final VoidCallback onProToggle;
 
-  const BatterySettingsTab({
+  const FeaturesSettingsTab({
     super.key,
     required this.settingsService,
     required this.isProUser,
@@ -25,8 +26,26 @@ class BatterySettingsTab extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           child: Column(
             children: [
+              // 배터리 정보 표시 방식 설정
+              _buildFeatureSettingsCard(
+                context,
+                '배터리 정보 표시 방식',
+                Icons.smartphone,
+                '배터리 정보 표시 및 전환 방식 설정',
+                [
+                  SettingsActionItem(
+                    title: '배터리 정보 표시 방식',
+                    subtitle: _getBatteryDisplaySubtitle(),
+                    icon: Icons.display_settings,
+                    onTap: () => _showBatteryDisplaySettingsDialog(context),
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 16),
+              
               // 배터리 알림 설정 (Pro 기능)
-              _buildBatterySettingsCard(
+              _buildFeatureSettingsCard(
                 context,
                 '배터리 알림',
                 Icons.notifications_active,
@@ -61,7 +80,7 @@ class BatterySettingsTab extends StatelessWidget {
     );
   }
 
-  Widget _buildBatterySettingsCard(
+  Widget _buildFeatureSettingsCard(
     BuildContext context,
     String title,
     IconData icon,
@@ -131,6 +150,20 @@ class BatterySettingsTab extends StatelessWidget {
     );
   }
 
+  String _getBatteryDisplaySubtitle() {
+    final speed = settingsService.appSettings.batteryDisplayCycleSpeed;
+    if (speed == BatteryDisplayCycleSpeed.off) {
+      return '자동 순환 끄기';
+    }
+    final speedText = speed.displayName;
+    final enabledCount = [
+      settingsService.appSettings.showChargingCurrent,
+      settingsService.appSettings.showBatteryPercentage,
+      settingsService.appSettings.showBatteryTemperature,
+    ].where((e) => e).length;
+    return '$speedText 속도, $enabledCount개 정보 표시';
+  }
+
   String _getChargingCompleteNotificationSubtitle() {
     final enabled = settingsService.appSettings.chargingCompleteNotificationEnabled;
     if (!enabled) return '비활성화';
@@ -152,6 +185,273 @@ class BatterySettingsTab extends StatelessWidget {
     if (thresholds.isEmpty) return '알림 퍼센트 없음';
     if (thresholds.length == 1) return '${thresholds.first.toInt()}% 알림';
     return '${thresholds.length}개 퍼센트 알림';
+  }
+
+  void _showBatteryDisplaySettingsDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('배터리 정보 표시 방식'),
+          contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+          content: SizedBox(
+            width: MediaQuery.of(context).size.width * 0.9,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 자동 순환
+                  Text(
+                    '자동 순환',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SwitchListTile(
+                    title: const Text('자동 순환 활성화'),
+                    subtitle: const Text('배터리 정보를 자동으로 전환'),
+                    value: settingsService.appSettings.batteryDisplayCycleSpeed != BatteryDisplayCycleSpeed.off,
+                    onChanged: (enabled) {
+                      if (enabled) {
+                        // 켜기를 선택하면 기본값(보통) 적용
+                        settingsService.updateBatteryDisplayCycleSpeed(BatteryDisplayCycleSpeed.normal);
+                      } else {
+                        settingsService.updateBatteryDisplayCycleSpeed(BatteryDisplayCycleSpeed.off);
+                      }
+                      setState(() {}); // 다이얼로그 상태 업데이트
+                    },
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  
+                  // 속도 선택 (켜기일 때만 표시)
+                  AnimatedSize(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                    child: settingsService.appSettings.batteryDisplayCycleSpeed != BatteryDisplayCycleSpeed.off
+                      ? Padding(
+                          padding: const EdgeInsets.only(top: 12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '순환 속도',
+                                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              SegmentedButton<BatteryDisplayCycleSpeed>(
+                                segments: [
+                                  ButtonSegment<BatteryDisplayCycleSpeed>(
+                                    value: BatteryDisplayCycleSpeed.slow,
+                                    label: const Text('느림'),
+                                    tooltip: '5초마다 전환',
+                                  ),
+                                  ButtonSegment<BatteryDisplayCycleSpeed>(
+                                    value: BatteryDisplayCycleSpeed.normal,
+                                    label: const Text('보통'),
+                                    tooltip: '3초마다 전환',
+                                  ),
+                                  ButtonSegment<BatteryDisplayCycleSpeed>(
+                                    value: BatteryDisplayCycleSpeed.fast,
+                                    label: const Text('빠름'),
+                                    tooltip: '2초마다 전환',
+                                  ),
+                                ],
+                                selected: {settingsService.appSettings.batteryDisplayCycleSpeed},
+                                onSelectionChanged: (Set<BatteryDisplayCycleSpeed> newSelection) {
+                                  if (newSelection.isNotEmpty) {
+                                    settingsService.updateBatteryDisplayCycleSpeed(newSelection.first);
+                                    setState(() {}); // 다이얼로그 상태 업데이트
+                                  }
+                                },
+                              ),
+                            ],
+                          ),
+                        )
+                      : const SizedBox.shrink(),
+                  ),
+                  
+                  const SizedBox(height: 16),
+                  
+                  // 표시할 정보 선택
+                  Text(
+                    '표시할 정보 선택',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  CheckboxListTile(
+                    title: Text(
+                      '충전 전류 표시',
+                      style: settingsService.appSettings.batteryDisplayCycleSpeed == BatteryDisplayCycleSpeed.off
+                        ? TextStyle(
+                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                          )
+                        : null,
+                    ),
+                    subtitle: Text(
+                      '충전 중일 때 전류 정보 표시',
+                      style: settingsService.appSettings.batteryDisplayCycleSpeed == BatteryDisplayCycleSpeed.off
+                        ? TextStyle(
+                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                          )
+                        : null,
+                    ),
+                    value: settingsService.appSettings.showChargingCurrent,
+                    onChanged: settingsService.appSettings.batteryDisplayCycleSpeed == BatteryDisplayCycleSpeed.off 
+                      ? null 
+                      : (value) {
+                          settingsService.updateShowChargingCurrent(value ?? false);
+                          setState(() {}); // 다이얼로그 상태 업데이트
+                        },
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  CheckboxListTile(
+                    title: Text(
+                      '배터리 퍼센트 표시',
+                      style: settingsService.appSettings.batteryDisplayCycleSpeed == BatteryDisplayCycleSpeed.off
+                        ? TextStyle(
+                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                          )
+                        : null,
+                    ),
+                    subtitle: Text(
+                      '배터리 잔량 퍼센트 표시',
+                      style: settingsService.appSettings.batteryDisplayCycleSpeed == BatteryDisplayCycleSpeed.off
+                        ? TextStyle(
+                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                          )
+                        : null,
+                    ),
+                    value: settingsService.appSettings.showBatteryPercentage,
+                    onChanged: settingsService.appSettings.batteryDisplayCycleSpeed == BatteryDisplayCycleSpeed.off 
+                      ? null 
+                      : (value) {
+                          settingsService.updateShowBatteryPercentage(value ?? false);
+                          setState(() {}); // 다이얼로그 상태 업데이트
+                        },
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  CheckboxListTile(
+                    title: Text(
+                      '배터리 온도 표시',
+                      style: settingsService.appSettings.batteryDisplayCycleSpeed == BatteryDisplayCycleSpeed.off
+                        ? TextStyle(
+                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                          )
+                        : null,
+                    ),
+                    subtitle: Text(
+                      '배터리 온도 정보 표시',
+                      style: settingsService.appSettings.batteryDisplayCycleSpeed == BatteryDisplayCycleSpeed.off
+                        ? TextStyle(
+                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                          )
+                        : null,
+                    ),
+                    value: settingsService.appSettings.showBatteryTemperature,
+                    onChanged: settingsService.appSettings.batteryDisplayCycleSpeed == BatteryDisplayCycleSpeed.off 
+                      ? null 
+                      : (value) {
+                          settingsService.updateShowBatteryTemperature(value ?? false);
+                          setState(() {}); // 다이얼로그 상태 업데이트
+                        },
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  
+                  const SizedBox(height: 16),
+                  
+                  // 제스처 설정
+                  Text(
+                    '제스처 설정',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  CheckboxListTile(
+                    title: Text(
+                      '탭으로 전환',
+                      style: settingsService.appSettings.batteryDisplayCycleSpeed == BatteryDisplayCycleSpeed.off
+                        ? TextStyle(
+                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                          )
+                        : null,
+                    ),
+                    subtitle: Text(
+                      '화면을 탭하여 정보 전환',
+                      style: settingsService.appSettings.batteryDisplayCycleSpeed == BatteryDisplayCycleSpeed.off
+                        ? TextStyle(
+                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                          )
+                        : null,
+                    ),
+                    value: settingsService.appSettings.enableTapToSwitch,
+                    onChanged: settingsService.appSettings.batteryDisplayCycleSpeed == BatteryDisplayCycleSpeed.off 
+                      ? null 
+                      : (value) {
+                          if (value == true) {
+                            // 탭 활성화 → 스와이프 자동 비활성화
+                            settingsService.updateEnableTapToSwitch(true);
+                            settingsService.updateEnableSwipeToSwitch(false);
+                          } else {
+                            // 탭 비활성화 (둘 다 비활성화 가능)
+                            settingsService.updateEnableTapToSwitch(false);
+                          }
+                          setState(() {}); // 다이얼로그 상태 업데이트
+                        },
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  CheckboxListTile(
+                    title: Text(
+                      '스와이프로 전환',
+                      style: settingsService.appSettings.batteryDisplayCycleSpeed == BatteryDisplayCycleSpeed.off
+                        ? TextStyle(
+                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                          )
+                        : null,
+                    ),
+                    subtitle: Text(
+                      '좌우 스와이프로 정보 전환',
+                      style: settingsService.appSettings.batteryDisplayCycleSpeed == BatteryDisplayCycleSpeed.off
+                        ? TextStyle(
+                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                          )
+                        : null,
+                    ),
+                    value: settingsService.appSettings.enableSwipeToSwitch,
+                    onChanged: settingsService.appSettings.batteryDisplayCycleSpeed == BatteryDisplayCycleSpeed.off 
+                      ? null 
+                      : (value) {
+                          if (value == true) {
+                            // 스와이프 활성화 → 탭 자동 비활성화
+                            settingsService.updateEnableTapToSwitch(false);
+                            settingsService.updateEnableSwipeToSwitch(true);
+                          } else {
+                            // 스와이프 비활성화 (둘 다 비활성화 가능)
+                            settingsService.updateEnableSwipeToSwitch(false);
+                          }
+                          setState(() {}); // 다이얼로그 상태 업데이트
+                        },
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('확인'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showChargingCompleteNotificationDialog(BuildContext context) {
@@ -433,3 +733,4 @@ class BatterySettingsTab extends StatelessWidget {
     );
   }
 }
+
