@@ -27,7 +27,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     HomeTab(
       isProUser: _isProUser,
       onProToggle: _handleProUpgrade,
-      onNavigateToOptimization: navigateToAnalysisOptimization,
     ),
     AnalysisTab(
       isProUser: _isProUser,

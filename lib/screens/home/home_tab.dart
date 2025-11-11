@@ -4,21 +4,18 @@ import '../../services/home_lifecycle_manager.dart';
 import '../../services/settings_service.dart';
 import '../../models/app_models.dart';
 import '../../widgets/home/battery_status_card.dart';
-import '../../widgets/home/quick_actions_card.dart';
-import '../../utils/app_utils.dart';
+import '../../widgets/home/realtime_charging_monitor.dart';
 
 /// 홈 탭 화면
 /// Phase 5에서 실제 구현
 class HomeTab extends StatefulWidget {
   final bool isProUser;
   final VoidCallback onProToggle;
-  final VoidCallback? onNavigateToOptimization;
 
   const HomeTab({
     super.key,
     required this.isProUser,
     required this.onProToggle,
-    this.onNavigateToOptimization,
   });
 
   @override
@@ -252,18 +249,11 @@ class _HomeTabState extends State<HomeTab> {
             
             const SizedBox(height: 16),
             
-            // 섹션 2: 빠른 액션 (하단 확장)
+            // 섹션 2: 실시간 충전 모니터 (하단 확장)
             Expanded(
               child: SingleChildScrollView(
-                child: QuickActionsCard(
-                  onBoost: _handleOptimization,
-                  onAnalysis: widget.onNavigateToOptimization ?? () {
-                    // 기본 동작 (분석 탭으로 이동)
-                    SnackBarUtils.showInfo(context, '분석 탭으로 이동합니다');
-                  },
-                  isProUser: widget.isProUser,
-                  dailyUsage: dailyUsage,
-                  dailyLimit: dailyLimit,
+                child: RealtimeChargingMonitor(
+                  batteryInfo: _batteryInfo,
                 ),
               ),
             ),
@@ -273,9 +263,4 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
-  /// 배터리 최적화 처리
-  void _handleOptimization() {
-    // Phase 5에서 실제 최적화 기능 구현 예정
-    SnackBarUtils.showSuccess(context, '배터리 최적화가 완료되었습니다!');
-  }
 }

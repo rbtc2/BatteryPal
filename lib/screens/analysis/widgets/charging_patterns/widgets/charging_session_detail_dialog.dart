@@ -59,10 +59,10 @@ class ChargingSessionDetailDialog extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
       ),
-      child: Container(
+      child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 500, maxHeight: 700),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisSize: MainAxisSize.max,
           children: [
             // 헤더
             Container(
@@ -127,7 +127,7 @@ class ChargingSessionDetailDialog extends StatelessWidget {
             ),
             
             // 내용 (스크롤 가능)
-            Flexible(
+            Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(20),
                 child: Column(
@@ -135,7 +135,7 @@ class ChargingSessionDetailDialog extends StatelessWidget {
                   children: [
                     // 기본 정보 섹션
                     _buildSectionTitle(context, '기본 정보'),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 10),
                     _buildInfoGrid(context, [
                       _InfoItem('시작 시간', startTimeStr, Icons.access_time, Colors.blue),
                       _InfoItem('종료 시간', endTimeStr, Icons.access_time_filled, Colors.blue),
@@ -143,7 +143,7 @@ class ChargingSessionDetailDialog extends StatelessWidget {
                       _InfoItem('배터리 변화', batteryChange, Icons.battery_charging_full, Colors.green),
                     ]),
                     
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 20),
                     
                     // 통계 정보 섹션
                     _buildSectionTitle(context, '통계 정보'),
@@ -165,7 +165,7 @@ class ChargingSessionDetailDialog extends StatelessWidget {
                     
                     // 전류 변화 이력 섹션
                     if (session.speedChanges.isNotEmpty) ...[
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 20),
                       _buildSectionTitle(context, '전류 변화 이력'),
                       const SizedBox(height: 12),
                       Container(
@@ -195,7 +195,7 @@ class ChargingSessionDetailDialog extends StatelessWidget {
                     ],
                     
                     // 추가 정보 섹션
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 20),
                     _buildSectionTitle(context, '추가 정보'),
                     const SizedBox(height: 12),
                     _buildAdditionalInfo(context, session),
@@ -249,7 +249,7 @@ class ChargingSessionDetailDialog extends StatelessWidget {
         crossAxisCount: 2,
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
-        childAspectRatio: 2.5,
+        childAspectRatio: 3.0,
       ),
       itemCount: items.length,
       itemBuilder: (context, index) {
@@ -261,7 +261,7 @@ class ChargingSessionDetailDialog extends StatelessWidget {
 
   Widget _buildInfoCard(BuildContext context, _InfoItem item) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: item.color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
@@ -272,16 +272,17 @@ class ChargingSessionDetailDialog extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             children: [
-              Icon(item.icon, size: 16, color: item.color),
+              Icon(item.icon, size: 14, color: item.color),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   item.label,
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 10,
                     color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                   ),
                   maxLines: 1,
@@ -290,11 +291,11 @@ class ChargingSessionDetailDialog extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           Text(
             item.value,
             style: TextStyle(
-              fontSize: 14,
+              fontSize: 13,
               fontWeight: FontWeight.bold,
               color: item.color,
             ),

@@ -438,7 +438,7 @@ class _BatteryStatusCardState extends State<BatteryStatusCard>
           
           const SizedBox(height: 16),
           
-          // 3개 메트릭 (온도/전압/건강도)
+          // 2개 메트릭 (온도/전압)
             Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
@@ -460,16 +460,6 @@ class _BatteryStatusCardState extends State<BatteryStatusCard>
                     label: '전압',
                     value: widget.batteryInfo?.formattedVoltage ?? '--mV',
                     color: Colors.blue,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildMetricCard(
-                    context,
-                    icon: '✅',
-                    label: '건강도',
-                    value: widget.batteryInfo?.healthText ?? '알 수 없음',
-                    color: Colors.green,
                   ),
                 ),
               ],
@@ -721,7 +711,7 @@ class _BatteryStatusCardState extends State<BatteryStatusCard>
     required Color color,
   }) {
     return Container(
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(10),
@@ -729,30 +719,34 @@ class _BatteryStatusCardState extends State<BatteryStatusCard>
           color: color.withValues(alpha: 0.3),
         ),
       ),
-      child: Column(
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(icon, style: const TextStyle(fontSize: 20)),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-      style: TextStyle(
-              fontSize: 10,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-            ),
-            maxLines: 1,
-            textAlign: TextAlign.center,
+          Text(icon, style: const TextStyle(fontSize: 16)),
+          const SizedBox(width: 6),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 10,
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                ),
+                maxLines: 1,
+              ),
+            ],
           ),
         ],
       ),
