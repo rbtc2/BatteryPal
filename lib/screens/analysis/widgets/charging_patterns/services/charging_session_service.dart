@@ -5,6 +5,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../../../../../models/app_models.dart';
 import '../../../../../services/battery_service.dart';
+import '../../../../../services/last_charging_info_service.dart';
 import '../models/charging_session_models.dart';
 import '../config/charging_session_config.dart';
 import '../utils/time_slot_utils.dart';
@@ -445,6 +446,18 @@ class ChargingSessionService {
             // 세션 목록 업데이트 알림
             _notifySessionsChanged();
             debugPrint('ChargingSessionService: 세션 저장 완료 - ${sessionRecord.sessionTitle}');
+            
+            // 마지막 충전 정보 저장
+            try {
+              await LastChargingInfoService().saveLastChargingInfo(
+                endTime: sessionRecord.endTime,
+                avgCurrent: sessionRecord.avgCurrent.toInt(),
+                batteryLevel: sessionRecord.endBatteryLevel,
+              );
+              debugPrint('ChargingSessionService: 마지막 충전 정보 저장 완료');
+            } catch (e) {
+              debugPrint('ChargingSessionService: 마지막 충전 정보 저장 실패 - $e');
+            }
           } else if (!saved) {
             debugPrint('ChargingSessionService: 세션 저장 실패 - ${sessionRecord.sessionTitle}');
             // 저장 실패해도 세션 목록은 업데이트 (메모리에만 있을 수 있음)

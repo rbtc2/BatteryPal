@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../services/battery_service.dart';
+import '../../services/last_charging_info_service.dart';
 import '../../models/app_models.dart';
 
 /// 실시간 충전 모니터 위젯
@@ -22,6 +23,10 @@ class _RealtimeChargingMonitorState extends State<RealtimeChargingMonitor> {
   final int _maxDataPoints = 50; // 50개 포인트 유지
   Timer? _updateTimer;
   final BatteryService _batteryService = BatteryService();
+  final LastChargingInfoService _lastChargingInfoService = LastChargingInfoService();
+  
+  // 마지막 충전 정보
+  LastChargingInfo? _lastChargingInfo;
 
   @override
   void initState() {
@@ -30,6 +35,76 @@ class _RealtimeChargingMonitorState extends State<RealtimeChargingMonitor> {
     if (widget.batteryInfo?.isCharging == true) {
       _startRealTimeUpdate();
     }
+    // 마지막 충전 정보 로드
+    _loadLastChargingInfo();
+  }
+
+  /// 마지막 충전 정보 로드
+  Future<void> _loadLastChargingInfo() async {
+    final info = await _lastChargingInfoService.getLastChargingInfo();
+    if (mounted) {
+      setState(() {
+        _lastChargingInfo = info;
+      });
+    }
+  }
+
+  /// 충전 시간 포맷팅
+  String _formatChargingTime(DateTime? endTime) {
+    if (endTime == null) {
+      return '--';
+    }
+    
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+    final endDate = DateTime(endTime.year, endTime.month, endTime.day);
+    
+    String timeStr;
+    if (endDate == today) {
+      // 오늘
+      final hour = endTime.hour;
+      final minute = endTime.minute.toString().padLeft(2, '0');
+      
+      if (hour < 12) {
+        timeStr = '오늘 오전 $hour:$minute';
+      } else if (hour == 12) {
+        timeStr = '오늘 오후 12:$minute';
+      } else {
+        timeStr = '오늘 오후 ${hour - 12}:$minute';
+      }
+    } else if (endDate == yesterday) {
+      // 어제
+      final hour = endTime.hour;
+      final minute = endTime.minute.toString().padLeft(2, '0');
+      
+      if (hour < 12) {
+        timeStr = '어제 오전 $hour:$minute';
+      } else if (hour == 12) {
+        timeStr = '어제 오후 12:$minute';
+      } else {
+        timeStr = '어제 오후 ${hour - 12}:$minute';
+      }
+    } else {
+      // 그 이전
+      final month = endTime.month;
+      final day = endTime.day;
+      final hour = endTime.hour;
+      final minute = endTime.minute.toString().padLeft(2, '0');
+      
+      String period;
+      if (hour < 12) {
+        period = '오전 $hour:$minute';
+      } else if (hour == 12) {
+        period = '오후 12:$minute';
+      } else {
+        period = '오후 ${hour - 12}:$minute';
+      }
+      
+      timeStr = '$month월 $day일 $period';
+    }
+    
+    return timeStr;
   }
 
   @override
@@ -45,6 +120,8 @@ class _RealtimeChargingMonitorState extends State<RealtimeChargingMonitor> {
     } else if (wasCharging && !isCharging) {
       // 충전 종료
       _stopRealTimeUpdate();
+      // 충전 종료 시 마지막 충전 정보 다시 로드
+      _loadLastChargingInfo();
     }
   }
 
@@ -99,29 +176,30 @@ class _RealtimeChargingMonitorState extends State<RealtimeChargingMonitor> {
             color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
           ),
         ),
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
             // 제목: 마지막 충전 정보
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
                     color: Colors.blue.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Text(
                     '📊',
-                    style: TextStyle(fontSize: 20),
+                    style: TextStyle(fontSize: 18),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 Text(
                   '마지막 충전 정보',
                   style: TextStyle(
-                    fontSize: 18,
+                    fontSize: 16,
                     fontWeight: FontWeight.bold,
                     color: Theme.of(context).colorScheme.onSurface,
                   ),
@@ -129,7 +207,7 @@ class _RealtimeChargingMonitorState extends State<RealtimeChargingMonitor> {
               ],
             ),
             
-            const SizedBox(height: 20),
+            const SizedBox(height: 12),
             
             // 정보 그리드 (2x2 레이아웃)
             Row(
@@ -138,25 +216,29 @@ class _RealtimeChargingMonitorState extends State<RealtimeChargingMonitor> {
                   child: _buildInfoCard(
                     context,
                     icon: '⏱️',
-                    text: '오늘 오전 8:32',
+                    text: _formatChargingTime(_lastChargingInfo?.endTime),
                     subtitle: '충전 시간',
                     color: Colors.blue,
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
                 Expanded(
                   child: _buildInfoCard(
                     context,
                     icon: '⚡',
-                    text: '고속 충전',
-                    subtitle: '48분 소요',
+                    text: _lastChargingInfo != null
+                        ? _lastChargingInfoService.getSpeedText(_lastChargingInfo!.speed)
+                        : '--',
+                    subtitle: _lastChargingInfo != null
+                        ? '${(_lastChargingInfo!.avgCurrent / 1000).toStringAsFixed(1)}A'
+                        : '--',
                     color: Colors.orange,
                   ),
                 ),
               ],
             ),
             
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             
             Row(
               children: [
@@ -164,12 +246,14 @@ class _RealtimeChargingMonitorState extends State<RealtimeChargingMonitor> {
                   child: _buildInfoCard(
                     context,
                     icon: '🎯',
-                    text: '82%',
+                    text: _lastChargingInfo != null
+                        ? '${_lastChargingInfo!.batteryLevel.toInt()}%'
+                        : '--',
                     subtitle: '충전 레벨',
                     color: Colors.purple,
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
                 Expanded(
                   child: _buildInfoCard(
                     context,
@@ -273,12 +357,12 @@ class _RealtimeChargingMonitorState extends State<RealtimeChargingMonitor> {
     bool isHighlight = false,
   }) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: isHighlight
             ? color.withValues(alpha: 0.15)
             : color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(
           color: isHighlight
               ? color.withValues(alpha: 0.4)
@@ -294,43 +378,43 @@ class _RealtimeChargingMonitorState extends State<RealtimeChargingMonitor> {
             children: [
               Text(
                 icon,
-                style: const TextStyle(fontSize: 20),
+                style: const TextStyle(fontSize: 18),
               ),
               const Spacer(),
               if (isHighlight)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                   decoration: BoxDecoration(
                     color: color.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
                     '✓',
                     style: TextStyle(
                       color: color,
-                      fontSize: 10,
+                      fontSize: 9,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
             text,
             style: TextStyle(
-              fontSize: 16,
+              fontSize: 14,
               fontWeight: FontWeight.bold,
               color: isHighlight
                   ? color
                   : Theme.of(context).colorScheme.onSurface,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           Text(
             subtitle,
             style: TextStyle(
-              fontSize: 11,
+              fontSize: 10,
               color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
             ),
           ),
