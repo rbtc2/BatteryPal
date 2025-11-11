@@ -15,7 +15,7 @@ class OptimizationDashboardCard extends StatelessWidget {
       todayTotalSaved: const Duration(hours: 2, minutes: 15),
       appsKilled: 12,
       memoryMB: 234,
-      cacheMB: 512,
+      cacheMB: 0,
       servicesStopped: 5,
     );
 
@@ -133,15 +133,6 @@ class OptimizationDashboardCard extends StatelessWidget {
             
             Row(
               children: [
-                Expanded(
-                  child: _buildMetricCard(
-                    context,
-                    icon: Icons.cleaning_services,
-                    value: '${stats.cacheMB}MB',
-                    label: '정리된 캐시',
-                  ),
-                ),
-                const SizedBox(width: 12),
                 Expanded(
                   child: _buildMetricCard(
                     context,

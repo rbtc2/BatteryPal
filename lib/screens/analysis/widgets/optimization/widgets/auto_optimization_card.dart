@@ -157,15 +157,6 @@ class _AutoOptimizationCardState extends State<AutoOptimizationCard> {
         isAutomatic: true,
       ),
       OptimizationItem(
-        id: 'cache_clean',
-        title: '캐시 정리',
-        currentStatus: '',
-        effect: '+10분',
-        icon: Icons.cleaning_services,
-        isEnabled: true,
-        isAutomatic: true,
-      ),
-      OptimizationItem(
         id: 'services_stop',
         title: '불필요한 서비스 중지',
         currentStatus: '',

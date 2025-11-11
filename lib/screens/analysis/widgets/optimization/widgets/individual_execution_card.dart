@@ -352,14 +352,6 @@ class _IndividualExecutionCardState extends State<IndividualExecutionCard> {
         effect: '+15분',
       ),
       IndividualExecutionItem(
-        id: 'cache_clean',
-        title: '캐시 정리',
-        icon: '🗑️',
-        currentStatus: '현재: 512MB 누적',
-        lastExecuted: '3시간 전',
-        effect: '+10분',
-      ),
-      IndividualExecutionItem(
         id: 'services_stop',
         title: '불필요한 서비스 중지',
         icon: '⚙️',
