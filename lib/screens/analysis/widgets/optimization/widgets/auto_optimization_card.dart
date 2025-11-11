@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/optimization_models.dart';
+import '../../../../../widgets/common/common_widgets.dart';
 
 /// 섹션 2: 자동 최적화 설정
 /// 원클릭 최적화 버튼을 눌렀을 때 실행될 항목을 선택하는 토글만 제공
@@ -21,72 +22,48 @@ class _AutoOptimizationCardState extends State<AutoOptimizationCard> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+    return CustomCard(
+      elevation: 2,
+      borderRadius: BorderRadius.circular(12),
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // 헤더
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Text('⚙️', style: TextStyle(fontSize: 24)),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        '자동 최적화 설정',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.onSurface,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
+          Row(
+            children: [
+              Icon(
+                Icons.settings,
+                color: Theme.of(context).colorScheme.primary,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                '자동 최적화 설정',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  '원클릭 최적화 버튼을 눌렀을 때 실행될 항목을 선택하세요',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                  ),
-                ),
-              ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '원클릭 최적화 버튼을 눌렀을 때 실행될 항목을 선택하세요',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+              fontSize: 12,
             ),
           ),
+          const SizedBox(height: 12),
           
           // 항목 리스트
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Column(
-              children: _autoItems.map((item) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _buildAutoItem(context, item),
-              )).toList(),
-            ),
+          Column(
+            children: _autoItems.map((item) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _buildAutoItem(context, item),
+            )).toList(),
           ),
-          
-          const SizedBox(height: 16),
         ],
       ),
     );

@@ -3,6 +3,7 @@ import '../../services/settings_service.dart';
 import '../../widgets/settings/settings_widgets.dart';
 import '../../widgets/common/common_widgets.dart';
 import '../../models/app_models.dart';
+import '../../screens/analysis/widgets/optimization/widgets/auto_optimization_card.dart';
 
 /// 기능 설정 탭 위젯
 class FeaturesSettingsTab extends StatelessWidget {
@@ -26,6 +27,11 @@ class FeaturesSettingsTab extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           child: Column(
             children: [
+              // 자동 최적화 설정
+              const AutoOptimizationCard(),
+              
+              const SizedBox(height: 16),
+              
               // 배터리 정보 표시 방식 설정
               _buildFeatureSettingsCard(
                 context,

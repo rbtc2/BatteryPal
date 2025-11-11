@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'optimization/widgets/optimization_dashboard_card.dart';
-import 'optimization/widgets/auto_optimization_card.dart';
 import 'optimization/widgets/individual_execution_card.dart';
 import 'optimization/widgets/manual_optimization_card.dart';
 import 'optimization/widgets/optimization_tips_card.dart';
@@ -9,17 +8,17 @@ import 'optimization/widgets/optimization_tips_card.dart';
 /// 
 /// 🎯 주요 기능:
 /// 1. OptimizationDashboardCard: 최적화 현황 대시보드
-/// 2. AutoOptimizationCard: 자동 최적화 설정 (토글)
-/// 3. IndividualExecutionCard: 개별 실행 (버튼)
-/// 4. ManualOptimizationCard: 수동 설정 항목 관리
-/// 5. OptimizationTipsCard: 맞춤 추천 및 팁
+/// 2. IndividualExecutionCard: 개별 실행 (버튼)
+/// 3. ManualOptimizationCard: 수동 설정 항목 관리
+/// 4. OptimizationTipsCard: 맞춤 추천 및 팁
 /// 
 /// 📱 구현된 섹션:
 /// - 최적화 현황: 마지막 최적화 시간, 오늘 통계, 4가지 핵심 지표
-/// - 자동 최적화 설정: 원클릭 최적화에 포함될 항목 선택 (토글)
 /// - 개별 실행: 각 항목을 지금 바로 실행 (버튼)
 /// - 수동 설정: 시스템 설정 화면으로 이동하는 항목들
 /// - 맞춤 추천: 배터리 소모 앱, 절약 팁, 통계
+/// 
+/// 📝 참고: 자동 최적화 설정은 설정 화면의 기능 탭에서 관리합니다.
 /// 
 /// 🎨 디자인 특징:
 /// - 그라데이션 배경 (초록→청록)
@@ -49,22 +48,17 @@ class OptimizationTab extends StatelessWidget {
           
           const SizedBox(height: 16),
           
-          // 섹션 2: 자동 최적화 설정
-          const AutoOptimizationCard(),
-          
-          const SizedBox(height: 16),
-          
-          // 섹션 3: 개별 실행
+          // 섹션 2: 개별 실행
           const IndividualExecutionCard(),
           
           const SizedBox(height: 16),
           
-          // 섹션 4: 수동 설정 항목
+          // 섹션 3: 수동 설정 항목
           const ManualOptimizationCard(),
           
           const SizedBox(height: 16),
           
-          // 섹션 5: 최적화 팁 & 인사이트
+          // 섹션 4: 최적화 팁 & 인사이트
           const OptimizationTipsCard(),
           
           // 하단 여백
