@@ -99,32 +99,64 @@ class _RealtimeChargingMonitorState extends State<RealtimeChargingMonitor> {
             color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
           ),
         ),
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(20),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(
-              Icons.battery_charging_full,
-              size: 48,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+            // 제목: 마지막 충전 정보
+            Row(
+              children: [
+                const Text(
+                  '📊',
+                  style: TextStyle(fontSize: 20),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '마지막 충전 정보',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            Text(
-              '충전 중이 아닙니다',
-              style: TextStyle(
-                fontSize: 16,
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                fontWeight: FontWeight.w500,
-              ),
+            
+            const SizedBox(height: 20),
+            
+            // 충전 시간 정보
+            _buildLastChargingInfoRow(
+              context,
+              icon: '⏱️',
+              text: '오늘 오전 8:32 충전',
             ),
-            const SizedBox(height: 8),
-            Text(
-              '충전기를 연결하면\n실시간 충전 모니터가 표시됩니다',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 12,
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
-              ),
+            
+            const SizedBox(height: 12),
+            
+            // 충전 속도 정보
+            _buildLastChargingInfoRow(
+              context,
+              icon: '⚡',
+              text: '고속 충전 (48분 소요)',
+            ),
+            
+            const SizedBox(height: 12),
+            
+            // 충전 레벨 정보
+            _buildLastChargingInfoRow(
+              context,
+              icon: '🎯',
+              text: '82% 까지 충전',
+            ),
+            
+            const SizedBox(height: 12),
+            
+            // 건강 상태 정보
+            _buildLastChargingInfoRow(
+              context,
+              icon: '💚',
+              text: '건강한 충전!',
+              isHighlight: true,
             ),
           ],
         ),
@@ -204,6 +236,36 @@ class _RealtimeChargingMonitorState extends State<RealtimeChargingMonitor> {
 
         ],
       ),
+    );
+  }
+
+  /// 마지막 충전 정보 행 위젯
+  Widget _buildLastChargingInfoRow(
+    BuildContext context, {
+    required String icon,
+    required String text,
+    bool isHighlight = false,
+  }) {
+    return Row(
+      children: [
+        Text(
+          icon,
+          style: const TextStyle(fontSize: 18),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(
+              fontSize: 15,
+              color: isHighlight
+                  ? Colors.green
+                  : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
+              fontWeight: isHighlight ? FontWeight.w600 : FontWeight.normal,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
