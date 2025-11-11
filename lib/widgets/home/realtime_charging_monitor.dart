@@ -106,11 +106,18 @@ class _RealtimeChargingMonitorState extends State<RealtimeChargingMonitor> {
             // 제목: 마지막 충전 정보
             Row(
               children: [
-                const Text(
-                  '📊',
-                  style: TextStyle(fontSize: 20),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Text(
+                    '📊',
+                    style: TextStyle(fontSize: 20),
+                  ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 12),
                 Text(
                   '마지막 충전 정보',
                   style: TextStyle(
@@ -124,39 +131,56 @@ class _RealtimeChargingMonitorState extends State<RealtimeChargingMonitor> {
             
             const SizedBox(height: 20),
             
-            // 충전 시간 정보
-            _buildLastChargingInfoRow(
-              context,
-              icon: '⏱️',
-              text: '오늘 오전 8:32 충전',
+            // 정보 그리드 (2x2 레이아웃)
+            Row(
+              children: [
+                Expanded(
+                  child: _buildInfoCard(
+                    context,
+                    icon: '⏱️',
+                    text: '오늘 오전 8:32',
+                    subtitle: '충전 시간',
+                    color: Colors.blue,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildInfoCard(
+                    context,
+                    icon: '⚡',
+                    text: '고속 충전',
+                    subtitle: '48분 소요',
+                    color: Colors.orange,
+                  ),
+                ),
+              ],
             ),
             
             const SizedBox(height: 12),
             
-            // 충전 속도 정보
-            _buildLastChargingInfoRow(
-              context,
-              icon: '⚡',
-              text: '고속 충전 (48분 소요)',
-            ),
-            
-            const SizedBox(height: 12),
-            
-            // 충전 레벨 정보
-            _buildLastChargingInfoRow(
-              context,
-              icon: '🎯',
-              text: '82% 까지 충전',
-            ),
-            
-            const SizedBox(height: 12),
-            
-            // 건강 상태 정보
-            _buildLastChargingInfoRow(
-              context,
-              icon: '💚',
-              text: '건강한 충전!',
-              isHighlight: true,
+            Row(
+              children: [
+                Expanded(
+                  child: _buildInfoCard(
+                    context,
+                    icon: '🎯',
+                    text: '82%',
+                    subtitle: '충전 레벨',
+                    color: Colors.purple,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildInfoCard(
+                    context,
+                    icon: '💚',
+                    text: '건강한 충전!',
+                    subtitle: '상태 양호',
+                    color: Colors.green,
+                    isHighlight: true,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -239,33 +263,79 @@ class _RealtimeChargingMonitorState extends State<RealtimeChargingMonitor> {
     );
   }
 
-  /// 마지막 충전 정보 행 위젯
-  Widget _buildLastChargingInfoRow(
+  /// 정보 카드 위젯
+  Widget _buildInfoCard(
     BuildContext context, {
     required String icon,
     required String text,
+    required String subtitle,
+    required Color color,
     bool isHighlight = false,
   }) {
-    return Row(
-      children: [
-        Text(
-          icon,
-          style: const TextStyle(fontSize: 18),
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isHighlight
+            ? color.withValues(alpha: 0.15)
+            : color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isHighlight
+              ? color.withValues(alpha: 0.4)
+              : color.withValues(alpha: 0.2),
+          width: isHighlight ? 1.5 : 1,
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Text(
+                icon,
+                style: const TextStyle(fontSize: 20),
+              ),
+              const Spacer(),
+              if (isHighlight)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '✓',
+                    style: TextStyle(
+                      color: color,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
             text,
             style: TextStyle(
-              fontSize: 15,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
               color: isHighlight
-                  ? Colors.green
-                  : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
-              fontWeight: isHighlight ? FontWeight.w600 : FontWeight.normal,
+                  ? color
+                  : Theme.of(context).colorScheme.onSurface,
             ),
           ),
-        ),
-      ],
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
+            style: TextStyle(
+              fontSize: 11,
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
