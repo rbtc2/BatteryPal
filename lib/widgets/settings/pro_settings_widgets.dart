@@ -15,15 +15,22 @@ class ProUpgradeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isLightMode = Theme.of(context).brightness == Brightness.light;
+    
     return CustomCard(
       elevation: 4,
       child: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [
-              Theme.of(context).colorScheme.primary,
-              Theme.of(context).colorScheme.primary.withValues(alpha: 0.8),
-            ],
+            colors: isLightMode
+                ? [
+                    Colors.green[400]!,
+                    Colors.teal[400]!,
+                  ]
+                : [
+                    Theme.of(context).colorScheme.primary,
+                    Theme.of(context).colorScheme.primary.withValues(alpha: 0.8),
+                  ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
