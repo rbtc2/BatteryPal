@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../services/charging_chart_service.dart';
 import '../models/charging_data_models.dart';
+import '../models/charging_session_models.dart';
+import '../services/charging_session_service.dart';
+import '../services/charging_session_storage.dart';
 import '../../../../../services/battery_history_database_service.dart';
 
 /// 섹션 2: 충전 전류 그래프 (메인)
@@ -27,14 +30,31 @@ class _ChargingCurrentChartState extends State<ChargingCurrentChart> {
   DateTime? _selectedDate;
   
   final BatteryHistoryDatabaseService _databaseService = BatteryHistoryDatabaseService();
+  final ChargingSessionService _sessionService = ChargingSessionService();
+  final ChargingSessionStorage _storageService = ChargingSessionStorage();
   Timer? _refreshTimer;
+  
+  // 통계 데이터
+  double _totalCurrentMah = 0.0; // 총 충전 전류량 (mAh)
+  Duration _totalChargingTime = Duration.zero; // 총 충전 시간
+  double _avgChargingSpeed = 0.0; // 평균 충전 속도 (mA)
   
   @override
   void initState() {
     super.initState();
+    _initializeService();
     _loadChartData();
     // 주기적으로 차트 데이터 새로고침 (오늘 탭일 때만, 30초마다)
     _startAutoRefresh();
+  }
+  
+  Future<void> _initializeService() async {
+    try {
+      await _sessionService.initialize();
+      await _storageService.initialize();
+    } catch (e) {
+      debugPrint('서비스 초기화 실패: $e');
+    }
   }
   
   @override
@@ -105,6 +125,21 @@ class _ChargingCurrentChartState extends State<ChargingCurrentChart> {
         targetDate: targetDate,
       );
       
+      // 통계 데이터 계산 (오늘 탭일 때만)
+      if (_selectedTab == '오늘' || (_selectedTab == '선택' && _selectedDate != null)) {
+        final targetDateForStats = _selectedTab == '오늘' 
+            ? DateTime.now() 
+            : _selectedDate!;
+        await _calculateStats(targetDateForStats);
+      } else {
+        // 오늘이 아닌 날짜는 통계 초기화
+        setState(() {
+          _totalCurrentMah = 0.0;
+          _totalChargingTime = Duration.zero;
+          _avgChargingSpeed = 0.0;
+        });
+      }
+      
       setState(() {
         _chartData = chartData;
         _isLoading = false;
@@ -115,6 +150,73 @@ class _ChargingCurrentChartState extends State<ChargingCurrentChart> {
         _chartData = [];
         _isLoading = false;
       });
+    }
+  }
+  
+  /// 통계 데이터 계산
+  Future<void> _calculateStats(DateTime targetDate) async {
+    try {
+      // 오늘 날짜인지 확인
+      final today = DateTime.now();
+      final todayNormalized = DateTime(today.year, today.month, today.day);
+      final targetDateNormalized = DateTime(targetDate.year, targetDate.month, targetDate.day);
+      final isToday = targetDateNormalized.isAtSameMomentAs(todayNormalized);
+      
+      List<ChargingSessionRecord> sessions;
+      
+      if (isToday) {
+        // 오늘은 실시간 세션 서비스 사용
+        sessions = _sessionService.getTodaySessions();
+      } else {
+        // 과거 날짜는 스토리지에서 조회
+        sessions = await _storageService.getSessionsByDate(targetDateNormalized);
+      }
+      
+      // 유효한 세션만 필터링
+      final validSessions = sessions.where((s) => s.validate()).toList();
+      
+      if (validSessions.isEmpty) {
+        setState(() {
+          _totalCurrentMah = 0.0;
+          _totalChargingTime = Duration.zero;
+          _avgChargingSpeed = 0.0;
+        });
+        return;
+      }
+      
+      // 총 충전 전류량 계산 (mAh)
+      // mAh = (평균 전류(mA) * 충전 시간(시간))
+      double totalMah = 0.0;
+      Duration totalTime = Duration.zero;
+      double totalCurrent = 0.0;
+      
+      for (final session in validSessions) {
+        // 각 세션의 전류량 = 평균 전류 * 시간(시간 단위)
+        final hours = session.duration.inMinutes / 60.0;
+        totalMah += session.avgCurrent * hours;
+        totalTime += session.duration;
+        totalCurrent += session.avgCurrent;
+      }
+      
+      // 평균 충전 속도 (mA)
+      final avgSpeed = totalCurrent / validSessions.length;
+      
+      if (mounted) {
+        setState(() {
+          _totalCurrentMah = totalMah;
+          _totalChargingTime = totalTime;
+          _avgChargingSpeed = avgSpeed;
+        });
+      }
+    } catch (e) {
+      debugPrint('통계 데이터 계산 실패: $e');
+      if (mounted) {
+        setState(() {
+          _totalCurrentMah = 0.0;
+          _totalChargingTime = Duration.zero;
+          _avgChargingSpeed = 0.0;
+        });
+      }
     }
   }
 
@@ -147,7 +249,7 @@ class _ChargingCurrentChartState extends State<ChargingCurrentChart> {
                 SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    '충전 전류 패턴',
+                    '오늘 충전 현황',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -261,6 +363,12 @@ class _ChargingCurrentChartState extends State<ChargingCurrentChart> {
               ],
             ),
           ),
+          
+          // 통계 정보 (오늘 탭일 때만 표시)
+          if (_selectedTab == '오늘' || (_selectedTab == '선택' && _selectedDate != null)) ...[
+            SizedBox(height: 20),
+            _buildStatsSection(),
+          ],
           
           SizedBox(height: 16),
         ],
@@ -410,6 +518,176 @@ class _ChargingCurrentChartState extends State<ChargingCurrentChart> {
       });
       _loadChartData();
     }
+  }
+  
+  /// 통계 정보 섹션 빌드
+  Widget _buildStatsSection() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3),
+              Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.1),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
+            width: 1,
+          ),
+        ),
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Expanded(
+              child: _buildStatItem(
+                icon: Icons.battery_charging_full,
+                iconColor: Colors.blue,
+                value: _formatMah(_totalCurrentMah),
+                label: '총 충전 전류량',
+                unit: 'mAh',
+              ),
+            ),
+            Container(
+              width: 1,
+              height: 50,
+              color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+            ),
+            Expanded(
+              child: _buildStatItem(
+                icon: Icons.access_time,
+                iconColor: Colors.orange,
+                value: _formatDuration(_totalChargingTime),
+                label: '총 충전 시간',
+                unit: '',
+              ),
+            ),
+            Container(
+              width: 1,
+              height: 50,
+              color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+            ),
+            Expanded(
+              child: _buildStatItem(
+                icon: Icons.speed,
+                iconColor: Colors.green,
+                value: _formatSpeed(_avgChargingSpeed),
+                label: '평균 충전 속도',
+                unit: 'mA',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  /// 통계 항목 빌드
+  Widget _buildStatItem({
+    required IconData icon,
+    required Color iconColor,
+    required String value,
+    required String label,
+    required String unit,
+  }) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: iconColor.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(
+            icon,
+            color: iconColor,
+            size: 20,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Flexible(
+              child: Text(
+                value,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (unit.isNotEmpty) ...[
+              const SizedBox(width: 2),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 2),
+                child: Text(
+                  unit,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
+    );
+  }
+  
+  /// mAh 포맷팅
+  String _formatMah(double mah) {
+    if (mah < 1) return '0';
+    if (mah < 1000) {
+      return mah.toStringAsFixed(0);
+    }
+    return '${(mah / 1000).toStringAsFixed(2)}k';
+  }
+  
+  /// Duration 포맷팅
+  String _formatDuration(Duration duration) {
+    if (duration.inMinutes == 0) return '0';
+    
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes % 60;
+    
+    if (hours > 0) {
+      if (minutes > 0) {
+        return '$hours시간 $minutes분';
+      }
+      return '$hours시간';
+    }
+    return '$minutes분';
+  }
+  
+  /// 속도 포맷팅
+  String _formatSpeed(double speed) {
+    if (speed < 1) return '0';
+    if (speed < 1000) {
+      return speed.toStringAsFixed(0);
+    }
+    return '${(speed / 1000).toStringAsFixed(2)}k';
   }
   
   void _showDetailedAnalysis() {

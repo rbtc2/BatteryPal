@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'charging_patterns/widgets/insight_card.dart';
 import 'charging_patterns/widgets/charging_current_chart.dart';
 import 'charging_patterns/widgets/charging_stats_card.dart';
 import 'charging_patterns/widgets/pro_exclusive_section.dart';
@@ -7,10 +6,9 @@ import 'charging_patterns/widgets/pro_exclusive_section.dart';
 /// 충전 패턴 탭 - 리팩토링된 모듈화된 구조
 /// 
 /// 주요 기능:
-/// 1. InsightCard: 접을 수 있는 인사이트 카드
-/// 2. ChargingCurrentChart: fl_chart를 사용한 실시간 충전 전류 그래프
-/// 3. ChargingStatsCard: 향상된 통계 및 세션 기록 카드
-/// 4. Pro 사용자 전용 고급 분석 기능
+/// 1. ChargingCurrentChart: fl_chart를 사용한 실시간 충전 전류 그래프
+/// 2. ChargingStatsCard: 향상된 통계 및 세션 기록 카드
+/// 3. Pro 사용자 전용 고급 분석 기능
 /// 
 /// 애니메이션:
 /// - 페이지 로드 시 순차적 슬라이드 애니메이션
@@ -114,28 +112,14 @@ class _ChargingPatternsTabState extends State<ChargingPatternsTab>
           padding: const EdgeInsets.all(16),
           child: Column(
             children: [
-              // 섹션 1: 인사이트 카드
-              SlideTransition(
-                position: Tween<Offset>(
-                  begin: const Offset(-1.0, 0.0),
-                  end: Offset.zero,
-                ).animate(CurvedAnimation(
-                  parent: _animationController,
-                  curve: const Interval(0.0, 0.3, curve: Curves.easeOut),
-                )),
-                child: InsightCard(),
-              ),
-              
-              SizedBox(height: 16),
-              
-              // 섹션 2: 충전 전류 그래프 (메인)
+              // 섹션 1: 충전 전류 그래프 (메인)
               SlideTransition(
                 position: Tween<Offset>(
                   begin: const Offset(0.0, 1.0),
                   end: Offset.zero,
                 ).animate(CurvedAnimation(
                   parent: _animationController,
-                  curve: const Interval(0.2, 0.6, curve: Curves.easeOut),
+                  curve: const Interval(0.0, 0.4, curve: Curves.easeOut),
                 )),
                 child: ChargingCurrentChart(
                   key: _chartKey,
@@ -146,14 +130,14 @@ class _ChargingPatternsTabState extends State<ChargingPatternsTab>
               
               SizedBox(height: 16),
               
-              // 섹션 3: 통계 + 세션 기록
+              // 섹션 2: 통계 + 세션 기록
               SlideTransition(
                 position: Tween<Offset>(
                   begin: const Offset(1.0, 0.0),
                   end: Offset.zero,
                 ).animate(CurvedAnimation(
                   parent: _animationController,
-                  curve: const Interval(0.4, 0.8, curve: Curves.easeOut),
+                  curve: const Interval(0.2, 0.6, curve: Curves.easeOut),
                 )),
                 child: ChargingStatsCard(
                   key: _statsKey,
@@ -169,7 +153,7 @@ class _ChargingPatternsTabState extends State<ChargingPatternsTab>
                     end: Offset.zero,
                   ).animate(CurvedAnimation(
                     parent: _animationController,
-                    curve: const Interval(0.6, 1.0, curve: Curves.easeOut),
+                    curve: const Interval(0.4, 0.8, curve: Curves.easeOut),
                   )),
                   child: ProExclusiveSection(),
                 ),
