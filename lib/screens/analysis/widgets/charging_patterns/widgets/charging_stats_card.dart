@@ -6,6 +6,7 @@ import '../services/charging_session_storage.dart';
 import '../utils/time_slot_utils.dart';
 import 'charging_session_list_item.dart';
 import 'charging_session_detail_dialog.dart';
+import '../../../../../services/battery_service.dart';
 
 /// 섹션 3: 통계 + 세션 기록 카드
 /// 
@@ -24,10 +25,12 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
   
   final ChargingSessionService _sessionService = ChargingSessionService();
   final ChargingSessionStorage _storageService = ChargingSessionStorage();
+  final BatteryService _batteryService = BatteryService();
   StreamSubscription<List<ChargingSessionRecord>>? _sessionsSubscription;
   
   // 자동 새로고침 타이머
   Timer? _refreshTimer;
+  Timer? _activeSessionUpdateTimer; // 진행 중인 세션 업데이트 타이머
   
   // 날짜 선택 관련 상태 변수
   String _selectedTab = '오늘'; // '오늘', '어제', '2일 전', '선택'
@@ -52,6 +55,8 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
     _initializeService();
     // 자동 새로고침 시작 (오늘 탭일 때만)
     _startAutoRefresh();
+    // 진행 중인 세션 업데이트 시작
+    _startActiveSessionUpdate();
   }
   
   Future<void> _initializeService() async {
@@ -306,6 +311,8 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
     // 타이머 정리
     _refreshTimer?.cancel();
     _refreshTimer = null;
+    _activeSessionUpdateTimer?.cancel();
+    _activeSessionUpdateTimer = null;
     
     // 스트림 구독 해제
     _sessionsSubscription?.cancel();
@@ -317,6 +324,23 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
     // 주의: ChargingSessionService는 싱글톤이므로 여기서 dispose하지 않음
     // 서비스는 앱 전체에서 사용되므로 위젯이 dispose되어도 유지됨
     super.dispose();
+  }
+  
+  /// 진행 중인 세션 업데이트 시작 (1초마다)
+  void _startActiveSessionUpdate() {
+    _activeSessionUpdateTimer?.cancel();
+    _activeSessionUpdateTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      // 오늘 탭이고 진행 중인 세션이 있으면 UI 업데이트
+      if (_selectedTab == '오늘' && _sessionService.isSessionActive) {
+        setState(() {
+          // 상태만 업데이트 (진행 중인 세션 카드 리빌드)
+        });
+      }
+    });
   }
   
   @override
@@ -498,6 +522,11 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
           
           // 세션 기록 리스트 (펼쳤을 때만 표시)
           if (_isSessionsExpanded) ...[
+            // 진행 중인 충전 카드 (오늘 탭이고 진행 중인 세션이 있을 때만)
+            if (_selectedTab == '오늘' && _sessionService.isSessionActive) ...[
+              _buildActiveChargingCard(),
+              SizedBox(height: 12),
+            ],
             if (_isLoading)
               Padding(
                 padding: const EdgeInsets.all(32),
@@ -532,7 +561,9 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
                       ),
                       SizedBox(height: 16),
                       Text(
-                        '${_getDateDisplayText()} 충전 세션이 없습니다',
+                        _selectedTab == '오늘' && _sessionService.isSessionActive
+                            ? '충전 중입니다'
+                            : '${_getDateDisplayText()} 충전 세션이 없습니다',
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
@@ -542,7 +573,9 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
                       ),
                       SizedBox(height: 8),
                       Text(
-                        '해당 날짜에 기록된 충전 세션이 없습니다',
+                        _selectedTab == '오늘' && _sessionService.isSessionActive
+                            ? '3분 이상 충전 시 여기에 기록됩니다'
+                            : '해당 날짜에 기록된 충전 세션이 없습니다',
                         style: TextStyle(
                           fontSize: 12,
                           color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
@@ -973,4 +1006,256 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
   }
 
   // 기존 _buildEnhancedSessionItem 메서드는 제거됨 (ChargingSessionListItem 사용)
+  
+  /// 진행 중인 충전 카드 빌드
+  Widget _buildActiveChargingCard() {
+    final batteryInfo = _batteryService.currentBatteryInfo;
+    final sessionStartTime = _sessionService.sessionStartTime;
+    
+    if (batteryInfo == null || sessionStartTime == null) {
+      return const SizedBox.shrink();
+    }
+    
+    final elapsed = DateTime.now().difference(sessionStartTime);
+    final minutes = elapsed.inMinutes;
+    final seconds = elapsed.inSeconds % 60;
+    
+    // 유의미한 세션이 되기까지 남은 시간 계산 (3분 = 180초)
+    const minSessionDuration = Duration(minutes: 3);
+    final remainingTime = minSessionDuration - elapsed;
+    final remainingMinutes = remainingTime.inMinutes.clamp(0, 999);
+    final remainingSeconds = remainingTime.inSeconds.clamp(0, 59) % 60;
+    
+    final currentLevel = batteryInfo.level;
+    
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Colors.blue.withValues(alpha: 0.15),
+            Colors.blue.withValues(alpha: 0.05),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.blue.withValues(alpha: 0.3),
+          width: 1.5,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 헤더: 진행 중 배지
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _PulsingDot(color: Colors.blue),
+                    const SizedBox(width: 6),
+                    Text(
+                      '진행 중',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue[700],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Spacer(),
+              Text(
+                batteryInfo.chargingTypeText,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                ),
+              ),
+            ],
+          ),
+          
+          const SizedBox(height: 16),
+          
+          // 정보 그리드
+          Row(
+            children: [
+              Expanded(
+                child: _buildActiveInfoItem(
+                  icon: Icons.access_time,
+                  label: '경과 시간',
+                  value: '$minutes분 $seconds초',
+                ),
+              ),
+              Container(
+                width: 1,
+                height: 40,
+                color: Colors.blue.withValues(alpha: 0.2),
+              ),
+              Expanded(
+                child: _buildActiveInfoItem(
+                  icon: Icons.battery_std,
+                  label: '배터리',
+                  value: '${currentLevel.toInt()}%',
+                ),
+              ),
+            ],
+          ),
+          
+          // 유의미한 세션이 되기까지 남은 시간
+          if (remainingTime.inSeconds > 0) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.blue.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    size: 16,
+                    color: Colors.blue[700],
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      remainingMinutes > 0
+                          ? '$remainingMinutes분 $remainingSeconds초 후 기록됩니다'
+                          : '$remainingSeconds초 후 기록됩니다',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.blue[700],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ] else ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.green.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.check_circle_outline,
+                    size: 16,
+                    color: Colors.green[700],
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '충전 세션 기록 조건을 만족했습니다',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.green[700],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+  
+  /// 진행 중인 충전 정보 항목 빌드
+  Widget _buildActiveInfoItem({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          icon,
+          size: 20,
+          color: Colors.blue[700],
+        ),
+        const SizedBox(height: 6),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 깜빡이는 점 (진행 중 표시)
+class _PulsingDot extends StatefulWidget {
+  final Color color;
+  
+  const _PulsingDot({required this.color});
+  
+  @override
+  State<_PulsingDot> createState() => _PulsingDotState();
+}
+
+class _PulsingDotState extends State<_PulsingDot> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 1000),
+      vsync: this,
+    )..repeat(reverse: true);
+  }
+  
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _controller,
+      child: Container(
+        width: 8,
+        height: 8,
+        decoration: BoxDecoration(
+          color: widget.color,
+          shape: BoxShape.circle,
+        ),
+      ),
+    );
+  }
+  
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 }
