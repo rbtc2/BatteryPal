@@ -1,14 +1,32 @@
 import 'dart:async';
-import 'dart:math';
 import 'package:battery_plus/battery_plus.dart';
 import 'package:flutter/material.dart';
 import 'native_battery_service.dart';
 import '../models/app_models.dart';
-import 'notification_service.dart';
 import 'settings_service.dart';
-import 'battery_history_database_service.dart';
+import 'battery/battery_info_validator.dart';
+import 'battery/battery_data_collector.dart';
+import 'battery/charging_current_monitor.dart';
+import 'battery/battery_notification_manager.dart';
 
 /// 배터리 정보를 관리하는 서비스 클래스
+/// 
+/// 이 클래스는 배터리 정보 수집, 검증, 모니터링, 알림 관리를 조합하여
+/// 통합된 배터리 서비스를 제공합니다.
+/// 
+/// 주요 책임:
+/// - 배터리 정보 스트림 관리
+/// - 배터리 모니터링 생명주기 관리
+/// - 분리된 서비스들 간의 조정 및 통신
+/// 
+/// 사용 예시:
+/// ```dart
+/// final batteryService = BatteryService();
+/// await batteryService.startMonitoring();
+/// batteryService.batteryInfoStream.listen((info) {
+///   print('배터리 레벨: ${info.level}%');
+/// });
+/// ```
 class BatteryService {
   static final BatteryService _instance = BatteryService._internal();
   factory BatteryService() => _instance;
@@ -20,34 +38,21 @@ class BatteryService {
   // 배터리 정보 스트림
   StreamController<BatteryInfo>? _batteryInfoController;
   
-  // 충전 전류 전용 모니터링 타이머
-  Timer? _chargingCurrentTimer;
+  // 배터리 정보 검증 서비스
+  final BatteryInfoValidator _validator = BatteryInfoValidator();
   
-  // 적응형 충전 전류 모니터링 간격 (밀리초)
-  int _chargingCurrentInterval = 1000; // 기본 1초
+  // 배터리 정보 수집 서비스
+  final BatteryDataCollector _collector = BatteryDataCollector();
   
-  // 충전 전류 안정성 추적
-  final List<int> _recentChargingCurrents = <int>[];
-  static const int _stabilityCheckCount = 5; // 최근 5회 측정값으로 안정성 판단
+  // 충전 전류 모니터링 서비스
+  final ChargingCurrentMonitor _chargingCurrentMonitor = ChargingCurrentMonitor();
   
-  // 충전 완료 알림 관련
-  SettingsService? _settingsService;
-  bool _hasNotifiedChargingComplete = false; // 중복 알림 방지
-  
-  // 충전 퍼센트 알림 관련
-  final Map<double, bool> _chargingPercentNotified = {}; // 각 퍼센트별 알림 여부 추적
-  
-  // 충전 전류 데이터 저장을 위한 데이터베이스 서비스
-  final BatteryHistoryDatabaseService _databaseService = BatteryHistoryDatabaseService();
-  bool _isDatabaseInitialized = false;
-  
-  // 충전 전류 저장을 위한 배치 버퍼 (성능 최적화)
-  final List<Map<String, dynamic>> _chargingCurrentBuffer = [];
-  Timer? _chargingCurrentSaveTimer;
+  // 알림 관리 서비스
+  final BatteryNotificationManager _notificationManager = BatteryNotificationManager();
   
   /// SettingsService 설정 (선택적)
   void setSettingsService(SettingsService? settingsService) {
-    _settingsService = settingsService;
+    _notificationManager.setSettingsService(settingsService);
   }
   
   Stream<BatteryInfo> get batteryInfoStream {
@@ -58,310 +63,57 @@ class BatteryService {
     return _batteryInfoController!.stream;
   }
   
-  /// 배터리 정보 모델
+  // ==================== 상태 관리 ====================
+  
+  /// 현재 배터리 정보
   BatteryInfo? _currentBatteryInfo;
+  
+  /// 현재 배터리 정보 가져오기
   BatteryInfo? get currentBatteryInfo => _currentBatteryInfo;
   
+  // ==================== 공개 API ====================
+  
   /// 안정화된 충전 전류 가져오기 (이동 평균 사용)
+  /// 
+  /// 최근 측정값들의 평균을 사용하여 노이즈를 줄인 충전 전류를 반환합니다.
   int getStableChargingCurrent() {
-    if (_recentChargingCurrents.isEmpty) {
-      return _currentBatteryInfo?.chargingCurrent ?? -1;
-    }
-    
-    // 최근 측정값들의 평균 사용 (이동 평균)
-    final average = _recentChargingCurrents.reduce((a, b) => a + b) / _recentChargingCurrents.length;
-    return average.round();
+    return _chargingCurrentMonitor.getStableChargingCurrent(_currentBatteryInfo);
   }
   
   /// 중앙값 충전 전류 가져오기 (극값의 영향을 줄임)
+  /// 
+  /// 최근 측정값들의 중앙값을 사용하여 이상치의 영향을 최소화합니다.
   int getMedianChargingCurrent() {
-    if (_recentChargingCurrents.isEmpty) {
-      return _currentBatteryInfo?.chargingCurrent ?? -1;
-    }
-    
-    final sorted = List<int>.from(_recentChargingCurrents)..sort();
-    final middle = sorted.length ~/ 2;
-    
-    if (sorted.length % 2 == 1) {
-      return sorted[middle];
-    } else {
-      return ((sorted[middle - 1] + sorted[middle]) / 2).round();
-    }
+    return _chargingCurrentMonitor.getMedianChargingCurrent(_currentBatteryInfo);
   }
   
   /// 충전 전류 안정성 상태 확인
+  /// 
+  /// Returns: 충전 전류가 안정적이면 true, 그렇지 않으면 false
   bool isChargingCurrentStable() {
-    return _isChargingCurrentStable();
+    return _chargingCurrentMonitor.isChargingCurrentStable();
   }
   
   /// 최근 충전 전류 측정값 개수
-  int get recentChargingCurrentCount => _recentChargingCurrents.length;
+  int get recentChargingCurrentCount => _chargingCurrentMonitor.recentChargingCurrentCount;
   
-  /// 성능 최적화를 위한 로그 레벨 관리
-  static const bool _enableDebugLogs = false; // 릴리즈 빌드에서는 false
-  
-  void _debugLog(String message) {
-    if (_enableDebugLogs) {
-      debugPrint(message);
-    }
-  }
+  // ==================== 내부 상태 ====================
   
   /// 서비스가 dispose되었는지 확인하는 플래그
   bool _isDisposed = false;
   
-  /// 마지막 업데이트 시간
-  DateTime? _lastUpdateTime;
-  
   /// 업데이트 중인지 확인하는 플래그 (중복 업데이트 방지)
   bool _isUpdating = false;
   
-  /// 배터리 정보 검증을 위한 최소 업데이트 간격 (밀리초)
-  static const int _minUpdateInterval = 1000; // 1초
-
-  /// 배터리 정보가 유효한지 검증
-  bool _isValidBatteryInfo(BatteryInfo info) {
-    // 기본 범위 검증
-    if (info.level < 0 || info.level > 100) {
-      debugPrint('배터리 레벨이 유효하지 않음: ${info.level}%');
-      return false;
-    }
-    
-    // 온도 검증 (일반적인 범위)
-    if (info.temperature != -1.0 && (info.temperature < -50 || info.temperature > 100)) {
-      debugPrint('배터리 온도가 유효하지 않음: ${info.temperature}°C');
-      return false;
-    }
-    
-    // 전압 검증 (일반적인 범위)
-    if (info.voltage != -1 && (info.voltage < 3000 || info.voltage > 5000)) {
-      debugPrint('배터리 전압이 유효하지 않음: ${info.voltage}mV');
-      return false;
-    }
-    
-    // 충전 전류 검증 (일반적인 범위)
-    if (info.chargingCurrent != -1 && info.chargingCurrent.abs() > 10000) {
-      debugPrint('충전 전류가 유효하지 않음: ${info.chargingCurrent}mA');
-      return false;
-    }
-    
-    return true;
-  }
+  // ==================== 유틸리티 메서드 ====================
   
-  /// 업데이트 간격 검증
-  bool _shouldUpdate() {
-    if (_lastUpdateTime == null) return true;
-    
-    final now = DateTime.now();
-    final timeDiff = now.difference(_lastUpdateTime!).inMilliseconds;
-    
-    return timeDiff >= _minUpdateInterval;
-  }
+  /// 성능 최적화를 위한 로그 레벨 관리
+  static const bool _enableDebugLogs = false; // 릴리즈 빌드에서는 false
   
-  /// 배터리 레벨에 따른 적응형 모니터링 간격 계산
-  int _getAdaptiveMonitoringInterval() {
-    if (_currentBatteryInfo == null) return 1000; // 기본 1초
-    
-    final batteryLevel = _currentBatteryInfo!.level;
-    
-    if (batteryLevel >= 80) {
-      return 2000; // 80% 이상: 2초 간격 (충전 속도 감소)
-    } else if (batteryLevel >= 50) {
-      return 1000; // 50-80%: 1초 간격
-    } else {
-      return 500;  // 50% 미만: 0.5초 간격 (빠른 충전)
-    }
-  }
-  
-  /// 충전 전류 안정성 확인
-  bool _isChargingCurrentStable() {
-    if (_recentChargingCurrents.length < _stabilityCheckCount) {
-      return false; // 충분한 데이터가 없으면 불안정으로 간주
-    }
-    
-    // 최근 측정값들의 표준편차 계산
-    final average = _recentChargingCurrents.reduce((a, b) => a + b) / _recentChargingCurrents.length;
-    final variance = _recentChargingCurrents.map((x) => (x - average) * (x - average)).reduce((a, b) => a + b) / _recentChargingCurrents.length;
-    final standardDeviation = sqrt(variance);
-    
-    // 표준편차가 평균의 10% 미만이면 안정적
-    return standardDeviation < (average * 0.1);
-  }
-  
-  /// 충전 전류 안정성에 따른 간격 조정
-  void _adjustMonitoringInterval() {
-    final adaptiveInterval = _getAdaptiveMonitoringInterval();
-    final stabilityFactor = _isChargingCurrentStable() ? 1.5 : 1.0; // 안정적이면 간격 늘리기
-    
-    _chargingCurrentInterval = (adaptiveInterval * stabilityFactor).round();
-    
-    debugPrint('모니터링 간격 조정: ${_chargingCurrentInterval}ms (적응형: ${adaptiveInterval}ms, 안정성: ${_isChargingCurrentStable()})');
-  }
-  
-  /// 충전 전류 전용 모니터링 시작 (적응형 간격)
-  void _startChargingCurrentMonitoring() {
-    if (_chargingCurrentTimer != null) {
-      debugPrint('충전 전류 모니터링이 이미 실행 중입니다');
-      return;
-    }
-    
-    // 초기 간격 설정
-    _adjustMonitoringInterval();
-    
-    debugPrint('충전 전류 전용 모니터링 시작 (${_chargingCurrentInterval}ms 간격)');
-    
-    _chargingCurrentTimer = Timer.periodic(
-      Duration(milliseconds: _chargingCurrentInterval),
-      (timer) async {
-        if (!_isDisposed && _currentBatteryInfo?.isCharging == true) {
-          await _updateChargingCurrentOnly();
-          
-          // 간격 동적 조정 (매 5회마다)
-          if (_recentChargingCurrents.length % 5 == 0) {
-            _adjustMonitoringInterval();
-            // 타이머 재시작 (새로운 간격으로)
-            _restartChargingCurrentTimer();
-          }
-        }
-      },
-    );
-  }
-  
-  /// 충전 전류 모니터링 타이머 재시작 (새로운 간격으로)
-  void _restartChargingCurrentTimer() {
-    _chargingCurrentTimer?.cancel();
-    _chargingCurrentTimer = null;
-    
-    if (_currentBatteryInfo?.isCharging == true) {
-      debugPrint('충전 전류 모니터링 재시작 (${_chargingCurrentInterval}ms 간격)');
-      
-      _chargingCurrentTimer = Timer.periodic(
-        Duration(milliseconds: _chargingCurrentInterval),
-        (timer) async {
-          if (!_isDisposed && _currentBatteryInfo?.isCharging == true) {
-            await _updateChargingCurrentOnly();
-            
-            // 간격 동적 조정 (매 5회마다)
-            if (_recentChargingCurrents.length % 5 == 0) {
-              _adjustMonitoringInterval();
-              _restartChargingCurrentTimer();
-            }
-          }
-        },
-      );
-    }
-  }
-  
-  /// 충전 전류 전용 모니터링 중지
-  void _stopChargingCurrentMonitoring() {
-    debugPrint('충전 전류 전용 모니터링 중지');
-    _chargingCurrentTimer?.cancel();
-    _chargingCurrentTimer = null;
-  }
-  
-  /// 충전 전류만 빠르게 업데이트 (안정성 추적 포함)
-  Future<void> _updateChargingCurrentOnly() async {
-    if (_isDisposed) {
-      debugPrint('서비스가 이미 dispose됨, 충전 전류 업데이트 건너뜀');
-      return;
-    }
-    
-    try {
-      debugPrint('충전 전류만 업데이트 시작...');
-      
-      // 네이티브에서 충전 전류만 빠르게 가져오기
-      final chargingCurrent = await NativeBatteryService.getChargingCurrentOnly();
-      
-      if (chargingCurrent >= 0 && _currentBatteryInfo != null) {
-        // 충전 전류 안정성 추적을 위한 데이터 수집
-        _recentChargingCurrents.add(chargingCurrent);
-        if (_recentChargingCurrents.length > _stabilityCheckCount) {
-          _recentChargingCurrents.removeAt(0); // 오래된 데이터 제거
-        }
-        
-        // 기존 배터리 정보의 충전 전류만 업데이트
-        final updatedBatteryInfo = _currentBatteryInfo!.copyWith(
-          chargingCurrent: chargingCurrent,
-          timestamp: DateTime.now(),
-        );
-        
-        // 충전 전류가 실제로 변경된 경우에만 업데이트 및 저장
-        if (_currentBatteryInfo!.chargingCurrent != chargingCurrent) {
-          debugPrint('충전 전류 변화 감지: ${_currentBatteryInfo!.chargingCurrent}mA → ${chargingCurrent}mA');
-          
-          _currentBatteryInfo = updatedBatteryInfo;
-          _safeAddEvent(updatedBatteryInfo);
-          
-          // 충전 전류 데이터를 데이터베이스에 저장 (배치 처리)
-          await _saveChargingCurrentToDatabase(chargingCurrent);
-          
-          debugPrint('충전 전류 업데이트 완료: ${chargingCurrent}mA');
-        }
-      }
-      
-    } catch (e) {
-      debugPrint('충전 전류 업데이트 실패: $e');
-    }
-  }
-  
-  /// 충전 전류 데이터를 데이터베이스에 저장 (배치 처리)
-  Future<void> _saveChargingCurrentToDatabase(int currentMa) async {
-    try {
-      // 데이터베이스 초기화 확인
-      if (!_isDatabaseInitialized) {
-        await _databaseService.initialize();
-        _isDatabaseInitialized = true;
-      }
-      
-      // 현재 시간과 충전 전류를 버퍼에 추가
-      _chargingCurrentBuffer.add({
-        'timestamp': DateTime.now(),
-        'currentMa': currentMa,
-      });
-      
-      // 배치 저장 타이머가 없으면 시작 (10초마다 저장)
-      _chargingCurrentSaveTimer ??= Timer.periodic(Duration(seconds: 10), (timer) async {
-        if (_chargingCurrentBuffer.isNotEmpty) {
-          final pointsToSave = List<Map<String, dynamic>>.from(_chargingCurrentBuffer);
-          _chargingCurrentBuffer.clear();
-          
-          try {
-            await _databaseService.insertChargingCurrentPoints(pointsToSave);
-            debugPrint('충전 전류 데이터 ${pointsToSave.length}개 배치 저장 완료');
-            
-            // 저장 후 7일 이상 된 데이터 자동 정리 (주기적으로만 실행)
-            // 매 저장마다 실행하면 성능 저하가 있으므로, 10번 중 1번만 실행
-            if (DateTime.now().second % 10 == 0) {
-              await _databaseService.cleanupOldChargingCurrentData();
-            }
-          } catch (e) {
-            debugPrint('충전 전류 데이터 배치 저장 실패: $e');
-            // 실패 시 다시 버퍼에 추가
-            _chargingCurrentBuffer.addAll(pointsToSave);
-          }
-        }
-      });
-      
-      // 버퍼가 너무 크면 (100개 이상) 즉시 저장
-      if (_chargingCurrentBuffer.length >= 100) {
-        final pointsToSave = List<Map<String, dynamic>>.from(_chargingCurrentBuffer);
-        _chargingCurrentBuffer.clear();
-        
-        try {
-          await _databaseService.insertChargingCurrentPoints(pointsToSave);
-          debugPrint('충전 전류 데이터 ${pointsToSave.length}개 즉시 저장 완료 (버퍼 초과)');
-          
-          // 저장 후 7일 이상 된 데이터 자동 정리 (드물게만 실행)
-          if (DateTime.now().second % 30 == 0) {
-            await _databaseService.cleanupOldChargingCurrentData();
-          }
-        } catch (e) {
-          debugPrint('충전 전류 데이터 즉시 저장 실패: $e');
-          // 실패 시 다시 버퍼에 추가
-          _chargingCurrentBuffer.addAll(pointsToSave);
-        }
-      }
-    } catch (e) {
-      debugPrint('충전 전류 데이터 저장 준비 실패: $e');
+  /// 디버그 로그 출력 (조건부)
+  void _debugLog(String message) {
+    if (_enableDebugLogs) {
+      debugPrint(message);
     }
   }
   
@@ -379,7 +131,13 @@ class BatteryService {
     }
   }
 
+  // ==================== 모니터링 관리 ====================
+  
   /// 배터리 모니터링 시작
+  /// 
+  /// 배터리 상태 변화를 감지하고, 충전 전류 모니터링 및 알림을 시작합니다.
+  /// 
+  /// Throws: 모니터링 시작 실패 시 예외 발생
   Future<void> startMonitoring() async {
     if (_isDisposed) {
       debugPrint('서비스가 이미 dispose됨, 모니터링 시작 건너뜀');
@@ -388,6 +146,16 @@ class BatteryService {
     
     try {
       debugPrint('배터리 모니터링 시작...');
+      
+      // 충전 전류 모니터 콜백 설정
+      _chargingCurrentMonitor.setCallbacks(
+        onChargingCurrentUpdate: (updatedInfo) {
+          _currentBatteryInfo = updatedInfo;
+          _safeAddEvent(updatedInfo);
+        },
+        isDisposed: () => _isDisposed,
+        getCurrentBatteryInfo: () => _currentBatteryInfo,
+      );
       
       // 기존 구독 정리
       await _batteryStateSubscription?.cancel();
@@ -402,15 +170,15 @@ class BatteryService {
       // 배터리 상태 변화 감지 (디바운싱 적용)
       _batteryStateSubscription = _battery.onBatteryStateChanged.listen(
         (BatteryState state) async {
-          if (!_isDisposed && _shouldUpdate()) {
+          if (!_isDisposed && _validator.shouldUpdate()) {
             debugPrint('배터리 상태 변화 감지: $state');
             await _updateBatteryInfo();
             
             // 충전 상태 변화 시 충전 전류 모니터링 시작/중지
             if (state == BatteryState.charging) {
-              _startChargingCurrentMonitoring();
+              _chargingCurrentMonitor.startMonitoring();
             } else {
-              _stopChargingCurrentMonitoring();
+              _chargingCurrentMonitor.stopMonitoring();
             }
           }
         },
@@ -421,7 +189,7 @@ class BatteryService {
       
       // 초기 충전 상태 확인하여 충전 전류 모니터링 시작
       if (_currentBatteryInfo?.isCharging == true) {
-        _startChargingCurrentMonitoring();
+        _chargingCurrentMonitor.startMonitoring();
       }
       
       debugPrint('배터리 모니터링 시작 완료');
@@ -432,7 +200,45 @@ class BatteryService {
     }
   }
 
+  // ==================== 이벤트 핸들러 ====================
+  
+  /// 충전 상태 변화 처리 (헬퍼 메서드)
+  /// 
+  /// 충전 상태 변화에 따라 충전 전류 모니터링을 시작/중지하고,
+  /// 알림을 체크합니다.
+  Future<void> _handleChargingStateChange(
+    BatteryInfo batteryInfo,
+    bool wasCharging,
+    double previousLevel,
+  ) async {
+    if (batteryInfo.isCharging && !wasCharging) {
+      // 충전 시작
+      debugPrint('충전 시작 감지 - 충전 전류 모니터링 시작');
+      _chargingCurrentMonitor.startMonitoring();
+      _notificationManager.resetNotificationFlags();
+    } else if (!batteryInfo.isCharging && wasCharging) {
+      // 충전 종료
+      debugPrint('충전 종료 감지 - 충전 전류 모니터링 중지');
+      _chargingCurrentMonitor.stopMonitoring();
+      await _chargingCurrentMonitor.flushBuffer();
+      _notificationManager.resetNotificationFlags();
+    }
+    
+    // 알림 체크
+    await _notificationManager.checkChargingCompleteNotification(
+      batteryInfo,
+      previousLevel,
+      wasCharging,
+    );
+    await _notificationManager.checkChargingPercentNotification(
+      batteryInfo,
+      previousLevel,
+    );
+  }
+  
   /// 네이티브에서 오는 배터리 상태 변화 즉시 처리
+  /// 
+  /// 네이티브 서비스에서 실시간으로 전달되는 충전 정보를 처리합니다.
   Future<void> _handleNativeBatteryStateChange(Map<String, dynamic> chargingInfo) async {
     if (_isDisposed) {
       debugPrint('서비스가 이미 dispose됨, 네이티브 배터리 상태 변화 처리 건너뜀');
@@ -460,35 +266,15 @@ class BatteryService {
         health: currentHealth,
       );
       
-      if (_isValidBatteryInfo(batteryInfo)) {
+      if (_validator.isValidBatteryInfo(batteryInfo)) {
         final previousLevel = _currentBatteryInfo?.level ?? 0.0;
         _currentBatteryInfo = batteryInfo;
         
         // 즉시 스트림에 이벤트 추가 (디바운싱 없이)
         _safeAddEvent(batteryInfo);
         
-        // 충전 상태 변화 감지하여 충전 전류 모니터링 시작/중지
-        if (batteryInfo.isCharging && !wasCharging) {
-          debugPrint('충전 시작 감지 - 충전 전류 모니터링 시작');
-          _startChargingCurrentMonitoring();
-          // 충전 시작 시 알림 플래그 리셋
-          _hasNotifiedChargingComplete = false;
-          _chargingPercentNotified.clear();
-        } else if (!batteryInfo.isCharging && wasCharging) {
-          debugPrint('충전 종료 감지 - 충전 전류 모니터링 중지');
-          _stopChargingCurrentMonitoring();
-          // 충전 종료 시 남은 데이터 저장
-          await _flushChargingCurrentBuffer();
-          // 충전 종료 시 알림 플래그 리셋
-          _hasNotifiedChargingComplete = false;
-          _chargingPercentNotified.clear();
-        }
-        
-        // 충전 완료 알림 체크
-        _checkChargingCompleteNotification(batteryInfo, previousLevel, wasCharging);
-        
-        // 충전 퍼센트 알림 체크
-        _checkChargingPercentNotification(batteryInfo, previousLevel);
+        // 충전 상태 변화 처리
+        await _handleChargingStateChange(batteryInfo, wasCharging, previousLevel);
         
         debugPrint('네이티브 배터리 상태 변화 처리 완료: ${batteryInfo.formattedLevel}');
       } else {
@@ -501,38 +287,27 @@ class BatteryService {
   }
 
   /// 배터리 모니터링 중지
+  /// 
+  /// 모든 모니터링을 중지하고 리소스를 정리합니다.
   void stopMonitoring() {
     _batteryStateSubscription?.cancel();
     _batteryStateSubscription = null;
     
     // 충전 전류 모니터링도 중지
-    _stopChargingCurrentMonitoring();
+    _chargingCurrentMonitor.stopMonitoring();
     
     // 남은 충전 전류 데이터 저장
-    _flushChargingCurrentBuffer();
-  }
-  
-  /// 충전 전류 버퍼에 남은 데이터를 즉시 저장
-  Future<void> _flushChargingCurrentBuffer() async {
-    _chargingCurrentSaveTimer?.cancel();
-    _chargingCurrentSaveTimer = null;
-    
-    if (_chargingCurrentBuffer.isNotEmpty) {
-      final pointsToSave = List<Map<String, dynamic>>.from(_chargingCurrentBuffer);
-      _chargingCurrentBuffer.clear();
-      
-      try {
-        if (_isDatabaseInitialized) {
-          await _databaseService.insertChargingCurrentPoints(pointsToSave);
-          debugPrint('충전 전류 데이터 ${pointsToSave.length}개 최종 저장 완료');
-        }
-      } catch (e) {
-        debugPrint('충전 전류 데이터 최종 저장 실패: $e');
-      }
-    }
+    _chargingCurrentMonitor.flushBuffer();
   }
 
+  // ==================== 배터리 정보 업데이트 ====================
+  
   /// 배터리 정보 업데이트
+  /// 
+  /// 배터리 정보를 수집하고 검증한 후, 상태 변화에 따라
+  /// 충전 전류 모니터링 및 알림을 처리합니다.
+  /// 
+  /// [forceUpdate]: true이면 업데이트 간격 검증을 건너뜁니다.
   Future<void> _updateBatteryInfo({bool forceUpdate = false}) async {
     if (_isDisposed) {
       debugPrint('서비스가 이미 dispose됨, 배터리 정보 업데이트 건너뜀');
@@ -546,51 +321,29 @@ class BatteryService {
     }
     
     // 업데이트 간격 검증 (강제 업데이트가 아닌 경우)
-    if (!forceUpdate && !_shouldUpdate()) {
+    if (!forceUpdate && !_validator.shouldUpdate()) {
       debugPrint('업데이트 간격이 너무 짧아서 건너뜀');
       return;
     }
     
     _isUpdating = true;
-    _lastUpdateTime = DateTime.now();
+    _validator.setLastUpdateTime(DateTime.now());
     
     try {
       debugPrint('배터리 정보 업데이트 시작... (강제: $forceUpdate)');
       
-      // 네이티브 배터리 정보를 우선적으로 가져오기
-      BatteryInfo? batteryInfo = await _getNativeBatteryInfo();
-      
-      // 네이티브 정보가 실패한 경우 플러그인 정보로 폴백
-      if (batteryInfo == null) {
-        debugPrint('네이티브 정보 실패, 플러그인 정보로 폴백');
-        batteryInfo = await _getPluginBatteryInfo();
-      }
+      // 배터리 정보 수집 (자동 폴백)
+      BatteryInfo? batteryInfo = await _collector.collectBatteryInfo();
       
       // 최종 검증 및 업데이트
-      if (batteryInfo != null && _isValidBatteryInfo(batteryInfo)) {
+      if (batteryInfo != null && _validator.isValidBatteryInfo(batteryInfo)) {
         final wasCharging = _currentBatteryInfo?.isCharging ?? false;
         final previousLevel = _currentBatteryInfo?.level ?? 0.0;
         _currentBatteryInfo = batteryInfo;
         _safeAddEvent(batteryInfo);
         
-        // 충전 상태 변화 감지하여 충전 전류 모니터링 시작/중지
-        if (batteryInfo.isCharging && !wasCharging) {
-          _startChargingCurrentMonitoring();
-          // 충전 시작 시 알림 플래그 리셋
-          _hasNotifiedChargingComplete = false;
-        } else if (!batteryInfo.isCharging && wasCharging) {
-          _stopChargingCurrentMonitoring();
-          // 충전 종료 시 남은 데이터 저장
-          await _flushChargingCurrentBuffer();
-          // 충전 종료 시 알림 플래그 리셋
-          _hasNotifiedChargingComplete = false;
-        }
-        
-        // 충전 완료 알림 체크
-        _checkChargingCompleteNotification(batteryInfo, previousLevel, wasCharging);
-        
-        // 충전 퍼센트 알림 체크
-        _checkChargingPercentNotification(batteryInfo, previousLevel);
+        // 충전 상태 변화 처리
+        await _handleChargingStateChange(batteryInfo, wasCharging, previousLevel);
         
         debugPrint('배터리 정보 업데이트 완료: ${batteryInfo.formattedLevel}');
       } else {
@@ -602,286 +355,20 @@ class BatteryService {
       debugPrint('스택 트레이스: $stackTrace');
       
       // 최종 폴백: 최소한의 배터리 정보라도 표시
-      await _fallbackToMinimalBatteryInfo();
+      final fallbackInfo = await _collector.getMinimalBatteryInfo();
+      _currentBatteryInfo = fallbackInfo;
+      _safeAddEvent(fallbackInfo);
+      debugPrint('최소 배터리 정보로 폴백: ${fallbackInfo.formattedLevel}');
     } finally {
       _isUpdating = false;
     }
   }
   
-  /// 네이티브 배터리 정보 가져오기 (우선 사용)
-  Future<BatteryInfo?> _getNativeBatteryInfo() async {
-    try {
-      debugPrint('네이티브 배터리 정보 수집 시작...');
-      
-      // 모든 네이티브 정보를 병렬로 가져오기
-      final futures = await Future.wait([
-        NativeBatteryService.getBatteryLevel(),
-        NativeBatteryService.getBatteryTemperature(),
-        NativeBatteryService.getBatteryVoltage(),
-        NativeBatteryService.getBatteryCapacity(),
-        NativeBatteryService.getBatteryHealth(),
-        NativeBatteryService.getChargingInfo(),
-      ]);
-      
-      final nativeLevel = futures[0] as double;
-      final temperature = futures[1] as double;
-      final voltage = futures[2] as int;
-      final capacity = futures[3] as int;
-      final health = futures[4] as int;
-      final chargingInfo = futures[5] as Map<String, dynamic>;
-      
-      // 네이티브 레벨이 유효한지 확인
-      if (nativeLevel < 0) {
-        debugPrint('네이티브 레벨이 유효하지 않음: $nativeLevel');
-        return null;
-      }
-      
-      // 플러그인에서 기본 상태 정보 가져오기
-      final batteryState = await _battery.batteryState;
-      
-      final batteryInfo = BatteryInfo(
-        level: nativeLevel,
-        state: batteryState,
-        timestamp: DateTime.now(),
-        temperature: temperature,
-        voltage: voltage,
-        capacity: capacity,
-        health: health,
-        chargingType: chargingInfo['chargingType'] ?? 'Unknown',
-        chargingCurrent: chargingInfo['chargingCurrent'] ?? -1,
-        isCharging: chargingInfo['isCharging'] ?? (batteryState == BatteryState.charging),
-      );
-      
-      debugPrint('네이티브 배터리 정보 수집 완료: ${batteryInfo.formattedLevel}');
-      return batteryInfo;
-      
-    } catch (e) {
-      debugPrint('네이티브 배터리 정보 수집 실패: $e');
-      return null;
-    }
-  }
+  // ==================== 공개 메서드 ====================
   
-  /// 플러그인 배터리 정보 가져오기 (폴백)
-  Future<BatteryInfo?> _getPluginBatteryInfo() async {
-    try {
-      debugPrint('플러그인 배터리 정보 수집 시작...');
-      
-      final batteryLevel = await _battery.batteryLevel;
-      final batteryState = await _battery.batteryState;
-      
-      final batteryInfo = BatteryInfo(
-        level: batteryLevel.toDouble(),
-        state: batteryState,
-        timestamp: DateTime.now(),
-        temperature: -1.0,
-        voltage: -1,
-        capacity: -1,
-        health: -1,
-        chargingType: 'Unknown',
-        chargingCurrent: -1,
-        isCharging: batteryState == BatteryState.charging,
-      );
-      
-      debugPrint('플러그인 배터리 정보 수집 완료: ${batteryInfo.formattedLevel}');
-      return batteryInfo;
-      
-    } catch (e) {
-      debugPrint('플러그인 배터리 정보 수집 실패: $e');
-      return null;
-    }
-  }
-  
-  /// 충전 타입이 알림 대상인지 확인
-  bool _shouldNotifyForChargingType(
-    String chargingType,
-    bool notifyOnFastCharging,
-    bool notifyOnNormalCharging,
-  ) {
-    // 둘 다 false면 알림 안 함
-    if (!notifyOnFastCharging && !notifyOnNormalCharging) {
-      return false;
-    }
-    
-    // 둘 다 true면 모든 타입 알림
-    if (notifyOnFastCharging && notifyOnNormalCharging) {
-      return true;
-    }
-    
-    // AC는 고속 충전, USB/Wireless는 일반 충전
-    final isFastCharging = chargingType == 'AC';
-    final isNormalCharging = chargingType == 'USB' || chargingType == 'Wireless';
-    
-    if (notifyOnFastCharging && isFastCharging) {
-      return true;
-    }
-    
-    if (notifyOnNormalCharging && isNormalCharging) {
-      return true;
-    }
-    
-    return false;
-  }
-
-  /// 충전 완료 알림 체크 및 표시
-  Future<void> _checkChargingCompleteNotification(
-    BatteryInfo batteryInfo,
-    double previousLevel,
-    bool wasCharging,
-  ) async {
-    // 설정이 없으면 알림 안 함
-    if (_settingsService == null) {
-      return;
-    }
-    
-    // 충전 완료 알림이 비활성화되어 있으면 알림 안 함
-    if (!_settingsService!.appSettings.chargingCompleteNotificationEnabled) {
-      return;
-    }
-    
-    // 충전 타입 필터 확인
-    final shouldNotify = _shouldNotifyForChargingType(
-      batteryInfo.chargingType,
-      _settingsService!.appSettings.chargingCompleteNotifyOnFastCharging,
-      _settingsService!.appSettings.chargingCompleteNotifyOnNormalCharging,
-    );
-    
-    if (!shouldNotify) {
-      return;
-    }
-    
-    // 이미 알림을 보냈으면 다시 보내지 않음
-    if (_hasNotifiedChargingComplete) {
-      return;
-    }
-    
-    // 조건 확인:
-    // 1. 현재 충전 중이어야 함
-    // 2. 배터리 레벨이 100%여야 함
-    // 3. 이전 레벨이 100% 미만이어야 함 (100%에 도달한 순간 감지)
-    if (batteryInfo.isCharging &&
-        batteryInfo.level >= 100.0 &&
-        previousLevel < 100.0) {
-      try {
-        await NotificationService().showChargingCompleteNotification();
-        _hasNotifiedChargingComplete = true;
-        debugPrint('충전 완료 알림 표시됨');
-      } catch (e) {
-        debugPrint('충전 완료 알림 표시 실패: $e');
-      }
-    }
-    
-    // 배터리 레벨이 100% 미만으로 떨어지면 알림 플래그 리셋 (다시 충전 시 알림 가능하도록)
-    if (batteryInfo.level < 100.0) {
-      _hasNotifiedChargingComplete = false;
-    }
-  }
-
-  /// 충전 퍼센트 알림 체크 및 표시
-  Future<void> _checkChargingPercentNotification(
-    BatteryInfo batteryInfo,
-    double previousLevel,
-  ) async {
-    // 설정이 없으면 알림 안 함
-    if (_settingsService == null) {
-      return;
-    }
-    
-    // 충전 퍼센트 알림이 비활성화되어 있으면 알림 안 함
-    if (!_settingsService!.appSettings.chargingPercentNotificationEnabled) {
-      return;
-    }
-    
-    // 충전 중이 아니면 알림 안 함
-    if (!batteryInfo.isCharging) {
-      // 충전 종료 시 알림 플래그 리셋
-      _chargingPercentNotified.clear();
-      return;
-    }
-    
-    // 알림 받을 퍼센트 목록이 비어있으면 알림 안 함
-    final thresholds = _settingsService!.appSettings.chargingPercentThresholds;
-    if (thresholds.isEmpty) {
-      return;
-    }
-    
-    // 충전 타입 필터 확인
-    final shouldNotify = _shouldNotifyForChargingType(
-      batteryInfo.chargingType,
-      _settingsService!.appSettings.chargingPercentNotifyOnFastCharging,
-      _settingsService!.appSettings.chargingPercentNotifyOnNormalCharging,
-    );
-    
-    if (!shouldNotify) {
-      return;
-    }
-    
-    // 각 임계값에 대해 확인
-    for (final threshold in thresholds) {
-      // 현재 레벨이 임계값 이상이고, 이전 레벨이 임계값 미만인 경우 알림
-      if (batteryInfo.level >= threshold && previousLevel < threshold) {
-        // 이미 알림을 보낸 퍼센트인지 확인
-        if (!(_chargingPercentNotified[threshold] ?? false)) {
-          try {
-            await NotificationService().showChargingPercentNotification(threshold.toInt());
-            _chargingPercentNotified[threshold] = true;
-            debugPrint('충전 퍼센트 알림 표시됨: ${threshold.toInt()}%');
-          } catch (e) {
-            debugPrint('충전 퍼센트 알림 표시 실패: $e');
-          }
-        }
-      }
-      
-      // 레벨이 임계값 미만으로 떨어지면 알림 플래그 리셋
-      if (batteryInfo.level < threshold) {
-        _chargingPercentNotified[threshold] = false;
-      }
-    }
-  }
-  
-  /// 최소한의 배터리 정보로 폴백
-  Future<void> _fallbackToMinimalBatteryInfo() async {
-    try {
-      final batteryLevel = await _battery.batteryLevel;
-      final batteryState = await _battery.batteryState;
-      
-      final batteryInfo = BatteryInfo(
-        level: batteryLevel.toDouble(),
-        state: batteryState,
-        timestamp: DateTime.now(),
-        temperature: -1.0,
-        voltage: -1,
-        capacity: -1,
-        health: -1,
-        chargingType: 'Unknown',
-        chargingCurrent: -1,
-        isCharging: batteryState == BatteryState.charging,
-      );
-      
-      _currentBatteryInfo = batteryInfo;
-      _safeAddEvent(batteryInfo);
-      debugPrint('최소 배터리 정보로 폴백: ${batteryInfo.formattedLevel}');
-      
-    } catch (fallbackError) {
-      debugPrint('최종 폴백도 실패: $fallbackError');
-      // 완전히 실패한 경우에도 빈 정보라도 전송하여 UI가 업데이트되도록 함
-      final batteryInfo = BatteryInfo(
-        level: 0.0,
-        state: BatteryState.unknown,
-        timestamp: DateTime.now(),
-        temperature: -1.0,
-        voltage: -1,
-        capacity: -1,
-        health: -1,
-        chargingType: 'Unknown',
-        chargingCurrent: -1,
-        isCharging: false,
-      );
-      _currentBatteryInfo = batteryInfo;
-      _safeAddEvent(batteryInfo);
-    }
-  }
-
   /// 수동으로 배터리 정보 새로고침
+  /// 
+  /// 사용자가 명시적으로 배터리 정보를 새로고침할 때 사용합니다.
   Future<void> refreshBatteryInfo() async {
     if (_isDisposed) {
       debugPrint('서비스가 이미 dispose됨, 배터리 정보 새로고침 건너뜀');
@@ -892,29 +379,31 @@ class BatteryService {
     await _updateBatteryInfo(forceUpdate: true);
   }
   
+  // ==================== 생명주기 관리 ====================
+  
   /// 배터리 서비스 상태 초기화 (앱 시작 시 호출)
+  /// 
+  /// 모든 상태를 초기화하고 스트림 컨트롤러를 재생성합니다.
   Future<void> resetService() async {
     debugPrint('배터리 서비스 상태 초기화...');
     
     // 기존 정보 초기화
     _currentBatteryInfo = null;
-    _lastUpdateTime = null;
+    _validator.resetLastUpdateTime();
     _isUpdating = false;
     
-    // 충전 전류 안정성 추적 데이터 초기화
-    _recentChargingCurrents.clear();
-    _chargingCurrentInterval = 1000; // 기본값으로 리셋
+    // 충전 전류 모니터 초기화
+    _chargingCurrentMonitor.reset();
     
     // 알림 플래그 초기화
-    _hasNotifiedChargingComplete = false;
-    _chargingPercentNotified.clear();
+    _notificationManager.resetNotificationFlags();
     
     // 기존 구독 정리
     await _batteryStateSubscription?.cancel();
     _batteryStateSubscription = null;
     
     // 충전 전류 모니터링 중지
-    _stopChargingCurrentMonitoring();
+    _chargingCurrentMonitor.stopMonitoring();
     
     // 스트림 컨트롤러 재생성
     if (_batteryInfoController != null && !_batteryInfoController!.isClosed) {
@@ -926,13 +415,13 @@ class BatteryService {
   }
 
   /// 리소스 정리
+  /// 
+  /// 모든 모니터링을 중지하고 리소스를 해제합니다.
+  /// 앱 종료 시 반드시 호출해야 합니다.
   void dispose() {
     debugPrint('배터리 서비스 dispose 시작...');
     _isDisposed = true;
     stopMonitoring();
-    
-    // 충전 전류 모니터링도 중지
-    _stopChargingCurrentMonitoring();
     
     if (_batteryInfoController != null && !_batteryInfoController!.isClosed) {
       _batteryInfoController!.close();
@@ -940,14 +429,14 @@ class BatteryService {
     _batteryInfoController = null;
     
     _currentBatteryInfo = null;
-    _lastUpdateTime = null;
+    _validator.resetLastUpdateTime();
     _isUpdating = false;
     
-    // 충전 전류 안정성 추적 데이터 정리
-    _recentChargingCurrents.clear();
+    // 충전 전류 모니터 정리
+    _chargingCurrentMonitor.dispose();
     
-    // 알림 플래그 정리
-    _chargingPercentNotified.clear();
+    // 알림 관리자 정리
+    _notificationManager.dispose();
     
     debugPrint('배터리 서비스 dispose 완료');
   }
