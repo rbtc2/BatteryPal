@@ -548,44 +548,44 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
                 ),
               )
             else if (_currentSessions.isEmpty)
-              Padding(
-                padding: const EdgeInsets.all(32),
-                child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.battery_charging_full,
-                        size: 48,
-                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
-                      ),
-                      SizedBox(height: 16),
-                      Text(
-                        _selectedTab == '오늘' && _sessionService.isSessionActive
-                            ? '충전 중입니다'
-                            : '${_getDateDisplayText()} 충전 세션이 없습니다',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+              // 진행 중인 충전 카드가 표시될 때는 빈 상태 메시지 숨김
+              if (_selectedTab == '오늘' && _sessionService.isSessionActive)
+                const SizedBox.shrink()
+              else
+                Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.battery_charging_full,
+                          size: 48,
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
                         ),
-                        textAlign: TextAlign.center,
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        _selectedTab == '오늘' && _sessionService.isSessionActive
-                            ? '3분 이상 충전 시 여기에 기록됩니다'
-                            : '해당 날짜에 기록된 충전 세션이 없습니다',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                        SizedBox(height: 16),
+                        Text(
+                          '${_getDateDisplayText()} 충전 세션이 없습니다',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                          ),
+                          textAlign: TextAlign.center,
                         ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
+                        SizedBox(height: 8),
+                        Text(
+                          '해당 날짜에 기록된 충전 세션이 없습니다',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              )
+                )
             else
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
