@@ -182,29 +182,13 @@ class _RealtimeChargingMonitorState extends State<RealtimeChargingMonitor> {
           mainAxisSize: MainAxisSize.min,
           children: [
             // 제목: 마지막 충전 정보
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Text(
-                    '📊',
-                    style: TextStyle(fontSize: 18),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  '마지막 충전 정보',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                ),
-              ],
+            Text(
+              '마지막 충전 정보',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
             ),
             
             const SizedBox(height: 12),
