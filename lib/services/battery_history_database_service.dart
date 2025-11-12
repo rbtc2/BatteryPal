@@ -1,247 +1,116 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
-import 'package:path/path.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:battery_plus/battery_plus.dart';
 import '../models/battery_history_models.dart';
+import 'database/database_manager.dart';
+import 'database/repositories/battery_data_repository.dart';
+import 'database/repositories/charging_current_repository.dart';
+import 'database/repositories/charging_session_repository.dart';
+import 'database/maintenance/data_cleanup_service.dart';
+import 'database/maintenance/data_compression_service.dart';
+import 'database/maintenance/backup_service.dart';
 
 /// 배터리 히스토리 데이터베이스 서비스
-/// SQLite를 사용한 로컬 데이터 저장 및 관리
+/// 
+/// Facade 패턴을 사용하여 데이터베이스 관련 모든 작업을 통합 관리하는 메인 서비스입니다.
+/// 
+/// 이 서비스는 다음과 같은 책임을 가집니다:
+/// - 데이터베이스 초기화 및 생명주기 관리
+/// - 배터리 데이터, 충전 전류 데이터, 충전 세션 데이터의 CRUD 작업 위임
+/// - 데이터 정리, 압축, 백업/복원 작업 위임
+/// 
+/// 실제 구현은 각각의 Repository와 Maintenance 서비스에서 처리됩니다.
+/// 
+/// 사용 예시:
+/// ```dart
+/// final service = BatteryHistoryDatabaseService();
+/// await service.initialize();
+/// 
+/// // 배터리 데이터 저장
+/// final id = await service.insertBatteryDataPoint(dataPoint);
+/// 
+/// // 데이터 조회
+/// final data = await service.getBatteryHistoryData(
+///   startTime: DateTime.now().subtract(Duration(days: 7)),
+/// );
+/// ```
 class BatteryHistoryDatabaseService {
   static final BatteryHistoryDatabaseService _instance = 
       BatteryHistoryDatabaseService._internal();
   factory BatteryHistoryDatabaseService() => _instance;
   BatteryHistoryDatabaseService._internal();
 
-  Database? _database;
-  bool _isInitialized = false;
-  final Completer<void> _initCompleter = Completer<void>();
+  // ==================== 의존성 주입 ====================
+  final DatabaseManager _databaseManager = DatabaseManager();
+  final BatteryDataRepository _batteryDataRepository = BatteryDataRepository();
+  final ChargingCurrentRepository _chargingCurrentRepository = ChargingCurrentRepository();
+  final ChargingSessionRepository _chargingSessionRepository = ChargingSessionRepository();
+  final DataCleanupService _dataCleanupService = DataCleanupService();
+  final DataCompressionService _dataCompressionService = DataCompressionService();
+  final BackupService _backupService = BackupService();
 
+  // ==================== 공개 속성 ====================
+  
   /// 데이터베이스 인스턴스 반환
-  Database? get database => _database;
+  Database? get database => _databaseManager.database;
   
   /// 초기화 완료 여부
-  bool get isInitialized => _isInitialized;
+  bool get isInitialized => _databaseManager.isInitialized;
   
   /// 초기화 완료 대기
-  Future<void> get initialization => _initCompleter.future;
+  Future<void> get initialization => _databaseManager.initialization;
+
+  // ==================== 초기화 및 생명주기 ====================
 
   /// 데이터베이스 초기화
+  /// 
+  /// 데이터베이스를 초기화하고 자동 정리 스케줄을 시작합니다.
+  /// 
+  /// Throws: 데이터베이스 초기화 실패 시 예외 발생
   Future<void> initialize() async {
-    if (_isInitialized) return;
-    
     try {
-      debugPrint('배터리 히스토리 데이터베이스 초기화 시작...');
+      await _databaseManager.initialize();
       
-      // 데이터베이스 경로 설정
-      final databasePath = await _getDatabasePath();
-      debugPrint('데이터베이스 경로: $databasePath');
-      
-      // 데이터베이스 열기 또는 생성
-      _database = await openDatabase(
-        databasePath,
-        version: BatteryHistoryDatabaseConfig.databaseVersion,
-        onCreate: _onCreate,
-        onUpgrade: _onUpgrade,
-        onOpen: _onOpen,
-      );
-      
-      _isInitialized = true;
-      _initCompleter.complete();
-      
-      debugPrint('배터리 히스토리 데이터베이스 초기화 완료');
-      
-      // 초기화 후 자동 정리 실행
-      _scheduleAutoCleanup();
-      
+      // 초기화 후 자동 정리 스케줄 시작
+      final db = database;
+      if (db != null) {
+        _dataCleanupService.scheduleAutoCleanup(
+          db,
+          cleanupOldDataCallback: () => cleanupOldData(),
+          cleanupChargingCurrentDataCallback: () => cleanupOldChargingCurrentData(),
+        );
+      }
     } catch (e, stackTrace) {
       debugPrint('데이터베이스 초기화 실패: $e');
       debugPrint('스택 트레이스: $stackTrace');
-      _initCompleter.completeError(e);
       rethrow;
     }
   }
 
-  /// 데이터베이스 경로 가져오기
-  Future<String> _getDatabasePath() async {
-    if (Platform.isAndroid || Platform.isIOS) {
-      // 모바일 플랫폼
-      final documentsDirectory = await getApplicationDocumentsDirectory();
-      return join(documentsDirectory.path, BatteryHistoryDatabaseConfig.databaseName);
-    } else {
-      // 데스크톱 플랫폼
-      final documentsDirectory = await getApplicationDocumentsDirectory();
-      return join(documentsDirectory.path, BatteryHistoryDatabaseConfig.databaseName);
-    }
+  /// 데이터베이스 닫기
+  /// 
+  /// 데이터베이스 연결을 종료합니다.
+  Future<void> close() async {
+    await _databaseManager.close();
   }
 
-  /// 데이터베이스 생성 시 실행
-  Future<void> _onCreate(Database db, int version) async {
-    debugPrint('데이터베이스 테이블 생성 시작...');
-    
-    await db.execute('''
-      CREATE TABLE ${BatteryHistoryDatabaseConfig.tableName} (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        timestamp INTEGER NOT NULL,
-        level REAL NOT NULL,
-        state INTEGER NOT NULL,
-        temperature REAL NOT NULL,
-        voltage INTEGER NOT NULL,
-        capacity INTEGER NOT NULL,
-        health INTEGER NOT NULL,
-        charging_type TEXT NOT NULL,
-        charging_current INTEGER NOT NULL,
-        is_charging INTEGER NOT NULL,
-        is_app_in_foreground INTEGER NOT NULL,
-        collection_method TEXT NOT NULL,
-        data_quality REAL NOT NULL,
-        created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
-      )
-    ''');
-    
-    // 성능 최적화를 위한 인덱스 생성
-    await db.execute('''
-      CREATE INDEX idx_timestamp ON ${BatteryHistoryDatabaseConfig.tableName} (timestamp)
-    ''');
-    
-    await db.execute('''
-      CREATE INDEX idx_level ON ${BatteryHistoryDatabaseConfig.tableName} (level)
-    ''');
-    
-    await db.execute('''
-      CREATE INDEX idx_state ON ${BatteryHistoryDatabaseConfig.tableName} (state)
-    ''');
-    
-    await db.execute('''
-      CREATE INDEX idx_charging ON ${BatteryHistoryDatabaseConfig.tableName} (is_charging)
-    ''');
-    
-    // 복합 인덱스 - 시간 범위 쿼리 최적화
-    await db.execute('''
-      CREATE INDEX idx_timestamp_range ON ${BatteryHistoryDatabaseConfig.tableName} (timestamp, level)
-    ''');
-    
-    // 충전 상태별 시간 인덱스
-    await db.execute('''
-      CREATE INDEX idx_charging_timestamp ON ${BatteryHistoryDatabaseConfig.tableName} (is_charging, timestamp)
-    ''');
-    
-    // 충전 전류 데이터 조회 최적화를 위한 날짜별 인덱스
-    await db.execute('''
-      CREATE INDEX idx_charging_current_date ON ${BatteryHistoryDatabaseConfig.tableName} (charging_current, timestamp)
-    ''');
-    
-    // 데이터 품질 인덱스
-    await db.execute('''
-      CREATE INDEX idx_data_quality ON ${BatteryHistoryDatabaseConfig.tableName} (data_quality)
-    ''');
-    
-    // 충전 세션 테이블 생성 (버전 2)
-    await _createChargingSessionsTable(db);
-    
-    debugPrint('데이터베이스 테이블 생성 완료');
-  }
-  
-  /// 충전 세션 테이블 생성
-  Future<void> _createChargingSessionsTable(Database db) async {
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS charging_sessions (
-        id TEXT PRIMARY KEY,
-        start_time INTEGER NOT NULL,
-        end_time INTEGER NOT NULL,
-        start_battery_level REAL NOT NULL,
-        end_battery_level REAL NOT NULL,
-        battery_change REAL NOT NULL,
-        duration_ms INTEGER NOT NULL,
-        avg_current REAL NOT NULL,
-        avg_temperature REAL NOT NULL,
-        max_current INTEGER NOT NULL,
-        min_current INTEGER NOT NULL,
-        efficiency REAL NOT NULL,
-        time_slot TEXT NOT NULL,
-        session_title TEXT NOT NULL,
-        speed_changes TEXT NOT NULL,
-        icon TEXT NOT NULL,
-        color INTEGER NOT NULL,
-        battery_capacity INTEGER,
-        battery_voltage INTEGER,
-        is_valid INTEGER NOT NULL DEFAULT 1,
-        created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
-      )
-    ''');
-    
-    // 인덱스 생성
-    await db.execute('''
-      CREATE INDEX IF NOT EXISTS idx_session_start_time ON charging_sessions (start_time)
-    ''');
-    
-    await db.execute('''
-      CREATE INDEX IF NOT EXISTS idx_session_date ON charging_sessions (start_time, time_slot)
-    ''');
-    
-    await db.execute('''
-      CREATE INDEX IF NOT EXISTS idx_session_time_slot ON charging_sessions (time_slot)
-    ''');
-    
-    debugPrint('충전 세션 테이블 생성 완료');
-  }
-
-  /// 데이터베이스 업그레이드 시 실행
-  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    debugPrint('데이터베이스 업그레이드: $oldVersion -> $newVersion');
-    
-    // 버전별 마이그레이션
-    if (oldVersion < 2) {
-      // 버전 2: charging_sessions 테이블 추가
-      debugPrint('데이터베이스 업그레이드: 버전 2 - charging_sessions 테이블 추가');
-      await _createChargingSessionsTable(db);
-    }
-    
-    // 향후 버전 업그레이드 로직 추가
-    if (oldVersion < newVersion && oldVersion >= 2) {
-      // 추가 마이그레이션 로직
-    }
-  }
-
-  /// 데이터베이스 열기 시 실행
-  Future<void> _onOpen(Database db) async {
-    debugPrint('데이터베이스 열기 완료');
-    
-    // 데이터베이스 무결성 검사
-    await _checkDatabaseIntegrity();
-  }
-
-  /// 데이터베이스 무결성 검사
-  Future<void> _checkDatabaseIntegrity() async {
-    if (_database == null) return;
-    
-    try {
-      final result = await _database!.rawQuery('PRAGMA integrity_check');
-      debugPrint('데이터베이스 무결성 검사 결과: $result');
-    } catch (e) {
-      debugPrint('데이터베이스 무결성 검사 실패: $e');
-    }
-  }
+  // ==================== 배터리 데이터 관리 ====================
 
   /// 배터리 히스토리 데이터 포인트 저장
+  /// 
+  /// [dataPoint]: 저장할 배터리 데이터 포인트
+  /// 
+  /// Returns: 저장된 데이터의 ID
+  /// 
+  /// Throws: 데이터베이스가 초기화되지 않았거나 저장 실패 시 예외 발생
   Future<int> insertBatteryDataPoint(BatteryHistoryDataPoint dataPoint) async {
-    await initialization;
-    if (_database == null) throw Exception('데이터베이스가 초기화되지 않았습니다');
+    final db = await _ensureInitialized();
     
     try {
-      final id = await _database!.insert(
-        BatteryHistoryDatabaseConfig.tableName,
-        _dataPointToMap(dataPoint),
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+      final id = await _batteryDataRepository.insertBatteryDataPoint(db, dataPoint);
       
-      debugPrint('배터리 데이터 포인트 저장 완료: ID $id');
-      
-      // 데이터 포인트 수가 임계값을 초과하면 압축 실행
-      await _checkAndCompressData();
+      // 데이터 포인트 수가 임계값을 초과하면 자동 압축 실행
+      await _dataCompressionService.checkAndCompressData(db);
       
       return id;
     } catch (e, stackTrace) {
@@ -252,30 +121,19 @@ class BatteryHistoryDatabaseService {
   }
 
   /// 여러 배터리 히스토리 데이터 포인트 일괄 저장 (성능 최적화)
+  /// 
+  /// 트랜잭션을 사용하여 성능을 최적화합니다.
+  /// 
+  /// [dataPoints]: 저장할 배터리 데이터 포인트 리스트
+  /// 
+  /// Returns: 저장된 데이터의 ID 리스트
+  /// 
+  /// Throws: 데이터베이스가 초기화되지 않았거나 저장 실패 시 예외 발생
   Future<List<int>> insertBatteryDataPoints(List<BatteryHistoryDataPoint> dataPoints) async {
-    await initialization;
-    if (_database == null) throw Exception('데이터베이스가 초기화되지 않았습니다');
-    
-    if (dataPoints.isEmpty) return [];
+    final db = await _ensureInitialized();
     
     try {
-      // 트랜잭션을 사용하여 성능 최적화
-      return await _database!.transaction((txn) async {
-        final batch = txn.batch();
-        
-        for (final dataPoint in dataPoints) {
-          batch.insert(
-            BatteryHistoryDatabaseConfig.tableName,
-            _dataPointToMap(dataPoint),
-            conflictAlgorithm: ConflictAlgorithm.replace,
-          );
-        }
-        
-        final results = await batch.commit();
-        debugPrint('${dataPoints.length}개 배터리 데이터 포인트 일괄 저장 완료 (트랜잭션)');
-        
-        return results.cast<int>();
-      });
+      return await _batteryDataRepository.insertBatteryDataPoints(db, dataPoints);
     } catch (e, stackTrace) {
       debugPrint('배터리 데이터 포인트 일괄 저장 실패: $e');
       debugPrint('스택 트레이스: $stackTrace');
@@ -283,100 +141,17 @@ class BatteryHistoryDatabaseService {
     }
   }
 
-  /// 충전 전류 데이터 포인트 일괄 저장
-  /// timestamp와 currentMa만 포함된 Map 리스트를 받아서 저장
-  /// 기존 데이터가 있으면 charging_current만 업데이트, 없으면 기본값으로 새 레코드 생성
-  Future<List<int>> insertChargingCurrentPoints(List<Map<String, dynamic>> points) async {
-    await initialization;
-    if (_database == null) throw Exception('데이터베이스가 초기화되지 않았습니다');
-    
-    if (points.isEmpty) return [];
-    
-    try {
-      // 트랜잭션을 사용하여 성능 최적화
-      return await _database!.transaction((txn) async {
-        final batch = txn.batch();
-        
-        for (final point in points) {
-          final timestamp = point['timestamp'] as DateTime;
-          final currentMa = point['currentMa'] as int;
-          final timestampMs = timestamp.millisecondsSinceEpoch;
-          
-          // 해당 timestamp에 대한 기존 데이터 확인
-          final existing = await txn.query(
-            BatteryHistoryDatabaseConfig.tableName,
-            where: 'timestamp = ?',
-            whereArgs: [timestampMs],
-            limit: 1,
-          );
-          
-          if (existing.isNotEmpty) {
-            // 기존 데이터가 있으면 charging_current만 업데이트
-            batch.update(
-              BatteryHistoryDatabaseConfig.tableName,
-              {'charging_current': currentMa},
-              where: 'timestamp = ?',
-              whereArgs: [timestampMs],
-            );
-          } else {
-            // 기존 데이터가 없으면 최근 배터리 데이터를 조회하여 기본값으로 사용
-            final recentData = await txn.query(
-              BatteryHistoryDatabaseConfig.tableName,
-              orderBy: 'timestamp DESC',
-              limit: 1,
-            );
-            
-            Map<String, dynamic> dataMap;
-            if (recentData.isNotEmpty) {
-              // 최근 데이터를 복사하여 사용
-              final recent = recentData.first;
-              dataMap = Map<String, dynamic>.from(recent);
-              dataMap['id'] = null; // 새 레코드이므로 ID는 null
-              dataMap['timestamp'] = timestampMs;
-              dataMap['charging_current'] = currentMa;
-              dataMap['is_charging'] = currentMa > 0 ? 1 : 0;
-              dataMap['created_at'] = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-            } else {
-              // 최근 데이터도 없으면 기본값으로 생성
-              dataMap = {
-                'timestamp': timestampMs,
-                'level': 0.0,
-                'state': 0, // BatteryState.unknown
-                'temperature': -1.0,
-                'voltage': -1,
-                'capacity': -1,
-                'health': -1,
-                'charging_type': 'Unknown',
-                'charging_current': currentMa,
-                'is_charging': currentMa > 0 ? 1 : 0,
-                'is_app_in_foreground': 1,
-                'collection_method': 'automatic',
-                'data_quality': 0.5,
-                'created_at': DateTime.now().millisecondsSinceEpoch ~/ 1000,
-              };
-            }
-            
-            batch.insert(
-              BatteryHistoryDatabaseConfig.tableName,
-              dataMap,
-              conflictAlgorithm: ConflictAlgorithm.replace,
-            );
-          }
-        }
-        
-        final results = await batch.commit();
-        debugPrint('${points.length}개 충전 전류 데이터 포인트 일괄 저장 완료 (트랜잭션)');
-        
-        return results.whereType<int>().toList();
-      });
-    } catch (e, stackTrace) {
-      debugPrint('충전 전류 데이터 포인트 일괄 저장 실패: $e');
-      debugPrint('스택 트레이스: $stackTrace');
-      rethrow;
-    }
-  }
-
   /// 특정 기간의 배터리 히스토리 데이터 조회
+  /// 
+  /// [startTime]: 시작 시간 (옵션)
+  /// [endTime]: 종료 시간 (옵션)
+  /// [limit]: 조회할 최대 개수 (옵션)
+  /// [offset]: 오프셋 (옵션)
+  /// [orderByTimestampDesc]: 타임스탬프 내림차순 정렬 여부
+  /// 
+  /// Returns: 배터리 히스토리 데이터 포인트 리스트
+  /// 
+  /// Throws: 데이터베이스가 초기화되지 않았거나 조회 실패 시 예외 발생
   Future<List<BatteryHistoryDataPoint>> getBatteryHistoryData({
     DateTime? startTime,
     DateTime? endTime,
@@ -384,39 +159,17 @@ class BatteryHistoryDatabaseService {
     int? offset,
     bool orderByTimestampDesc = false,
   }) async {
-    await initialization;
-    if (_database == null) throw Exception('데이터베이스가 초기화되지 않았습니다');
+    final db = await _ensureInitialized();
     
     try {
-      String whereClause = '';
-      List<dynamic> whereArgs = [];
-      
-      if (startTime != null) {
-        whereClause += 'timestamp >= ?';
-        whereArgs.add(startTime.millisecondsSinceEpoch);
-      }
-      
-      if (endTime != null) {
-        if (whereClause.isNotEmpty) whereClause += ' AND ';
-        whereClause += 'timestamp <= ?';
-        whereArgs.add(endTime.millisecondsSinceEpoch);
-      }
-      
-      String orderBy = orderByTimestampDesc ? 'timestamp DESC' : 'timestamp ASC';
-      
-      final results = await _database!.query(
-        BatteryHistoryDatabaseConfig.tableName,
-        where: whereClause.isNotEmpty ? whereClause : null,
-        whereArgs: whereArgs.isNotEmpty ? whereArgs : null,
-        orderBy: orderBy,
+      return await _batteryDataRepository.getBatteryHistoryData(
+        db,
+        startTime: startTime,
+        endTime: endTime,
         limit: limit,
         offset: offset,
+        orderByTimestampDesc: orderByTimestampDesc,
       );
-      
-      final dataPoints = results.map((row) => _mapToDataPoint(row)).toList();
-      debugPrint('${dataPoints.length}개 배터리 히스토리 데이터 조회 완료');
-      
-      return dataPoints;
     } catch (e, stackTrace) {
       debugPrint('배터리 히스토리 데이터 조회 실패: $e');
       debugPrint('스택 트레이스: $stackTrace');
@@ -425,112 +178,44 @@ class BatteryHistoryDatabaseService {
   }
 
   /// 최근 N개의 배터리 히스토리 데이터 조회
+  /// 
+  /// [count]: 조회할 개수
+  /// 
+  /// Returns: 배터리 히스토리 데이터 포인트 리스트 (최신순)
+  /// 
+  /// Throws: 데이터베이스가 초기화되지 않았거나 조회 실패 시 예외 발생
   Future<List<BatteryHistoryDataPoint>> getRecentBatteryHistoryData(int count) async {
-    return getBatteryHistoryData(
-      limit: count,
-      orderByTimestampDesc: true,
-    );
-  }
-
-  /// 특정 날짜의 충전 전류 데이터 조회
-  /// 날짜별로 그룹화하여 timestamp와 charging_current를 반환
-  Future<List<Map<String, dynamic>>> getChargingCurrentDataByDate(DateTime date) async {
-    await initialization;
-    if (_database == null) throw Exception('데이터베이스가 초기화되지 않았습니다');
+    final db = await _ensureInitialized();
     
     try {
-      // 해당 날짜의 시작 시간 (00:00:00)
-      final startOfDay = DateTime(date.year, date.month, date.day);
-      // 해당 날짜의 끝 시간 (23:59:59.999)
-      final endOfDay = DateTime(date.year, date.month, date.day, 23, 59, 59, 999);
-      
-      final results = await _database!.query(
-        BatteryHistoryDatabaseConfig.tableName,
-        columns: ['timestamp', 'charging_current'],
-        where: 'timestamp >= ? AND timestamp <= ?',
-        whereArgs: [startOfDay.millisecondsSinceEpoch, endOfDay.millisecondsSinceEpoch],
-        orderBy: 'timestamp ASC',
-      );
-      
-      // 결과를 Map 형식으로 변환하고, 같은 시간(분 단위)의 포인트는 하나만 사용
-      final timeMap = <String, Map<String, dynamic>>{}; // "YYYY-MM-DD HH:MM" -> data
-      
-      for (final row in results) {
-        final timestamp = DateTime.fromMillisecondsSinceEpoch(row['timestamp'] as int);
-        final timeKey = '${timestamp.year}-${timestamp.month.toString().padLeft(2, '0')}-${timestamp.day.toString().padLeft(2, '0')} ${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}';
-        
-        // 같은 분 단위의 데이터가 있으면, 더 높은 전류 값을 가진 것으로 교체
-        if (!timeMap.containsKey(timeKey) || 
-            (row['charging_current'] as int) > timeMap[timeKey]!['currentMa']) {
-          timeMap[timeKey] = {
-            'timestamp': timestamp,
-            'currentMa': row['charging_current'] as int,
-          };
-        }
-      }
-      
-      final data = timeMap.values.toList()
-        ..sort((a, b) => (a['timestamp'] as DateTime).compareTo(b['timestamp'] as DateTime));
-      
-      debugPrint('${data.length}개의 충전 전류 데이터 조회 완료 (날짜: ${date.toString().split(' ')[0]})');
-      
-      return data;
+      return await _batteryDataRepository.getRecentBatteryHistoryData(db, count);
     } catch (e, stackTrace) {
-      debugPrint('충전 전류 데이터 조회 실패: $e');
+      debugPrint('최근 배터리 히스토리 데이터 조회 실패: $e');
       debugPrint('스택 트레이스: $stackTrace');
       rethrow;
     }
   }
 
   /// 특정 기간의 배터리 통계 조회
+  /// 
+  /// [startTime]: 시작 시간 (옵션)
+  /// [endTime]: 종료 시간 (옵션)
+  /// 
+  /// Returns: 배터리 통계 맵 (count, avg_level, min_level, max_level, avg_temperature, avg_quality, charging_count)
+  /// 
+  /// Throws: 데이터베이스가 초기화되지 않았거나 조회 실패 시 예외 발생
   Future<Map<String, dynamic>> getBatteryStatistics({
     DateTime? startTime,
     DateTime? endTime,
   }) async {
-    await initialization;
-    if (_database == null) throw Exception('데이터베이스가 초기화되지 않았습니다');
+    final db = await _ensureInitialized();
     
     try {
-      String whereClause = '';
-      List<dynamic> whereArgs = [];
-      
-      if (startTime != null) {
-        whereClause += 'timestamp >= ?';
-        whereArgs.add(startTime.millisecondsSinceEpoch);
-      }
-      
-      if (endTime != null) {
-        if (whereClause.isNotEmpty) whereClause += ' AND ';
-        whereClause += 'timestamp <= ?';
-        whereArgs.add(endTime.millisecondsSinceEpoch);
-      }
-      
-      final result = await _database!.rawQuery('''
-        SELECT 
-          COUNT(*) as count,
-          AVG(level) as avg_level,
-          MIN(level) as min_level,
-          MAX(level) as max_level,
-          AVG(temperature) as avg_temperature,
-          AVG(data_quality) as avg_quality,
-          SUM(CASE WHEN is_charging = 1 THEN 1 ELSE 0 END) as charging_count
-        FROM ${BatteryHistoryDatabaseConfig.tableName}
-        ${whereClause.isNotEmpty ? 'WHERE $whereClause' : ''}
-      ''', whereArgs);
-      
-      if (result.isEmpty) {
-        return {
-          'count': 0,
-          'avg_level': 0.0,
-          'min_level': 0.0,
-          'max_level': 0.0,
-          'avg_temperature': 0.0,
-          'avg_quality': 0.0,
-          'charging_count': 0,
-        };
-      }
-      
-      return result.first;
+      return await _batteryDataRepository.getBatteryStatistics(
+        db,
+        startTime: startTime,
+        endTime: endTime,
+      );
     } catch (e, stackTrace) {
       debugPrint('배터리 통계 조회 실패: $e');
       debugPrint('스택 트레이스: $stackTrace');
@@ -539,286 +224,80 @@ class BatteryHistoryDatabaseService {
   }
 
   /// 데이터 포인트 수 조회
+  /// 
+  /// Returns: 데이터 포인트 개수
+  /// 
+  /// Throws: 데이터베이스가 초기화되지 않았거나 조회 실패 시 예외 발생
   Future<int> getDataPointCount() async {
-    await initialization;
-    if (_database == null) throw Exception('데이터베이스가 초기화되지 않았습니다');
+    final db = await _ensureInitialized();
     
     try {
-      final result = await _database!.rawQuery(
-        'SELECT COUNT(*) as count FROM ${BatteryHistoryDatabaseConfig.tableName}'
-      );
-      return Sqflite.firstIntValue(result) ?? 0;
+      return await _batteryDataRepository.getDataPointCount(db);
     } catch (e) {
       debugPrint('데이터 포인트 수 조회 실패: $e');
       return 0;
     }
   }
 
-  /// 오래된 데이터 정리
-  Future<int> cleanupOldData({int? retentionDays}) async {
-    await initialization;
-    if (_database == null) throw Exception('데이터베이스가 초기화되지 않았습니다');
-    
-    final days = retentionDays ?? BatteryHistoryDatabaseConfig.dataRetentionDays;
-    final cutoffTime = DateTime.now().subtract(Duration(days: days));
-    
-    try {
-      final deletedCount = await _database!.delete(
-        BatteryHistoryDatabaseConfig.tableName,
-        where: 'timestamp < ?',
-        whereArgs: [cutoffTime.millisecondsSinceEpoch],
-      );
-      
-      debugPrint('$deletedCount개의 오래된 데이터 정리 완료');
-      return deletedCount;
-    } catch (e, stackTrace) {
-      debugPrint('오래된 데이터 정리 실패: $e');
-      debugPrint('스택 트레이스: $stackTrace');
-      rethrow;
-    }
-  }
-  
-  /// 충전 전류 데이터만 정리 (7일 이상 된 데이터 삭제)
-  /// 그래프용 충전 전류 데이터는 7일만 보관
-  Future<int> cleanupOldChargingCurrentData() async {
-    await initialization;
-    if (_database == null) throw Exception('데이터베이스가 초기화되지 않았습니다');
-    
-    final cutoffDays = BatteryHistoryDatabaseConfig.chargingCurrentRetentionDays;
-    final cutoffTime = DateTime.now().subtract(Duration(days: cutoffDays));
-    final cutoffTimestamp = cutoffTime.millisecondsSinceEpoch;
+  // ==================== 충전 전류 데이터 관리 ====================
+
+  /// 충전 전류 데이터 포인트 일괄 저장
+  /// 
+  /// timestamp와 currentMa만 포함된 Map 리스트를 받아서 저장합니다.
+  /// 기존 데이터가 있으면 charging_current만 업데이트하고,
+  /// 없으면 기본값으로 새 레코드를 생성합니다.
+  /// 
+  /// [points]: timestamp와 currentMa를 포함한 Map 리스트
+  /// 
+  /// Returns: 저장된 데이터의 ID 리스트
+  /// 
+  /// Throws: 데이터베이스가 초기화되지 않았거나 저장 실패 시 예외 발생
+  Future<List<int>> insertChargingCurrentPoints(List<Map<String, dynamic>> points) async {
+    final db = await _ensureInitialized();
     
     try {
-      // 삭제 전 행 수 확인
-      final beforeCount = await _database!.rawQuery('''
-        SELECT COUNT(*) as count FROM ${BatteryHistoryDatabaseConfig.tableName}
-        WHERE charging_current > 0
-      ''');
-      
-      // 충전 전류 데이터만 삭제 (charging_current가 0이 아닌 데이터 중에서 오래된 것)
-      await _database!.delete(
-        BatteryHistoryDatabaseConfig.tableName,
-        where: 'timestamp < ? AND charging_current > 0',
-        whereArgs: [cutoffTimestamp],
-      );
-      
-      // 삭제 후 행 수 확인
-      final afterCount = await _database!.rawQuery('''
-        SELECT COUNT(*) as count FROM ${BatteryHistoryDatabaseConfig.tableName}
-        WHERE charging_current > 0
-      ''');
-      
-      final before = Sqflite.firstIntValue(beforeCount) ?? 0;
-      final after = Sqflite.firstIntValue(afterCount) ?? 0;
-      final deletedCount = before - after;
-      
-      debugPrint('$deletedCount개의 오래된 충전 전류 데이터 정리 완료 ($cutoffDays일 이상)');
-      return deletedCount;
+      return await _chargingCurrentRepository.insertChargingCurrentPoints(db, points);
     } catch (e, stackTrace) {
-      debugPrint('오래된 충전 전류 데이터 정리 실패: $e');
+      debugPrint('충전 전류 데이터 포인트 일괄 저장 실패: $e');
       debugPrint('스택 트레이스: $stackTrace');
       rethrow;
     }
   }
 
-  /// 데이터 압축 (중복 데이터 제거)
-  Future<int> compressData() async {
-    await initialization;
-    if (_database == null) throw Exception('데이터베이스가 초기화되지 않았습니다');
+  /// 특정 날짜의 충전 전류 데이터 조회
+  /// 
+  /// 날짜별로 그룹화하여 timestamp와 charging_current를 반환합니다.
+  /// 같은 시간(분 단위)의 포인트는 더 높은 전류 값을 가진 것으로 선택합니다.
+  /// 
+  /// [date]: 조회할 날짜
+  /// 
+  /// Returns: timestamp와 currentMa를 포함한 Map 리스트
+  /// 
+  /// Throws: 데이터베이스가 초기화되지 않았거나 조회 실패 시 예외 발생
+  Future<List<Map<String, dynamic>>> getChargingCurrentDataByDate(DateTime date) async {
+    final db = await _ensureInitialized();
     
     try {
-      // 시간순으로 정렬하여 중복 제거
-      await _database!.rawQuery('''
-        DELETE FROM ${BatteryHistoryDatabaseConfig.tableName}
-        WHERE id NOT IN (
-          SELECT MIN(id)
-          FROM ${BatteryHistoryDatabaseConfig.tableName}
-          GROUP BY timestamp, level, state
-        )
-      ''');
-      
-      debugPrint('데이터 압축 완료');
-      return 0; // SQLite에서는 영향받은 행 수를 직접 반환하지 않음
+      return await _chargingCurrentRepository.getChargingCurrentDataByDate(db, date);
     } catch (e, stackTrace) {
-      debugPrint('데이터 압축 실패: $e');
+      debugPrint('충전 전류 데이터 조회 실패: $e');
       debugPrint('스택 트레이스: $stackTrace');
       rethrow;
     }
   }
 
-  /// 데이터 압축 필요 여부 확인 및 실행
-  Future<void> _checkAndCompressData() async {
-    final count = await getDataPointCount();
-    if (count > BatteryHistoryDatabaseConfig.compressionThreshold) {
-      await compressData();
-    }
-  }
+  // ==================== 충전 세션 관리 ====================
 
-  /// 자동 정리 스케줄링
-  void _scheduleAutoCleanup() {
-    // 매일 자정에 충전 전류 데이터 정리 실행
-    _scheduleDailyCleanup();
-    
-    // 일주일마다 전체 데이터 정리 실행
-    Timer.periodic(
-      Duration(days: BatteryHistoryDatabaseConfig.autoCleanupIntervalDays),
-      (timer) async {
-        try {
-          await cleanupOldData();
-        } catch (e) {
-          debugPrint('자동 정리 실패: $e');
-        }
-      },
-    );
-  }
-  
-  /// 매일 자정에 실행되는 충전 전류 데이터 정리
-  void _scheduleDailyCleanup() {
-    // 다음 자정 시간 계산
-    final now = DateTime.now();
-    final tomorrow = DateTime(now.year, now.month, now.day + 1, 
-                              BatteryHistoryDatabaseConfig.dailyCleanupHour);
-    final durationUntilMidnight = tomorrow.difference(now);
-    
-    // 다음 자정까지 대기 후 실행
-    Timer(durationUntilMidnight, () {
-      // 매일 자정에 실행
-      Timer.periodic(Duration(days: 1), (timer) async {
-        try {
-          debugPrint('일별 충전 전류 데이터 정리 실행 (${DateTime.now()})');
-          await cleanupOldChargingCurrentData();
-        } catch (e) {
-          debugPrint('일별 충전 전류 데이터 정리 실패: $e');
-        }
-      });
-      
-      // 첫 실행은 즉시
-      Timer(Duration(seconds: 1), () async {
-        try {
-          debugPrint('초기 충전 전류 데이터 정리 실행');
-          await cleanupOldChargingCurrentData();
-        } catch (e) {
-          debugPrint('초기 충전 전류 데이터 정리 실패: $e');
-        }
-      });
-    });
-  }
-
-  /// 데이터베이스 백업
-  Future<String> backupDatabase() async {
-    await initialization;
-    if (_database == null) throw Exception('데이터베이스가 초기화되지 않았습니다');
-    
-    try {
-      final documentsDirectory = await getApplicationDocumentsDirectory();
-      final backupPath = join(
-        documentsDirectory.path,
-        'battery_history_backup_${DateTime.now().millisecondsSinceEpoch}.db'
-      );
-      
-      final databasePath = await _getDatabasePath();
-      await File(databasePath).copy(backupPath);
-      
-      debugPrint('데이터베이스 백업 완료: $backupPath');
-      return backupPath;
-    } catch (e, stackTrace) {
-      debugPrint('데이터베이스 백업 실패: $e');
-      debugPrint('스택 트레이스: $stackTrace');
-      rethrow;
-    }
-  }
-
-  /// 데이터베이스 복원
-  Future<void> restoreDatabase(String backupPath) async {
-    await initialization;
-    if (_database == null) throw Exception('데이터베이스가 초기화되지 않았습니다');
-    
-    try {
-      await _database!.close();
-      
-      final databasePath = await _getDatabasePath();
-      await File(backupPath).copy(databasePath);
-      
-      await initialize();
-      
-      debugPrint('데이터베이스 복원 완료: $backupPath');
-    } catch (e, stackTrace) {
-      debugPrint('데이터베이스 복원 실패: $e');
-      debugPrint('스택 트레이스: $stackTrace');
-      rethrow;
-    }
-  }
-
-  /// 데이터베이스 닫기
-  Future<void> close() async {
-    if (_database != null) {
-      await _database!.close();
-      _database = null;
-      _isInitialized = false;
-      debugPrint('배터리 히스토리 데이터베이스 닫기 완료');
-    }
-  }
-
-  /// 데이터 포인트를 Map으로 변환
-  Map<String, dynamic> _dataPointToMap(BatteryHistoryDataPoint dataPoint) {
-    return {
-      'id': dataPoint.id,
-      'timestamp': dataPoint.timestamp.millisecondsSinceEpoch,
-      'level': dataPoint.level,
-      'state': dataPoint.state.index,
-      'temperature': dataPoint.temperature,
-      'voltage': dataPoint.voltage,
-      'capacity': dataPoint.capacity,
-      'health': dataPoint.health,
-      'charging_type': dataPoint.chargingType,
-      'charging_current': dataPoint.chargingCurrent,
-      'is_charging': dataPoint.isCharging ? 1 : 0,
-      'is_app_in_foreground': dataPoint.isAppInForeground ? 1 : 0,
-      'collection_method': dataPoint.collectionMethod,
-      'data_quality': dataPoint.dataQuality,
-    };
-  }
-
-  /// Map을 데이터 포인트로 변환
-  BatteryHistoryDataPoint _mapToDataPoint(Map<String, dynamic> map) {
-    return BatteryHistoryDataPoint(
-      id: map['id'] as int?,
-      timestamp: DateTime.fromMillisecondsSinceEpoch(map['timestamp'] as int),
-      level: map['level'] as double,
-      state: BatteryState.values[map['state'] as int],
-      temperature: map['temperature'] as double,
-      voltage: map['voltage'] as int,
-      capacity: map['capacity'] as int,
-      health: map['health'] as int,
-      chargingType: map['charging_type'] as String,
-      chargingCurrent: map['charging_current'] as int,
-      isCharging: (map['is_charging'] as int) == 1,
-      isAppInForeground: (map['is_app_in_foreground'] as int) == 1,
-      collectionMethod: map['collection_method'] as String,
-      dataQuality: map['data_quality'] as double,
-    );
-  }
-  
-  // ==================== 충전 세션 관련 메서드 ====================
-  
   /// 충전 세션 저장
+  /// 
+  /// [sessionMap]: 저장할 충전 세션 데이터 (Map 형식)
+  /// 
+  /// Throws: 데이터베이스가 초기화되지 않았거나 저장 실패 시 예외 발생
   Future<void> insertChargingSession(Map<String, dynamic> sessionMap) async {
-    await initialization;
-    if (_database == null) throw Exception('데이터베이스가 초기화되지 않았습니다');
+    final db = await _ensureInitialized();
     
     try {
-      // speed_changes를 JSON 문자열로 변환
-      final speedChangesJson = sessionMap['speed_changes'];
-      if (speedChangesJson is List) {
-        sessionMap['speed_changes'] = jsonEncode(speedChangesJson);
-      }
-      
-      await _database!.insert(
-        'charging_sessions',
-        sessionMap,
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
-      debugPrint('충전 세션 저장 완료: ${sessionMap['id']}');
+      await _chargingSessionRepository.insertChargingSession(db, sessionMap);
     } catch (e, stackTrace) {
       debugPrint('충전 세션 저장 실패: $e');
       debugPrint('스택 트레이스: $stackTrace');
@@ -827,34 +306,17 @@ class BatteryHistoryDatabaseService {
   }
   
   /// 여러 충전 세션 일괄 저장
+  /// 
+  /// 트랜잭션을 사용하여 성능을 최적화합니다.
+  /// 
+  /// [sessionMaps]: 저장할 충전 세션 데이터 리스트 (Map 형식)
+  /// 
+  /// Throws: 데이터베이스가 초기화되지 않았거나 저장 실패 시 예외 발생
   Future<void> insertChargingSessions(List<Map<String, dynamic>> sessionMaps) async {
-    await initialization;
-    if (_database == null) throw Exception('데이터베이스가 초기화되지 않았습니다');
-    
-    if (sessionMaps.isEmpty) return;
+    final db = await _ensureInitialized();
     
     try {
-      // 트랜잭션을 사용하여 성능 최적화
-      await _database!.transaction((txn) async {
-        final batch = txn.batch();
-        
-        for (final sessionMap in sessionMaps) {
-          // speed_changes를 JSON 문자열로 변환
-          final speedChangesJson = sessionMap['speed_changes'];
-          if (speedChangesJson is List) {
-            sessionMap['speed_changes'] = jsonEncode(speedChangesJson);
-          }
-          
-          batch.insert(
-            'charging_sessions',
-            sessionMap,
-            conflictAlgorithm: ConflictAlgorithm.replace,
-          );
-        }
-        
-        await batch.commit();
-        debugPrint('${sessionMaps.length}개 충전 세션 일괄 저장 완료 (트랜잭션)');
-      });
+      await _chargingSessionRepository.insertChargingSessions(db, sessionMaps);
     } catch (e, stackTrace) {
       debugPrint('충전 세션 일괄 저장 실패: $e');
       debugPrint('스택 트레이스: $stackTrace');
@@ -863,38 +325,17 @@ class BatteryHistoryDatabaseService {
   }
   
   /// 특정 날짜의 충전 세션 조회
+  /// 
+  /// [date]: 조회할 날짜
+  /// 
+  /// Returns: 충전 세션 데이터 리스트 (speed_changes는 자동으로 파싱됨)
+  /// 
+  /// Throws: 데이터베이스가 초기화되지 않았거나 조회 실패 시 예외 발생
   Future<List<Map<String, dynamic>>> getChargingSessionsByDate(DateTime date) async {
-    await initialization;
-    if (_database == null) throw Exception('데이터베이스가 초기화되지 않았습니다');
+    final db = await _ensureInitialized();
     
     try {
-      // 해당 날짜의 시작 시간 (00:00:00)
-      final startOfDay = DateTime(date.year, date.month, date.day);
-      // 해당 날짜의 끝 시간 (23:59:59.999)
-      final endOfDay = DateTime(date.year, date.month, date.day, 23, 59, 59, 999);
-      
-      final results = await _database!.query(
-        'charging_sessions',
-        where: 'start_time >= ? AND start_time <= ?',
-        whereArgs: [startOfDay.millisecondsSinceEpoch, endOfDay.millisecondsSinceEpoch],
-        orderBy: 'start_time ASC',
-      );
-      
-      // speed_changes를 JSON에서 파싱
-      for (final result in results) {
-        if (result['speed_changes'] is String) {
-          try {
-            result['speed_changes'] = jsonDecode(result['speed_changes'] as String);
-          } catch (e) {
-            debugPrint('speed_changes JSON 파싱 실패: $e');
-            result['speed_changes'] = [];
-          }
-        }
-      }
-      
-      debugPrint('${results.length}개의 충전 세션 조회 완료 (날짜: ${date.toString().split(' ')[0]})');
-      
-      return results;
+      return await _chargingSessionRepository.getChargingSessionsByDate(db, date);
     } catch (e, stackTrace) {
       debugPrint('충전 세션 조회 실패: $e');
       debugPrint('스택 트레이스: $stackTrace');
@@ -903,35 +344,17 @@ class BatteryHistoryDatabaseService {
   }
   
   /// 세션 ID로 충전 세션 조회
+  /// 
+  /// [sessionId]: 조회할 세션 ID
+  /// 
+  /// Returns: 충전 세션 데이터 (없으면 null, speed_changes는 자동으로 파싱됨)
+  /// 
+  /// Throws: 데이터베이스가 초기화되지 않았거나 조회 실패 시 예외 발생
   Future<Map<String, dynamic>?> getChargingSessionById(String sessionId) async {
-    await initialization;
-    if (_database == null) throw Exception('데이터베이스가 초기화되지 않았습니다');
+    final db = await _ensureInitialized();
     
     try {
-      final results = await _database!.query(
-        'charging_sessions',
-        where: 'id = ?',
-        whereArgs: [sessionId],
-        limit: 1,
-      );
-      
-      if (results.isEmpty) {
-        return null;
-      }
-      
-      final result = results.first;
-      
-      // speed_changes를 JSON에서 파싱
-      if (result['speed_changes'] is String) {
-        try {
-          result['speed_changes'] = jsonDecode(result['speed_changes'] as String);
-        } catch (e) {
-          debugPrint('speed_changes JSON 파싱 실패: $e');
-          result['speed_changes'] = [];
-        }
-      }
-      
-      return result;
+      return await _chargingSessionRepository.getChargingSessionById(db, sessionId);
     } catch (e, stackTrace) {
       debugPrint('충전 세션 ID로 조회 실패: $e');
       debugPrint('스택 트레이스: $stackTrace');
@@ -940,42 +363,141 @@ class BatteryHistoryDatabaseService {
   }
   
   /// 7일 이상 된 충전 세션 데이터 삭제
+  /// 
+  /// Returns: 삭제된 세션 개수
+  /// 
+  /// Throws: 데이터베이스가 초기화되지 않았거나 삭제 실패 시 예외 발생
   Future<int> cleanupOldChargingSessions() async {
-    await initialization;
-    if (_database == null) throw Exception('데이터베이스가 초기화되지 않았습니다');
-    
-    final cutoffDays = 7; // ChargingSessionConfig.sessionRetentionDays와 동일
-    final cutoffTime = DateTime.now().subtract(Duration(days: cutoffDays));
-    final cutoffTimestamp = cutoffTime.millisecondsSinceEpoch;
+    final db = await _ensureInitialized();
     
     try {
-      // 삭제 전 행 수 확인
-      final beforeCount = await _database!.rawQuery('''
-        SELECT COUNT(*) as count FROM charging_sessions
-      ''');
-      
-      // 7일 이상 된 세션 데이터 삭제
-      await _database!.delete(
-        'charging_sessions',
-        where: 'start_time < ?',
-        whereArgs: [cutoffTimestamp],
-      );
-      
-      // 삭제 후 행 수 확인
-      final afterCount = await _database!.rawQuery('''
-        SELECT COUNT(*) as count FROM charging_sessions
-      ''');
-      
-      final before = Sqflite.firstIntValue(beforeCount) ?? 0;
-      final after = Sqflite.firstIntValue(afterCount) ?? 0;
-      final deletedCount = before - after;
-      
-      debugPrint('$deletedCount개의 오래된 충전 세션 데이터 정리 완료 ($cutoffDays일 이상)');
-      return deletedCount;
+      return await _chargingSessionRepository.cleanupOldChargingSessions(db, cutoffDays: 7);
     } catch (e, stackTrace) {
       debugPrint('오래된 충전 세션 데이터 정리 실패: $e');
       debugPrint('스택 트레이스: $stackTrace');
       rethrow;
     }
+  }
+
+  // ==================== 데이터 유지보수 ====================
+
+  /// 오래된 데이터 정리
+  /// 
+  /// 지정된 보관 기간을 초과한 배터리 데이터를 삭제합니다.
+  /// 
+  /// [retentionDays]: 보관 기간 (일), 기본값은 설정값 사용
+  /// 
+  /// Returns: 삭제된 데이터 개수
+  /// 
+  /// Throws: 데이터베이스가 초기화되지 않았거나 정리 실패 시 예외 발생
+  Future<int> cleanupOldData({int? retentionDays}) async {
+    final db = await _ensureInitialized();
+    
+    try {
+      return await _dataCleanupService.cleanupOldData(
+        db,
+        retentionDays: retentionDays,
+      );
+    } catch (e, stackTrace) {
+      debugPrint('오래된 데이터 정리 실패: $e');
+      debugPrint('스택 트레이스: $stackTrace');
+      rethrow;
+    }
+  }
+  
+  /// 충전 전류 데이터만 정리 (7일 이상 된 데이터 삭제)
+  /// 
+  /// 그래프용 충전 전류 데이터는 7일만 보관합니다.
+  /// 
+  /// Returns: 삭제된 데이터 개수
+  /// 
+  /// Throws: 데이터베이스가 초기화되지 않았거나 정리 실패 시 예외 발생
+  Future<int> cleanupOldChargingCurrentData() async {
+    final db = await _ensureInitialized();
+    
+    try {
+      return await _dataCleanupService.cleanupOldChargingCurrentData(db);
+    } catch (e, stackTrace) {
+      debugPrint('오래된 충전 전류 데이터 정리 실패: $e');
+      debugPrint('스택 트레이스: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// 데이터 압축 (중복 데이터 제거)
+  /// 
+  /// timestamp, level, state가 동일한 데이터 중에서 가장 오래된 것만 남기고 나머지를 삭제합니다.
+  /// 
+  /// Returns: 압축 완료 (SQLite에서는 영향받은 행 수를 직접 반환하지 않음)
+  /// 
+  /// Throws: 데이터베이스가 초기화되지 않았거나 압축 실패 시 예외 발생
+  Future<int> compressData() async {
+    final db = await _ensureInitialized();
+    
+    try {
+      return await _dataCompressionService.compressData(db);
+    } catch (e, stackTrace) {
+      debugPrint('데이터 압축 실패: $e');
+      debugPrint('스택 트레이스: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// 데이터베이스 백업
+  /// 
+  /// 현재 데이터베이스 파일을 백업 파일로 복사합니다.
+  /// 
+  /// Returns: 백업 파일 경로
+  /// 
+  /// Throws: 데이터베이스가 초기화되지 않았거나 백업 실패 시 예외 발생
+  Future<String> backupDatabase() async {
+    final db = await _ensureInitialized();
+    
+    try {
+      return await _backupService.backupDatabase(db);
+    } catch (e, stackTrace) {
+      debugPrint('데이터베이스 백업 실패: $e');
+      debugPrint('스택 트레이스: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// 데이터베이스 복원
+  /// 
+  /// 백업 파일로부터 데이터베이스를 복원합니다.
+  /// 
+  /// 주의: 복원 후 데이터베이스가 재초기화됩니다.
+  /// 
+  /// [backupPath]: 복원할 백업 파일 경로
+  /// 
+  /// Throws: 데이터베이스가 초기화되지 않았거나 복원 실패 시 예외 발생
+  Future<void> restoreDatabase(String backupPath) async {
+    await initialization;
+    
+    try {
+      await _backupService.restoreDatabase(backupPath, _databaseManager);
+    } catch (e, stackTrace) {
+      debugPrint('데이터베이스 복원 실패: $e');
+      debugPrint('스택 트레이스: $stackTrace');
+      rethrow;
+    }
+  }
+
+  // ==================== 내부 헬퍼 메서드 ====================
+
+  /// 데이터베이스 초기화 확인 및 인스턴스 반환
+  /// 
+  /// 데이터베이스가 초기화되지 않았으면 예외를 발생시킵니다.
+  /// 
+  /// Returns: 초기화된 데이터베이스 인스턴스
+  /// 
+  /// Throws: 데이터베이스가 초기화되지 않았을 때 예외 발생
+  Future<Database> _ensureInitialized() async {
+    await initialization;
+    final db = database;
+    if (db == null) {
+      throw Exception('데이터베이스가 초기화되지 않았습니다');
+    }
+    return db;
   }
 }
