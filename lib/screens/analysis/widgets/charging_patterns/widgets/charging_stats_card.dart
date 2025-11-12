@@ -337,8 +337,6 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
-                Text('📈', style: TextStyle(fontSize: 24)),
-                SizedBox(width: 12),
                 Text(
                   '충전 분석',
                   style: TextStyle(

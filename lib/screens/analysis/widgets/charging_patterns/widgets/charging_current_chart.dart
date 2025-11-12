@@ -33,6 +33,7 @@ class _ChargingCurrentChartState extends State<ChargingCurrentChart> {
   final ChargingSessionService _sessionService = ChargingSessionService();
   final ChargingSessionStorage _storageService = ChargingSessionStorage();
   Timer? _refreshTimer;
+  StreamSubscription<List<ChargingSessionRecord>>? _sessionsSubscription;
   
   // 통계 데이터
   double _totalCurrentMah = 0.0; // 총 충전 전류량 (mAh)
@@ -52,6 +53,21 @@ class _ChargingCurrentChartState extends State<ChargingCurrentChart> {
     try {
       await _sessionService.initialize();
       await _storageService.initialize();
+      
+      // 오늘 탭일 때만 세션 스트림 구독 (실시간 업데이트)
+      _sessionsSubscription = _sessionService.sessionsStream.listen(
+        (sessions) {
+          // 오늘 탭일 때만 실시간 업데이트
+          if (mounted && _selectedTab == '오늘') {
+            _updateStatsFromSessions(sessions);
+          }
+        },
+        onError: (error, stackTrace) {
+          debugPrint('세션 스트림 오류: $error');
+          debugPrint('스택 트레이스: $stackTrace');
+        },
+        cancelOnError: false,
+      );
     } catch (e) {
       debugPrint('서비스 초기화 실패: $e');
     }
@@ -60,6 +76,7 @@ class _ChargingCurrentChartState extends State<ChargingCurrentChart> {
   @override
   void dispose() {
     _refreshTimer?.cancel();
+    _sessionsSubscription?.cancel();
     super.dispose();
   }
   
@@ -125,20 +142,8 @@ class _ChargingCurrentChartState extends State<ChargingCurrentChart> {
         targetDate: targetDate,
       );
       
-      // 통계 데이터 계산 (오늘 탭일 때만)
-      if (_selectedTab == '오늘' || (_selectedTab == '선택' && _selectedDate != null)) {
-        final targetDateForStats = _selectedTab == '오늘' 
-            ? DateTime.now() 
-            : _selectedDate!;
-        await _calculateStats(targetDateForStats);
-      } else {
-        // 오늘이 아닌 날짜는 통계 초기화
-        setState(() {
-          _totalCurrentMah = 0.0;
-          _totalChargingTime = Duration.zero;
-          _avgChargingSpeed = 0.0;
-        });
-      }
+      // 통계 데이터 계산 (모든 탭에 대해)
+      await _calculateStats(targetDate);
       
       setState(() {
         _chartData = chartData;
@@ -153,7 +158,7 @@ class _ChargingCurrentChartState extends State<ChargingCurrentChart> {
     }
   }
   
-  /// 통계 데이터 계산
+  /// 통계 데이터 계산 (날짜별)
   Future<void> _calculateStats(DateTime targetDate) async {
     try {
       // 오늘 날짜인지 확인
@@ -172,7 +177,26 @@ class _ChargingCurrentChartState extends State<ChargingCurrentChart> {
         sessions = await _storageService.getSessionsByDate(targetDateNormalized);
       }
       
-      // 유효한 세션만 필터링
+      // 세션 목록으로 통계 계산
+      _updateStatsFromSessions(sessions);
+    } catch (e) {
+      debugPrint('통계 데이터 계산 실패: $e');
+      if (mounted) {
+        setState(() {
+          _totalCurrentMah = 0.0;
+          _totalChargingTime = Duration.zero;
+          _avgChargingSpeed = 0.0;
+        });
+      }
+    }
+  }
+  
+  /// 세션 목록으로부터 통계 업데이트 (공통 로직)
+  void _updateStatsFromSessions(List<ChargingSessionRecord> sessions) {
+    if (!mounted) return;
+    
+    try {
+      // 유의미한 세션만 필터링 (validate()로 검증)
       final validSessions = sessions.where((s) => s.validate()).toList();
       
       if (validSessions.isEmpty) {
@@ -198,18 +222,18 @@ class _ChargingCurrentChartState extends State<ChargingCurrentChart> {
         totalCurrent += session.avgCurrent;
       }
       
-      // 평균 충전 속도 (mA)
+      // 평균 충전 속도 (mA) - 모든 유의미한 세션의 평균 전류 평균
       final avgSpeed = totalCurrent / validSessions.length;
       
-      if (mounted) {
-        setState(() {
-          _totalCurrentMah = totalMah;
-          _totalChargingTime = totalTime;
-          _avgChargingSpeed = avgSpeed;
-        });
-      }
+      setState(() {
+        _totalCurrentMah = totalMah;
+        _totalChargingTime = totalTime;
+        _avgChargingSpeed = avgSpeed;
+      });
+      
+      debugPrint('통계 업데이트 완료: ${totalMah.toStringAsFixed(0)}mAh, ${totalTime.inMinutes}분, ${avgSpeed.toStringAsFixed(0)}mA');
     } catch (e) {
-      debugPrint('통계 데이터 계산 실패: $e');
+      debugPrint('통계 업데이트 실패: $e');
       if (mounted) {
         setState(() {
           _totalCurrentMah = 0.0;
@@ -245,11 +269,9 @@ class _ChargingCurrentChartState extends State<ChargingCurrentChart> {
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
-                Text('📊', style: TextStyle(fontSize: 24)),
-                SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    '오늘 충전 현황',
+                    '충전 현황',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -364,11 +386,9 @@ class _ChargingCurrentChartState extends State<ChargingCurrentChart> {
             ),
           ),
           
-          // 통계 정보 (오늘 탭일 때만 표시)
-          if (_selectedTab == '오늘' || (_selectedTab == '선택' && _selectedDate != null)) ...[
-            SizedBox(height: 20),
-            _buildStatsSection(),
-          ],
+          // 통계 정보 (모든 탭에서 표시)
+          SizedBox(height: 20),
+          _buildStatsSection(),
           
           SizedBox(height: 16),
         ],
@@ -383,7 +403,7 @@ class _ChargingCurrentChartState extends State<ChargingCurrentChart> {
         setState(() {
           _selectedTab = label;
         });
-        _loadChartData();
+        _loadChartData(); // 차트와 통계 모두 업데이트
         _startAutoRefresh(); // 탭 변경 시 자동 새로고침 재시작
       },
       borderRadius: BorderRadius.circular(8),
