@@ -41,7 +41,6 @@ class _HomeTabState extends State<HomeTab> {
   
   // 실제 배터리 정보
   BatteryInfo? _batteryInfo;
-  bool _isRefreshing = false;
 
   @override
   void initState() {
@@ -135,6 +134,28 @@ class _HomeTabState extends State<HomeTab> {
     super.dispose();
   }
 
+  /// Pull-to-refresh를 위한 배터리 정보 새로고침
+  Future<void> _refreshBatteryInfo() async {
+    debugPrint('홈 탭: Pull-to-refresh 새로고침 시작');
+    
+    try {
+      // 생명주기 관리자를 통한 새로고침
+      await _lifecycleManager.refreshBatteryInfo();
+      
+      // 즉시 현재 정보 반영
+      final latest = _lifecycleManager.currentBatteryInfo;
+      if (mounted && latest != null) {
+        setState(() {
+          _batteryInfo = latest;
+        });
+        debugPrint('홈 탭: Pull-to-refresh 새로고침 완료 - ${latest.formattedLevel}');
+      }
+    } catch (e) {
+      debugPrint('홈 탭: Pull-to-refresh 새로고침 실패: $e');
+      // RefreshIndicator가 자동으로 에러를 처리하므로 여기서는 로그만 남김
+      rethrow; // RefreshIndicator가 에러를 표시할 수 있도록 rethrow
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -150,71 +171,6 @@ class _HomeTabState extends State<HomeTab> {
         elevation: 0,
         centerTitle: true,
         actions: [
-          // 배터리 새로고침 버튼 (로딩 상태/중복 클릭 방지)
-          IconButton(
-            onPressed: _isRefreshing
-                ? null
-                : () async {
-                    setState(() {
-                      _isRefreshing = true;
-                    });
-                    
-                    // context를 미리 저장하여 비동기 작업 후에도 안전하게 사용
-                    final scaffoldMessenger = ScaffoldMessenger.of(context);
-                    
-                    try {
-                      debugPrint('홈 탭: 수동 새로고침 시작');
-                      
-                      // 생명주기 관리자를 통한 새로고침
-                      await _lifecycleManager.refreshBatteryInfo();
-                      
-                      // 즉시 현재 정보 반영
-                      final latest = _lifecycleManager.currentBatteryInfo;
-                      if (mounted && latest != null) {
-                        setState(() {
-                          _batteryInfo = latest;
-                        });
-                        debugPrint('홈 탭: 수동 새로고침 완료 - ${latest.formattedLevel}');
-                      }
-                      
-                      if (mounted) {
-                        scaffoldMessenger.showSnackBar(
-                          SnackBar(
-                            content: Text('배터리 정보를 새로고침했습니다 (${latest?.formattedLevel ?? '--.-%'})'),
-                            duration: const Duration(seconds: 2),
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
-                      }
-                    } catch (e) {
-                      debugPrint('홈 탭: 수동 새로고침 실패: $e');
-                      if (mounted) {
-                        scaffoldMessenger.showSnackBar(
-                          SnackBar(
-                            content: Text('새로고침 실패: $e'),
-                            duration: const Duration(seconds: 2),
-                            behavior: SnackBarBehavior.floating,
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                      }
-                    } finally {
-                      if (mounted) {
-                        setState(() {
-                          _isRefreshing = false;
-                        });
-                      }
-                    }
-                  },
-            icon: _isRefreshing
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.refresh),
-            tooltip: '배터리 정보 새로고침',
-          ),
           // Pro 배지
           if (!widget.isProUser)
             Container(
@@ -237,27 +193,31 @@ class _HomeTabState extends State<HomeTab> {
             ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            // 섹션 1: 배터리 상태 (상단 고정)
-            BatteryStatusCard(
-              batteryInfo: _batteryInfo,
-              settingsService: _settingsService,
-            ),
-            
-            const SizedBox(height: 16),
-            
-            // 섹션 2: 실시간 충전 모니터 (하단 확장)
-            Expanded(
-              child: SingleChildScrollView(
-                child: RealtimeChargingMonitor(
-                  batteryInfo: _batteryInfo,
+      body: RefreshIndicator(
+        onRefresh: _refreshBatteryInfo,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              // 섹션 1: 배터리 상태 (상단 고정)
+              BatteryStatusCard(
+                batteryInfo: _batteryInfo,
+                settingsService: _settingsService,
+              ),
+              
+              const SizedBox(height: 16),
+              
+              // 섹션 2: 실시간 충전 모니터 (하단 확장)
+              Expanded(
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(), // Pull-to-refresh를 위해 항상 스크롤 가능하게
+                  child: RealtimeChargingMonitor(
+                    batteryInfo: _batteryInfo,
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
