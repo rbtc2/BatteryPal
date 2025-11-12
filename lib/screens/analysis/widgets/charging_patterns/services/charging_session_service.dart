@@ -656,10 +656,11 @@ class ChargingSessionService {
         description: '충전 종료',
       );
     } else if (previousCurrent > 0 && newCurrent > 0) {
-      // 충전 속도 변화
+      // 충전 속도 변화 - 충전 단위 간 전환만 기록
       final prevSpeedType = ChargingSessionConfig.getChargingSpeedType(previousCurrent);
       final newSpeedType = ChargingSessionConfig.getChargingSpeedType(newCurrent);
       
+      // 충전 단위(저속/일반/급속/초고속) 간 전환만 기록
       if (prevSpeedType != newSpeedType) {
         return CurrentChangeEvent(
           timestamp: timestamp,
@@ -668,16 +669,8 @@ class ChargingSessionService {
           changeType: newSpeedType,
           description: '$prevSpeedType → $newSpeedType 전환 ⚡',
         );
-      } else if (newCurrent > previousCurrent * 1.5) {
-        // 같은 타입이지만 크게 증가
-        return CurrentChangeEvent(
-          timestamp: timestamp,
-          previousCurrent: previousCurrent,
-          newCurrent: newCurrent,
-          changeType: newSpeedType,
-          description: '$newSpeedType 증가 ($previousCurrent mA → $newCurrent mA)',
-        );
       }
+      // 같은 충전 단위 내에서의 변화는 기록하지 않음
     }
     
     return null;

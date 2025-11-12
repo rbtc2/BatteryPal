@@ -764,6 +764,7 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
   
   /// 전류 속도 타입 반환
   String _getCurrentSpeedType(double current) {
+    if (current >= 3000) return '⚡ 초고속';
     if (current >= 1500) return '⚡ 급속';
     if (current >= 500) return '🟧 일반';
     return '🔵 저속';

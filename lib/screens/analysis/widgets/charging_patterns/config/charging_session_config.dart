@@ -34,8 +34,11 @@ class ChargingSessionConfig {
   /// 500 ~ 1500mA: 일반 충전
   static const int normalChargingThresholdMa = 1500;
 
-  /// 1500mA 이상: 급속 충전
-  /// (별도 상수 없음, normalChargingThresholdMa 초과)
+  /// 급속 충전 임계값 (mA)
+  /// 1500 ~ 3000mA: 급속 충전
+  static const int fastChargingThresholdMa = 3000;
+
+  /// 3000mA 이상: 초고속 충전
 
   // ==================== 전류 변화 감지 관련 상수 ====================
 
@@ -128,14 +131,17 @@ class ChargingSessionConfig {
   /// 반환:
   /// - "저속": 0 ~ 500mA
   /// - "일반": 500 ~ 1500mA
-  /// - "급속": 1500mA 이상
+  /// - "급속": 1500 ~ 3000mA
+  /// - "초고속": 3000mA 이상
   static String getChargingSpeedType(int currentMa) {
     if (currentMa < slowChargingThresholdMa) {
       return '저속';
     } else if (currentMa < normalChargingThresholdMa) {
       return '일반';
-    } else {
+    } else if (currentMa < fastChargingThresholdMa) {
       return '급속';
+    } else {
+      return '초고속';
     }
   }
 
@@ -151,7 +157,12 @@ class ChargingSessionConfig {
 
   /// 전류값이 급속 충전인지 확인
   static bool isFastCharging(int currentMa) {
-    return currentMa >= normalChargingThresholdMa;
+    return currentMa >= normalChargingThresholdMa && currentMa < fastChargingThresholdMa;
+  }
+
+  /// 전류값이 초고속 충전인지 확인
+  static bool isUltraFastCharging(int currentMa) {
+    return currentMa >= fastChargingThresholdMa;
   }
 
   /// 효율 등급 반환

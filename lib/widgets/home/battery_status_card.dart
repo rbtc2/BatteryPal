@@ -392,28 +392,9 @@ class _BatteryStatusCardState extends State<BatteryStatusCard>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 헤더
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                const Text('🔋', style: TextStyle(fontSize: 24)),
-                const SizedBox(width: 12),
-                Text(
-                  '배터리 상태',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          
           // 메인 영역: 게이지 + 상태
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
             child: Row(
               children: [
                 // 원형 게이지
@@ -436,11 +417,11 @@ class _BatteryStatusCardState extends State<BatteryStatusCard>
             ),
           ),
           
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           
           // 2개 메트릭 (온도/전압)
-            Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Row(
               children: [
                 Expanded(
@@ -466,14 +447,13 @@ class _BatteryStatusCardState extends State<BatteryStatusCard>
             ),
           ),
           
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
         ],
       ),
     );
   }
 
   Widget _buildCircularGauge(BuildContext context, double level) {
-    final color = _getLevelColor(level);
     final isCharging = widget.batteryInfo?.isCharging ?? false;
     
     return Stack(
@@ -485,11 +465,13 @@ class _BatteryStatusCardState extends State<BatteryStatusCard>
           height: double.infinity,
           child: isCharging 
               ? _buildAnimatedChargingGauge(context, level)
-              : CircularProgressIndicator(
-                  value: level / 100,
-                  strokeWidth: 12,
-                  backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-                  valueColor: AlwaysStoppedAnimation<Color>(color),
+              : CustomPaint(
+                  size: const Size(200, 200),
+                  painter: BatteryGaugePainter(
+                    progress: level / 100,
+                    strokeWidth: 12,
+                    backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  ),
                 ),
         ),
         // 중앙 텍스트 (동적 표시) + 제스처 감지
@@ -638,9 +620,9 @@ class _BatteryStatusCardState extends State<BatteryStatusCard>
           scale: 1.0 + (_pulseController.value * 0.05), // 5% 크기 변화
           child: Transform.rotate(
             angle: _rotationController.value * 2 * math.pi,
-            child: CustomPaint(
+              child: CustomPaint(
               size: const Size(200, 200),
-              painter: ChargingGaugePainter(
+              painter: BatteryGaugePainter(
                 progress: level / 100,
                 strokeWidth: 12,
                 backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
@@ -767,13 +749,13 @@ class _BatteryStatusCardState extends State<BatteryStatusCard>
   }
 }
 
-/// 충전 중일 때 그라데이션 효과가 적용된 게이지 페인터
-class ChargingGaugePainter extends CustomPainter {
+/// 배터리 게이지 페인터 (Pro 업그레이드 그라데이션 적용)
+class BatteryGaugePainter extends CustomPainter {
   final double progress;
   final double strokeWidth;
   final Color backgroundColor;
 
-  ChargingGaugePainter({
+  BatteryGaugePainter({
     required this.progress,
     required this.strokeWidth,
     required this.backgroundColor,
@@ -793,42 +775,44 @@ class ChargingGaugePainter extends CustomPainter {
 
     canvas.drawCircle(center, radius, backgroundPaint);
 
-    // 그라데이션 원 그리기
-    final gradientPaint = Paint()
-      ..strokeWidth = strokeWidth
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-
-    // 그라데이션 색상 정의 (초록 → 파랑 → 보라)
-    final colors = [
-      Colors.green,
-      Colors.blue,
-      Colors.purple,
-      Colors.green,
-    ];
-
-    // 그라데이션 생성
-    final gradient = SweepGradient(
-      colors: colors,
-      stops: const [0.0, 0.33, 0.66, 1.0],
-    );
-
-    final rect = Rect.fromCircle(center: center, radius: radius);
-    gradientPaint.shader = gradient.createShader(rect);
-
-    // 진행률에 따른 호 그리기
+    // 진행률에 따른 호 그리기 (Pro 업그레이드 그라데이션 적용)
     final sweepAngle = 2 * math.pi * progress;
-    canvas.drawArc(
-      rect,
-      -math.pi / 2, // 12시 방향부터 시작
-      sweepAngle,
-      false,
-      gradientPaint,
-    );
+    final startAngle = -math.pi / 2; // 12시 방향부터 시작
+    
+    // 각도에 따라 색상을 계산하여 선형 그라데이션 효과 구현
+    // 부드러운 그라데이션을 위해 충분한 세그먼트 수 사용
+    final segments = (sweepAngle * 60 / (2 * math.pi)).ceil().clamp(1, 120);
+    final segmentAngle = sweepAngle / segments;
+    
+    for (int i = 0; i < segments; i++) {
+      final currentAngle = startAngle + (segmentAngle * i);
+      final t = i / segments; // 0.0 ~ 1.0
+      
+      // Pro 업그레이드 그라데이션 색상 (초록 → 청록)
+      final color = Color.lerp(
+        Colors.green[400]!,
+        Colors.teal[400]!,
+        t,
+      )!;
+      
+      final segmentPaint = Paint()
+        ..color = color
+        ..strokeWidth = strokeWidth
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round;
+      
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: radius),
+        currentAngle,
+        segmentAngle,
+        false,
+        segmentPaint,
+      );
+    }
   }
 
   @override
-  bool shouldRepaint(ChargingGaugePainter oldDelegate) {
+  bool shouldRepaint(BatteryGaugePainter oldDelegate) {
     return oldDelegate.progress != progress ||
            oldDelegate.strokeWidth != strokeWidth ||
            oldDelegate.backgroundColor != backgroundColor;
