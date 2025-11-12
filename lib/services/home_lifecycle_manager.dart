@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../models/app_models.dart';
 import 'battery_service.dart';
 import 'settings_service.dart';
+import '../../screens/analysis/widgets/charging_patterns/services/charging_session_service.dart';
 
 /// 홈 탭 생명주기 관리 서비스 (싱글톤)
 /// 앱 생명주기, 탭 전환, 배터리 모니터링 등의 로직을 관리
@@ -211,6 +212,9 @@ class HomeLifecycleManager {
           debugPrint('HomeLifecycleManager: 앱이 포그라운드로 복귀, 모니터링 재시작');
           _optimizeForForeground();
           
+          // 충전 세션 서비스 날짜 변경 체크 (배터리 효율적 - 앱 사용 시에만)
+          _checkChargingSessionDateChange();
+          
           // 전역 콜백 호출 (하위 호환성)
           onAppResumed?.call();
           
@@ -259,6 +263,20 @@ class HomeLifecycleManager {
     _batteryService.refreshBatteryInfo();
     
     debugPrint('HomeLifecycleManager: 포그라운드 최적화 완료');
+  }
+  
+  /// 충전 세션 서비스 날짜 변경 체크 (앱 포그라운드 복귀 시)
+  /// 배터리 효율적 - 앱을 사용할 때만 체크
+  void _checkChargingSessionDateChange() {
+    try {
+      final sessionService = ChargingSessionService();
+      if (sessionService.isInitialized) {
+        sessionService.checkDateChangeAndSave();
+        debugPrint('HomeLifecycleManager: 충전 세션 날짜 변경 체크 완료');
+      }
+    } catch (e) {
+      debugPrint('HomeLifecycleManager: 충전 세션 날짜 변경 체크 실패 - $e');
+    }
   }
   
   /// 탭 복귀 시 배터리 정보 새로고침 (즉시 복원 + 비동기 업데이트)

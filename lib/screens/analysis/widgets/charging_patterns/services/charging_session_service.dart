@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import '../../../../../models/app_models.dart';
 import '../../../../../services/battery_service.dart';
 import '../../../../../services/last_charging_info_service.dart';
+import '../../../../../services/battery_history_database_service.dart';
 import '../models/charging_session_models.dart';
 import '../config/charging_session_config.dart';
 import '../utils/time_slot_utils.dart';
@@ -41,6 +42,7 @@ class ChargingSessionService {
 
   final BatteryService _batteryService = BatteryService();
   final ChargingSessionStorage _storageService = ChargingSessionStorage();
+  final BatteryHistoryDatabaseService _databaseService = BatteryHistoryDatabaseService();
   
   // 스트림 구독 관리
   StreamSubscription<BatteryInfo>? _batteryInfoSubscription;
@@ -51,6 +53,9 @@ class ChargingSessionService {
   
   // 날짜 변경 감지를 위한 마지막 저장 날짜 추적
   String? _lastSavedDateKey;
+  
+  // 자정 타이머 (배터리 효율적 - 다음 자정까지 한 번만 타이머 설정)
+  Timer? _midnightTimer;
   
   // ==================== 세션 상태 관리 ====================
   
@@ -168,6 +173,9 @@ class ChargingSessionService {
         }
       }
       
+      // 자정 타이머 시작 (배터리 효율적 날짜 변경 감지)
+      _scheduleMidnightTimer();
+      
       _isInitialized = true;
       debugPrint('ChargingSessionService: 초기화 완료');
       
@@ -193,6 +201,10 @@ class ChargingSessionService {
     // 종료 대기 타이머 정리
     _endWaitTimer?.cancel();
     _endWaitTimer = null;
+    
+    // 자정 타이머 정리
+    _midnightTimer?.cancel();
+    _midnightTimer = null;
     
     // 스트림 구독 해제
     _batteryInfoSubscription?.cancel();
@@ -225,7 +237,65 @@ class ChargingSessionService {
     return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   }
   
+  /// 자정 타이머 스케줄링 (배터리 효율적 - 다음 자정까지 한 번만 타이머 설정)
+  /// 
+  /// 매일 자정에 날짜 변경 체크 및 어제 데이터 저장, 7일 이상 된 데이터 정리
+  void _scheduleMidnightTimer() {
+    if (_isDisposed || !_isInitialized) return;
+    
+    // 기존 타이머 취소
+    _midnightTimer?.cancel();
+    
+    try {
+      final now = DateTime.now();
+      // 다음 자정 시간 계산 (00:00:00)
+      final tomorrow = DateTime(now.year, now.month, now.day + 1, 0, 0, 0);
+      final durationUntilMidnight = tomorrow.difference(now);
+      
+      debugPrint('ChargingSessionService: 자정 타이머 스케줄링 - ${durationUntilMidnight.inHours}시간 ${durationUntilMidnight.inMinutes % 60}분 후 실행');
+      
+      // 다음 자정까지 대기 후 실행
+      _midnightTimer = Timer(durationUntilMidnight, () {
+        if (_isDisposed || !_isInitialized) return;
+        
+        // 자정에 날짜 변경 체크 및 저장
+        _checkDateChangeAndSave();
+        
+        // 7일 이상 된 데이터 정리
+        _cleanupOldSessions();
+        
+        // 다음 자정까지 다시 스케줄링 (재귀적)
+        _scheduleMidnightTimer();
+      });
+    } catch (e, stackTrace) {
+      debugPrint('ChargingSessionService: 자정 타이머 스케줄링 실패 - $e');
+      debugPrint('스택 트레이스: $stackTrace');
+    }
+  }
+  
+  /// 7일 이상 된 충전 세션 데이터 정리
+  Future<void> _cleanupOldSessions() async {
+    if (_isDisposed || !_isInitialized) return;
+    
+    try {
+      final deletedCount = await _databaseService.cleanupOldChargingSessions();
+      if (deletedCount > 0) {
+        debugPrint('ChargingSessionService: 7일 이상 된 세션 $deletedCount개 자동 정리 완료');
+      }
+    } catch (e, stackTrace) {
+      debugPrint('ChargingSessionService: 오래된 세션 정리 실패 - $e');
+      debugPrint('스택 트레이스: $stackTrace');
+    }
+  }
+  
   /// 날짜 변경 감지 및 과거 세션 저장
+  /// 
+  /// 공개 메서드로 만들어서 앱 포그라운드 복귀 시에도 호출 가능
+  void checkDateChangeAndSave() {
+    _checkDateChangeAndSave();
+  }
+  
+  /// 날짜 변경 감지 및 과거 세션 저장 (내부)
   void _checkDateChangeAndSave() {
     if (_isDisposed || !_isInitialized) return;
     
