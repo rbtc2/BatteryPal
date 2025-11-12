@@ -281,43 +281,32 @@ class _RealtimeChargingMonitorState extends State<RealtimeChargingMonitor> {
           width: 1.5,
         ),
       ),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
       child: Column(
         children: [
-          // 헤더
-          Row(
-            children: [
-              const Icon(Icons.monitor_heart, color: Colors.green, size: 24),
-              const SizedBox(width: 8),
-              const Text(
-                '⚡ 실시간 충전 모니터',
-                style: TextStyle(
-                  color: Colors.green,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const Spacer(),
-              // 깜빡이는 점
-              const BlinkingDot(),
-            ],
-          ),
-
-          const SizedBox(height: 16),
-
           // 심전도 스타일 그래프
           SizedBox(
-            height: 160,
-            child: CustomPaint(
-              painter: ECGPainter(
-                dataPoints: _dataPoints,
-                color: Colors.green,
-              ),
-              child: Container(),
+            height: 180,
+            child: Stack(
+              children: [
+                CustomPaint(
+                  size: const Size(double.infinity, 180),
+                  painter: ECGPainter(
+                    dataPoints: _dataPoints,
+                    color: Colors.green,
+                  ),
+                ),
+                // 깜빡이는 점 (오른쪽 상단)
+                const Positioned(
+                  top: 0,
+                  right: 0,
+                  child: BlinkingDot(),
+                ),
+              ],
             ),
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
 
           // 현재 수치 (크게)
           Row(
