@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import '../services/charging_session_service.dart';
 import '../services/charging_session_storage.dart';
@@ -13,11 +12,23 @@ import 'charging_session_list_item.dart';
 import 'charging_session_detail_dialog.dart';
 import '../../../../../services/battery_service.dart';
 
-/// 섹션 3: 통계 + 세션 기록 카드
+/// 충전 통계 및 세션 기록 카드
 /// 
-/// 실제 충전 세션 데이터를 표시하는 카드
-/// - 날짜별 통계 (평균 속도, 충전 횟수, 주 시간대)
-/// - 날짜별 충전 세션 목록
+/// 날짜별 충전 통계와 세션 기록을 표시하는 위젯입니다.
+/// 
+/// 주요 기능:
+/// - 날짜별 통계 표시 (평균 속도, 충전 횟수, 주 시간대)
+/// - 날짜 선택 (오늘, 어제, 2일 전, 사용자 지정)
+/// - 충전 세션 목록 표시
+/// - 진행 중인 충전 세션 실시간 표시
+/// 
+/// 내부적으로 다음 컴포넌트들을 사용합니다:
+/// - [ChargingStatsController]: 상태 관리 및 타이머 관리
+/// - [DateSelectorController]: 날짜 선택 관리
+/// - [ChargingSessionDataLoader]: 데이터 로딩 및 캐싱
+/// - [StatCard]: 통계 카드 UI
+/// - [ActiveChargingCard]: 진행 중인 충전 카드 UI
+/// - [DateSelectorTabs]: 날짜 선택 탭 UI
 class ChargingStatsCard extends StatefulWidget {
   const ChargingStatsCard({super.key});
 
@@ -40,16 +51,22 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
   @override
   void initState() {
     super.initState();
-    // 날짜 선택 컨트롤러 초기화
+    _initializeControllers();
+    _initializeService();
+  }
+  
+  /// 컨트롤러 초기화
+  void _initializeControllers() {
+    // 날짜 선택 컨트롤러
     _dateController = DateSelectorController();
     
-    // 데이터 로더 초기화
+    // 데이터 로더
     _dataLoader = ChargingSessionDataLoader(
       sessionService: _sessionService,
       storageService: _storageService,
     );
     
-    // 통계 컨트롤러 초기화
+    // 통계 컨트롤러
     _statsController = ChargingStatsController(
       sessionService: _sessionService,
       storageService: _storageService,
@@ -57,24 +74,22 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
       dateController: _dateController,
       dataLoader: _dataLoader,
     );
-    _statsController.setIsMounted(() => mounted);
-    _statsController.setOnStateChanged(() {
-      if (mounted) {
-        setState(() {});
-      }
-    });
-    _statsController.addListener(() {
-      if (mounted) {
-        setState(() {});
-      }
-    });
     
-    _initializeService();
+    // 컨트롤러 리스너 설정
+    _statsController.setIsMounted(() => mounted);
+    _statsController.addListener(_onStatsChanged);
   }
   
+  /// 통계 컨트롤러 상태 변경 핸들러
+  void _onStatsChanged() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+  
+  /// 서비스 초기화 및 데이터 로드
   Future<void> _initializeService() async {
     try {
-      // 통계 컨트롤러 초기화 (내부에서 데이터 로더 초기화 및 데이터 로드 수행)
       await _statsController.initialize();
     } catch (e, stackTrace) {
       debugPrint('ChargingStatsCard 초기화 실패: $e');
@@ -90,17 +105,14 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
   
   @override
   void dispose() {
-    // 통계 컨트롤러 정리 (내부에서 타이머 및 스트림 정리)
-    _statsController.dispose();
+    // 리스너 제거
+    _statsController.removeListener(_onStatsChanged);
     
-    // 날짜 선택 컨트롤러 정리
+    // 컨트롤러 정리 (내부에서 타이머 및 스트림 정리)
+    _statsController.dispose();
     _dateController.dispose();
     
-    // 데이터 로더 캐시 정리 (선택사항, 메모리 절약)
-    // _dataLoader.clearCache();
-    
-    // 주의: ChargingSessionService는 싱글톤이므로 여기서 dispose하지 않음
-    // 서비스는 앱 전체에서 사용되므로 위젯이 dispose되어도 유지됨
+    // 주의: 서비스들은 싱글톤이므로 dispose하지 않음
     super.dispose();
   }
   
@@ -139,47 +151,57 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
           
           SizedBox(height: 16),
           
-          // 통계 카드 3개 (가로 배치)
+          // 통계 카드 3개
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  child: StatCard(
+                  child: _buildStatCard(
                     title: '평균속도',
-                    mainValue: _statsController.isLoading ? '...' : (_statsController.stats.avgCurrent > 0 ? _statsController.stats.avgCurrent.toStringAsFixed(0) : '0'),
+                    mainValue: _statsController.isLoading 
+                        ? '...' 
+                        : (_statsController.stats.avgCurrent > 0 
+                            ? _statsController.stats.avgCurrent.toStringAsFixed(0) 
+                            : '0'),
                     unit: 'mA',
-                    subValue: _statsController.stats.avgCurrent > 0 ? _getCurrentSpeedType(_statsController.stats.avgCurrent) : '데이터 없음',
-                    trend: '', // 추후 주간 비교 데이터 추가 시 사용
-                    trendColor: Colors.green,
+                    subValue: _statsController.stats.avgCurrent > 0 
+                        ? _getCurrentSpeedType(_statsController.stats.avgCurrent) 
+                        : '데이터 없음',
                     icon: Icons.speed,
+                    color: Colors.green,
                   ),
                 ),
                 SizedBox(width: 8),
                 Expanded(
-                  child: StatCard(
+                  child: _buildStatCard(
                     title: '충전횟수',
-                    mainValue: _statsController.isLoading ? '...' : '${_statsController.stats.sessionCount}회',
+                    mainValue: _statsController.isLoading 
+                        ? '...' 
+                        : '${_statsController.stats.sessionCount}회',
                     unit: _dateController.getDateUnitText(),
-                    subValue: _statsController.stats.sessionCount > 0 ? '${_dateController.getDateDisplayText()} 기준' : '없음',
-                    trend: '', // 추후 주간 비교 데이터 추가 시 사용
-                    trendColor: Colors.blue,
+                    subValue: _statsController.stats.sessionCount > 0 
+                        ? '${_dateController.getDateDisplayText()} 기준' 
+                        : '없음',
                     icon: Icons.battery_charging_full,
+                    color: Colors.blue,
                   ),
                 ),
                 SizedBox(width: 8),
                 Expanded(
-                  child: StatCard(
+                  child: _buildStatCard(
                     title: '주시간대',
-                    mainValue: _statsController.isLoading ? '...' : _statsController.stats.mainTimeSlot,
+                    mainValue: _statsController.isLoading 
+                        ? '...' 
+                        : _statsController.stats.mainTimeSlot,
                     unit: '',
-                    subValue: _statsController.stats.mainTimeSlot != '-' && _statsController.stats.mainTimeSlotEnum != null 
+                    subValue: _statsController.stats.mainTimeSlot != '-' 
+                            && _statsController.stats.mainTimeSlotEnum != null
                         ? TimeSlotUtils.getTimeSlotRange(_statsController.stats.mainTimeSlotEnum!) 
                         : '없음',
-                    trend: '안정',
-                    trendColor: Colors.blue,
                     icon: Icons.access_time,
+                    color: Colors.blue,
                   ),
                 ),
               ],
@@ -363,7 +385,31 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
     );
   }
   
+  /// 통계 카드 빌더
+  Widget _buildStatCard({
+    required String title,
+    required String mainValue,
+    required String unit,
+    required String subValue,
+    required IconData icon,
+    required Color color,
+  }) {
+    return StatCard(
+      title: title,
+      mainValue: mainValue,
+      unit: unit,
+      subValue: subValue,
+      trend: '', // 추후 주간 비교 데이터 추가 시 사용
+      trendColor: color,
+      icon: icon,
+    );
+  }
+  
   /// 전류 속도 타입 반환
+  /// 
+  /// [current]: 전류 값 (mA)
+  /// 
+  /// 반환값: 전류 속도 타입 문자열
   String _getCurrentSpeedType(double current) {
     if (current >= 3000) return '⚡ 초고속';
     if (current >= 1500) return '⚡ 급속';
