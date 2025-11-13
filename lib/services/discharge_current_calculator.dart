@@ -78,7 +78,7 @@ class DischargeCurrentCalculator {
           totalDischargeCurrent += mAh.round();
           
           debugPrint('방전 구간: ${current.level.toStringAsFixed(1)}% → ${next.level.toStringAsFixed(1)}% '
-              '(${levelDiff.toStringAsFixed(1)}%, ${timeDiff}초, ${mAh.round()}mAh)');
+              '(${levelDiff.toStringAsFixed(1)}%, $timeDiff초, ${mAh.round()}mAh)');
         }
       }
       

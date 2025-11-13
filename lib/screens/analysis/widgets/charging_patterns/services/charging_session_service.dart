@@ -6,33 +6,32 @@ import 'package:flutter/foundation.dart';
 import '../../../../../models/models.dart';
 import '../../../../../services/battery_service.dart';
 import '../../../../../services/last_charging_info_service.dart';
-import '../../../../../services/battery_history_database_service.dart';
 import '../models/charging_session_models.dart';
-import '../config/charging_session_config.dart';
-import '../utils/time_slot_utils.dart';
-import 'charging_session_analyzer.dart' as charging_session_analyzer;
 import 'charging_session_storage.dart';
-
-/// 세션 상태 enum
-enum SessionState {
-  /// 대기 중 (충전 중이 아님)
-  idle,
-  
-  /// 세션 진행 중 (충전 중, 데이터 수집 중)
-  active,
-  
-  /// 세션 종료 대기 중 (전류가 0이 되었지만 아직 종료 판단 전)
-  ending,
-}
+import 'session_timer_manager.dart';
+import 'session_data_collector.dart';
+import 'session_record_builder.dart';
+import 'date_change_manager.dart';
+import 'session_state_manager.dart';
 
 /// 충전 세션 감지 및 추적 서비스 (싱글톤)
 /// 
+/// 이 서비스는 충전 세션의 전체 생명주기를 관리하는 오케스트레이터 역할을 합니다.
+/// 실제 작업은 다음과 같은 전문 서비스들에 위임합니다:
+/// 
+/// - [SessionStateManager]: 세션 상태 관리 및 전환
+/// - [SessionDataCollector]: 데이터 수집 및 전류 변화 감지
+/// - [SessionRecordBuilder]: 세션 기록 생성 및 분석
+/// - [SessionTimerManager]: 타이머 관리 (데이터 수집, 종료 대기, 자정)
+/// - [DateChangeManager]: 날짜 변경 감지 및 데이터 정리
+/// - [ChargingSessionStorage]: 세션 데이터 저장 및 조회
+/// 
 /// 주요 기능:
 /// 1. BatteryService 스트림 구독하여 충전 상태 변화 감지
-/// 2. 충전 세션 시작/종료 감지
+/// 2. 충전 세션 시작/종료 감지 및 상태 관리
 /// 3. 세션 진행 중 실시간 데이터 수집
-/// 4. 전류 변화 이력 추적
-/// 5. 세션 유효성 검증
+/// 4. 세션 기록 생성 및 저장
+/// 5. 날짜 변경 감지 및 과거 데이터 관리
 class ChargingSessionService {
   // 싱글톤 인스턴스
   static final ChargingSessionService _instance = 
@@ -42,7 +41,11 @@ class ChargingSessionService {
 
   final BatteryService _batteryService = BatteryService();
   final ChargingSessionStorage _storageService = ChargingSessionStorage();
-  final BatteryHistoryDatabaseService _databaseService = BatteryHistoryDatabaseService();
+  final SessionTimerManager _timerManager = SessionTimerManager();
+  final SessionDataCollector _dataCollector = SessionDataCollector();
+  final SessionRecordBuilder _recordBuilder = SessionRecordBuilder();
+  final DateChangeManager _dateChangeManager = DateChangeManager();
+  final SessionStateManager _stateManager = SessionStateManager();
   
   // 스트림 구독 관리
   StreamSubscription<BatteryInfo>? _batteryInfoSubscription;
@@ -50,50 +53,6 @@ class ChargingSessionService {
   // 서비스 상태 관리
   bool _isInitialized = false;
   bool _isDisposed = false;
-  
-  // 날짜 변경 감지를 위한 마지막 저장 날짜 추적
-  String? _lastSavedDateKey;
-  
-  // 자정 타이머 (배터리 효율적 - 다음 자정까지 한 번만 타이머 설정)
-  Timer? _midnightTimer;
-  
-  // ==================== 세션 상태 관리 ====================
-  
-  /// 현재 세션 상태
-  SessionState _sessionState = SessionState.idle;
-  
-  /// 현재 진행 중인 세션 데이터
-  ChargingSessionRecord? _currentSession;
-  
-  /// 세션 시작 시간
-  DateTime? _sessionStartTime;
-  
-  /// 세션 종료 대기 시작 시간 (전류가 0이 된 시점)
-  /// 종료 대기 타이머에서 사용
-  DateTime? _sessionEndWaitStartTime;
-  
-  /// 이전 충전 상태 (충전 시작/종료 감지용)
-  bool _wasCharging = false;
-  
-  // ==================== 세션 데이터 수집 ====================
-  
-  /// 세션 데이터 수집 타이머
-  Timer? _dataCollectionTimer;
-  
-  /// 수집된 데이터 포인트들
-  final List<SessionDataPoint> _collectedDataPoints = [];
-  
-  /// 이전 전류값 (전류 변화 감지용)
-  int? _previousCurrent;
-  
-  /// 이전 전류값의 타임스탬프
-  DateTime? _previousCurrentTime;
-  
-  /// 전류 변화 이벤트 목록
-  final List<CurrentChangeEvent> _speedChanges = [];
-  
-  /// 세션 시작 시 배터리 정보
-  BatteryInfo? _startBatteryInfo;
   
   // ==================== 세션 목록 관리 ====================
   
@@ -135,7 +94,7 @@ class ChargingSessionService {
   
   /// 현재 진행 중인 세션 가져오기
   ChargingSessionRecord? getCurrentSession() {
-    return _currentSession;
+    return _stateManager.currentSession;
   }
   
   // ==================== 서비스 초기화 및 정리 ====================
@@ -166,15 +125,28 @@ class ChargingSessionService {
       // 현재 충전 상태 확인
       final currentInfo = _batteryService.currentBatteryInfo;
       if (currentInfo != null) {
-        _wasCharging = currentInfo.isCharging;
-        if (_wasCharging && currentInfo.chargingCurrent > 0) {
+        _stateManager.setWasCharging(currentInfo.isCharging);
+        if (currentInfo.isCharging && currentInfo.chargingCurrent > 0) {
           // 이미 충전 중이면 세션 시작
           _startSession(currentInfo);
         }
       }
       
       // 자정 타이머 시작 (배터리 효율적 날짜 변경 감지)
-      _scheduleMidnightTimer();
+      _timerManager.scheduleMidnightTimer(
+        onMidnight: () {
+          _dateChangeManager.checkDateChangeAndSave(
+            isDisposed: () => _isDisposed,
+            isInitialized: () => _isInitialized,
+          );
+          _dateChangeManager.cleanupOldSessions(
+            isDisposed: () => _isDisposed,
+            isInitialized: () => _isInitialized,
+          );
+        },
+        isDisposed: () => _isDisposed,
+        isInitialized: () => _isInitialized,
+      );
       
       _isInitialized = true;
       debugPrint('ChargingSessionService: 초기화 완료');
@@ -194,24 +166,15 @@ class ChargingSessionService {
     
     _isDisposed = true;
     
-    // 타이머 정리 (먼저 정리하여 새로운 데이터 수집 방지)
-    _dataCollectionTimer?.cancel();
-    _dataCollectionTimer = null;
-    
-    // 종료 대기 타이머 정리
-    _endWaitTimer?.cancel();
-    _endWaitTimer = null;
-    
-    // 자정 타이머 정리
-    _midnightTimer?.cancel();
-    _midnightTimer = null;
+    // 모든 타이머 정리
+    _timerManager.dispose();
     
     // 스트림 구독 해제
     _batteryInfoSubscription?.cancel();
     _batteryInfoSubscription = null;
     
     // 현재 세션이 있으면 종료 처리 (dispose는 동기 함수이므로 unawaited 사용)
-    if (_sessionState == SessionState.active || _sessionState == SessionState.ending) {
+    if (_stateManager.isActive || _stateManager.isEnding) {
       // 비동기 작업이지만 dispose에서는 await하지 않음
       // _isDisposed 플래그로 _endSession 내부에서 추가 작업 방지
       _endSession().catchError((e) {
@@ -224,121 +187,19 @@ class ChargingSessionService {
       _sessionsController.close();
     }
     
-    // Storage 서비스 정리 (Storage는 싱글톤이므로 dispose하지 않음)
-    // _storageService.dispose(); // 주석 처리: 다른 곳에서 사용 중일 수 있음
-    
     debugPrint('ChargingSessionService: dispose 완료');
   }
   
   // ==================== 날짜 변경 감지 및 저장 ====================
   
-  /// 날짜 키 생성
-  String _getDateKey(DateTime date) {
-    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-  }
-  
-  /// 자정 타이머 스케줄링 (배터리 효율적 - 다음 자정까지 한 번만 타이머 설정)
-  /// 
-  /// 매일 자정에 날짜 변경 체크 및 어제 데이터 저장, 7일 이상 된 데이터 정리
-  void _scheduleMidnightTimer() {
-    if (_isDisposed || !_isInitialized) return;
-    
-    // 기존 타이머 취소
-    _midnightTimer?.cancel();
-    
-    try {
-      final now = DateTime.now();
-      // 다음 자정 시간 계산 (00:00:00)
-      final tomorrow = DateTime(now.year, now.month, now.day + 1, 0, 0, 0);
-      final durationUntilMidnight = tomorrow.difference(now);
-      
-      debugPrint('ChargingSessionService: 자정 타이머 스케줄링 - ${durationUntilMidnight.inHours}시간 ${durationUntilMidnight.inMinutes % 60}분 후 실행');
-      
-      // 다음 자정까지 대기 후 실행
-      _midnightTimer = Timer(durationUntilMidnight, () {
-        if (_isDisposed || !_isInitialized) return;
-        
-        // 자정에 날짜 변경 체크 및 저장
-        _checkDateChangeAndSave();
-        
-        // 7일 이상 된 데이터 정리
-        _cleanupOldSessions();
-        
-        // 다음 자정까지 다시 스케줄링 (재귀적)
-        _scheduleMidnightTimer();
-      });
-    } catch (e, stackTrace) {
-      debugPrint('ChargingSessionService: 자정 타이머 스케줄링 실패 - $e');
-      debugPrint('스택 트레이스: $stackTrace');
-    }
-  }
-  
-  /// 7일 이상 된 충전 세션 데이터 정리
-  Future<void> _cleanupOldSessions() async {
-    if (_isDisposed || !_isInitialized) return;
-    
-    try {
-      final deletedCount = await _databaseService.cleanupOldChargingSessions();
-      if (deletedCount > 0) {
-        debugPrint('ChargingSessionService: 7일 이상 된 세션 $deletedCount개 자동 정리 완료');
-      }
-    } catch (e, stackTrace) {
-      debugPrint('ChargingSessionService: 오래된 세션 정리 실패 - $e');
-      debugPrint('스택 트레이스: $stackTrace');
-    }
-  }
-  
   /// 날짜 변경 감지 및 과거 세션 저장
   /// 
   /// 공개 메서드로 만들어서 앱 포그라운드 복귀 시에도 호출 가능
   void checkDateChangeAndSave() {
-    _checkDateChangeAndSave();
-  }
-  
-  /// 날짜 변경 감지 및 과거 세션 저장 (내부)
-  void _checkDateChangeAndSave() {
-    if (_isDisposed || !_isInitialized) return;
-    
-    try {
-      final now = DateTime.now();
-      final todayKey = _getDateKey(now);
-      
-      // 마지막 저장 날짜가 없으면 오늘 날짜로 초기화
-      if (_lastSavedDateKey == null) {
-        _lastSavedDateKey = todayKey;
-        return;
-      }
-      
-      // 날짜가 바뀌었는지 확인
-      if (_lastSavedDateKey != todayKey) {
-        debugPrint('ChargingSessionService: 날짜 변경 감지 - $_lastSavedDateKey -> $todayKey');
-        
-        // 어제 날짜의 세션을 DB에 저장
-        final yesterday = now.subtract(const Duration(days: 1));
-        _storageService.saveDateSessionsToDatabase(yesterday).then((count) {
-          if (count > 0) {
-            debugPrint('ChargingSessionService: 어제 세션 $count개 DB 저장 완료');
-          }
-        }).catchError((e) {
-          debugPrint('ChargingSessionService: 어제 세션 저장 실패 - $e');
-        });
-        
-        // 모든 과거 세션 저장 (7일 전까지)
-        _storageService.saveAllPastSessionsToDatabase(todayKey).then((count) {
-          if (count > 0) {
-            debugPrint('ChargingSessionService: 과거 세션 $count개 DB 저장 완료');
-          }
-        }).catchError((e) {
-          debugPrint('ChargingSessionService: 과거 세션 저장 실패 - $e');
-        });
-        
-        // 오늘 날짜로 업데이트
-        _lastSavedDateKey = todayKey;
-      }
-    } catch (e, stackTrace) {
-      debugPrint('ChargingSessionService: 날짜 변경 감지 실패 - $e');
-      debugPrint('스택 트레이스: $stackTrace');
-    }
+    _dateChangeManager.checkDateChangeAndSave(
+      isDisposed: () => _isDisposed,
+      isInitialized: () => _isInitialized,
+    );
   }
   
   // ==================== 배터리 정보 업데이트 처리 ====================
@@ -348,24 +209,27 @@ class ChargingSessionService {
     if (_isDisposed) return;
     
     // 날짜 변경 체크 (1분마다 체크하지만, 배터리 업데이트 시에도 체크)
-    _checkDateChangeAndSave();
+    _dateChangeManager.checkDateChangeAndSave(
+      isDisposed: () => _isDisposed,
+      isInitialized: () => _isInitialized,
+    );
     
     try {
       final isCurrentlyCharging = batteryInfo.isCharging;
       final chargingCurrent = batteryInfo.chargingCurrent;
       
       // 충전 상태 변화 감지
-      if (isCurrentlyCharging && !_wasCharging) {
+      if (isCurrentlyCharging && !_stateManager.wasCharging) {
         // 충전 시작
         debugPrint('ChargingSessionService: 충전 시작 감지');
         _startSession(batteryInfo);
-        _wasCharging = true;
+        _stateManager.setWasCharging(true);
         
-      } else if (!isCurrentlyCharging && _wasCharging) {
+      } else if (!isCurrentlyCharging && _stateManager.wasCharging) {
         // 충전 종료
         debugPrint('ChargingSessionService: 충전 종료 감지');
         _handleChargingEnd();
-        _wasCharging = false;
+        _stateManager.setWasCharging(false);
         
       } else if (isCurrentlyCharging && chargingCurrent > 0) {
         // 충전 중 - 전류 변화 감지 및 데이터 수집
@@ -388,29 +252,39 @@ class ChargingSessionService {
   
   /// 세션 시작
   void _startSession(BatteryInfo batteryInfo) {
-    if (_sessionState != SessionState.idle) {
-      debugPrint('ChargingSessionService: 세션이 이미 진행 중입니다');
+    if (!_stateManager.startSession(batteryInfo)) {
       return;
     }
     
     try {
       debugPrint('ChargingSessionService: 세션 시작');
       
-      _sessionState = SessionState.active;
-      _sessionStartTime = DateTime.now();
-      _startBatteryInfo = batteryInfo;
-      
       // 데이터 수집 초기화
-      _collectedDataPoints.clear();
-      _speedChanges.clear();
-      _previousCurrent = null;
-      _previousCurrentTime = null;
+      _dataCollector.reset();
       
       // 첫 데이터 포인트 추가
-      _addDataPoint(batteryInfo);
+      _dataCollector.addDataPoint(
+        batteryInfo,
+        sessionStartTime: _stateManager.startTime,
+        isDisposed: () => _isDisposed,
+      );
       
       // 데이터 수집 타이머 시작
-      _startDataCollectionTimer();
+      _timerManager.startDataCollectionTimer(
+        onTick: () {
+          final batteryInfo = _batteryService.currentBatteryInfo;
+          if (batteryInfo != null && 
+              batteryInfo.isCharging && 
+              batteryInfo.chargingCurrent > 0) {
+            _dataCollector.addDataPoint(
+              batteryInfo,
+              sessionStartTime: _stateManager.startTime,
+              isDisposed: () => _isDisposed,
+            );
+          }
+        },
+        isActive: () => _stateManager.isActive && !_isDisposed,
+      );
       
       debugPrint('ChargingSessionService: 세션 시작 완료 - 시작 배터리: ${batteryInfo.level}%');
       
@@ -425,51 +299,31 @@ class ChargingSessionService {
   
   /// 충전 종료 처리
   void _handleChargingEnd() {
-    if (_sessionState == SessionState.idle) {
+    if (!_stateManager.startEndWait()) {
       return;
     }
     
-    // 세션 종료 대기 상태로 전환
-    if (_sessionState == SessionState.active) {
-      _sessionState = SessionState.ending;
-      _sessionEndWaitStartTime = DateTime.now();
-      debugPrint('ChargingSessionService: 세션 종료 대기 시작');
-      
-      // 종료 대기 타이머 시작
-      _startEndWaitTimer();
-    }
-  }
-  
-  /// 종료 대기 타이머
-  Timer? _endWaitTimer;
-  
-  /// 종료 대기 타이머 시작
-  void _startEndWaitTimer() {
-    // 기존 타이머가 있으면 취소
-    _endWaitTimer?.cancel();
+    debugPrint('ChargingSessionService: 세션 종료 대기 시작');
     
-    _sessionEndWaitStartTime = DateTime.now();
-    _endWaitTimer = Timer(ChargingSessionConfig.sessionEndWaitDuration, () {
-      if (_isDisposed) {
-        return;
-      }
-      
-      if (_sessionState == SessionState.ending && _sessionEndWaitStartTime != null) {
-        // 대기 시간이 지났으면 세션 종료
-        final waitDuration = DateTime.now().difference(_sessionEndWaitStartTime!);
-        debugPrint('ChargingSessionService: 종료 대기 완료 (${waitDuration.inSeconds}초 대기)');
-        _endSession().catchError((e) {
-          debugPrint('ChargingSessionService: 종료 대기 타이머에서 세션 종료 실패 - $e');
-        });
-      }
-      
-      _endWaitTimer = null;
-    });
+    // 종료 대기 타이머 시작
+    _timerManager.startEndWaitTimer(
+      onComplete: () {
+        if (_stateManager.isEnding && _stateManager.endWaitStartTime != null) {
+          final waitDuration = DateTime.now().difference(_stateManager.endWaitStartTime!);
+          debugPrint('ChargingSessionService: 종료 대기 완료 (${waitDuration.inSeconds}초 대기)');
+          _endSession().catchError((e) {
+            debugPrint('ChargingSessionService: 종료 대기 타이머에서 세션 종료 실패 - $e');
+          });
+        }
+      },
+      isDisposed: () => _isDisposed,
+    );
   }
+  
   
   /// 세션 종료
   Future<void> _endSession() async {
-    if (_sessionState == SessionState.idle || _isDisposed) {
+    if (_stateManager.isIdle || _isDisposed) {
       return;
     }
     
@@ -477,7 +331,7 @@ class ChargingSessionService {
       debugPrint('ChargingSessionService: 세션 종료 처리 시작');
       
       // 데이터 수집 타이머 중지
-      _stopDataCollectionTimer();
+      _timerManager.stopDataCollectionTimer();
       
       // dispose된 경우 추가 작업 중단
       if (_isDisposed) {
@@ -487,7 +341,7 @@ class ChargingSessionService {
       
       // 마지막 배터리 정보 가져오기
       final endBatteryInfo = _batteryService.currentBatteryInfo;
-      if (endBatteryInfo == null || _startBatteryInfo == null) {
+      if (endBatteryInfo == null || _stateManager.startBatteryInfo == null) {
         debugPrint('ChargingSessionService: 배터리 정보가 없어 세션을 종료할 수 없습니다');
         _resetSession();
         return;
@@ -500,7 +354,12 @@ class ChargingSessionService {
       }
       
       // 세션 데이터 분석 및 기록 생성
-      final sessionRecord = await _createSessionRecord(endBatteryInfo);
+      final sessionRecord = await _recordBuilder.buildSessionRecord(
+        dataCollector: _dataCollector,
+        startTime: _stateManager.startTime!,
+        startBatteryInfo: _stateManager.startBatteryInfo!,
+        endBatteryInfo: endBatteryInfo,
+      );
       
       // dispose된 경우 추가 작업 중단
       if (_isDisposed || sessionRecord == null) {
@@ -561,321 +420,41 @@ class ChargingSessionService {
   /// 세션 초기화
   void _resetSession() {
     // 종료 대기 타이머 취소
-    _endWaitTimer?.cancel();
-    _endWaitTimer = null;
+    _timerManager.stopEndWaitTimer();
+    
+    // 데이터 수집 타이머 중지
+    _timerManager.stopDataCollectionTimer();
     
     // 모든 데이터 포인트 정리
-    _collectedDataPoints.clear();
-    _speedChanges.clear();
+    _dataCollector.reset();
     
-    _sessionState = SessionState.idle;
-    _currentSession = null;
-    _sessionStartTime = null;
-    _sessionEndWaitStartTime = null;
-    _previousCurrent = null;
-    _previousCurrentTime = null;
-    _startBatteryInfo = null;
-    _stopDataCollectionTimer();
+    // 상태 리셋
+    _stateManager.reset();
   }
   
   // ==================== 충전 중 업데이트 처리 ====================
   
   /// 충전 중 업데이트 처리
   void _handleChargingUpdate(BatteryInfo batteryInfo) {
-    if (_sessionState != SessionState.active) {
+    if (!_stateManager.isActive) {
       return;
     }
     
     // 종료 대기 상태였다면 다시 활성 상태로
-    if (_sessionState == SessionState.ending) {
-      _sessionState = SessionState.active;
-      _sessionEndWaitStartTime = null;
-      debugPrint('ChargingSessionService: 세션이 다시 활성화됨');
+    if (_stateManager.isEnding) {
+      _stateManager.reactivateSession();
     }
     
-    // 전류 변화 감지
-    _checkCurrentChange(batteryInfo);
-    
-    // 데이터 포인트 추가 (타이머가 자동으로 추가하지만, 전류 변화 시 즉시 추가)
-    // 실제로는 타이머가 주기적으로 추가하므로 여기서는 전류 변화만 처리
-  }
-  
-  // ==================== 데이터 수집 ====================
-  
-  /// 데이터 수집 타이머 시작
-  void _startDataCollectionTimer() {
-    _stopDataCollectionTimer();
-    
-    _dataCollectionTimer = Timer.periodic(
-      ChargingSessionConfig.dataCollectionInterval,
-      (timer) {
-        if (_sessionState != SessionState.active || _isDisposed) {
-          timer.cancel();
-          _dataCollectionTimer = null;
-          return;
-        }
-        
-        final batteryInfo = _batteryService.currentBatteryInfo;
-        if (batteryInfo != null && 
-            batteryInfo.isCharging && 
-            batteryInfo.chargingCurrent > 0) {
-          _addDataPoint(batteryInfo);
-        } else {
-          // 충전이 종료되었으면 타이머 중지
-          timer.cancel();
-          _dataCollectionTimer = null;
-        }
-      },
-    );
-    
-    debugPrint('ChargingSessionService: 데이터 수집 타이머 시작');
-  }
-  
-  /// 데이터 수집 타이머 중지
-  void _stopDataCollectionTimer() {
-    _dataCollectionTimer?.cancel();
-    _dataCollectionTimer = null;
-  }
-  
-  /// 데이터 포인트 추가
-  void _addDataPoint(BatteryInfo batteryInfo) {
-    if (_sessionStartTime == null || _isDisposed) {
-      return;
-    }
-    
-    final dataPoint = SessionDataPoint(
-      timestamp: DateTime.now(),
-      currentMa: batteryInfo.chargingCurrent,
-      batteryLevel: batteryInfo.level,
-      temperature: batteryInfo.temperature,
-    );
-    
-    _collectedDataPoints.add(dataPoint);
-    
-    // 메모리 관리: 데이터 포인트 리스트 크기 제한
-    // 최대 1000개까지만 유지 (약 2.7시간 분량, 10초 간격 기준)
-    const maxDataPoints = 1000;
-    if (_collectedDataPoints.length > maxDataPoints) {
-      // 오래된 데이터 제거 (FIFO)
-      _collectedDataPoints.removeAt(0);
-    }
-    
-    // 전류 변화 감지
-    _checkCurrentChange(batteryInfo);
-  }
-  
-  // ==================== 전류 변화 감지 ====================
-  
-  /// 전류 변화 감지
-  void _checkCurrentChange(BatteryInfo batteryInfo) {
-    final current = batteryInfo.chargingCurrent;
-    final now = DateTime.now();
-    
-    if (_previousCurrent == null) {
-      // 첫 전류값
-      _previousCurrent = current;
-      _previousCurrentTime = now;
-      return;
-    }
-    
-    // 전류 변화가 유의미한지 확인
-    if (ChargingSessionConfig.isSignificantCurrentChange(
-      _previousCurrent!,
-      current,
-    )) {
-      // 전류 변화 이벤트 생성
-      final changeEvent = _createCurrentChangeEvent(
-        _previousCurrent!,
-        current,
-        _previousCurrentTime!,
-      );
-      
-      if (changeEvent != null) {
-        _speedChanges.add(changeEvent);
-        debugPrint('ChargingSessionService: 전류 변화 감지 - ${changeEvent.description}');
-      }
-      
-      _previousCurrent = current;
-      _previousCurrentTime = now;
-    }
-  }
-  
-  /// 전류 변화 이벤트 생성
-  CurrentChangeEvent? _createCurrentChangeEvent(
-    int previousCurrent,
-    int newCurrent,
-    DateTime timestamp,
-  ) {
-    if (previousCurrent == 0 && newCurrent > 0) {
-      // 충전 시작
-      final speedType = ChargingSessionConfig.getChargingSpeedType(newCurrent);
-      return CurrentChangeEvent(
-        timestamp: timestamp,
-        previousCurrent: previousCurrent,
-        newCurrent: newCurrent,
-        changeType: speedType,
-        description: '$speedType 시작',
-      );
-    } else if (previousCurrent > 0 && newCurrent == 0) {
-      // 충전 종료
-      return CurrentChangeEvent(
-        timestamp: timestamp,
-        previousCurrent: previousCurrent,
-        newCurrent: newCurrent,
-        changeType: '종료',
-        description: '충전 종료',
-      );
-    } else if (previousCurrent > 0 && newCurrent > 0) {
-      // 충전 속도 변화 - 충전 단위 간 전환만 기록
-      final prevSpeedType = ChargingSessionConfig.getChargingSpeedType(previousCurrent);
-      final newSpeedType = ChargingSessionConfig.getChargingSpeedType(newCurrent);
-      
-      // 충전 단위(저속/일반/급속/초고속) 간 전환만 기록
-      if (prevSpeedType != newSpeedType) {
-        return CurrentChangeEvent(
-          timestamp: timestamp,
-          previousCurrent: previousCurrent,
-          newCurrent: newCurrent,
-          changeType: newSpeedType,
-          description: '$prevSpeedType → $newSpeedType 전환 ⚡',
-        );
-      }
-      // 같은 충전 단위 내에서의 변화는 기록하지 않음
-    }
-    
-    return null;
-  }
-  
-  // ==================== 세션 기록 생성 ====================
-  
-  /// 세션 기록 생성
-  Future<ChargingSessionRecord?> _createSessionRecord(BatteryInfo endBatteryInfo) async {
-    if (_sessionStartTime == null || _startBatteryInfo == null) {
-      return null;
-    }
-    
-    if (_collectedDataPoints.isEmpty) {
-      debugPrint('ChargingSessionService: 수집된 데이터가 없습니다');
-      return null;
-    }
-    
-    final endTime = DateTime.now();
-    final duration = endTime.difference(_sessionStartTime!);
-    
-    // 데이터 분석
-    final analysis = _analyzeSessionData();
-    
-    // 배터리 변화량 계산
-    final batteryChange = endBatteryInfo.level - _startBatteryInfo!.level;
-    
-    // 유효성 검증
-    if (!ChargingSessionConfig.isValidSession(
-      duration: duration,
-      avgCurrent: analysis.avgCurrent,
-      batteryChange: batteryChange,
-    )) {
-      debugPrint('ChargingSessionService: 세션이 유효하지 않습니다');
-      return null;
-    }
-    
-    // 시간대 분류
-    final timeSlot = TimeSlotUtils.getTimeSlot(_sessionStartTime!);
-    
-    // 세션 제목 생성 (오늘 세션 목록에서 가져오기)
-    final todaySessions = await _storageService.getTodaySessions();
-    final existingTitles = todaySessions
-        .where((s) => TimeSlotUtils.getTimeSlot(s.startTime) == timeSlot)
-        .map((s) => s.sessionTitle)
-        .toList();
-    final sessionTitle = TimeSlotUtils.generateSessionTitle(timeSlot, existingTitles);
-    
-    // 전류 변화 이력 분석 (PHASE 3의 ChargingSessionAnalyzer 사용)
-    final speedChanges = charging_session_analyzer.ChargingSessionAnalyzer.analyzeCurrentChanges(
-      _collectedDataPoints.map((p) => charging_session_analyzer.SessionDataPoint(
-        timestamp: p.timestamp,
-        currentMa: p.currentMa,
-        batteryLevel: p.batteryLevel,
-        temperature: p.temperature,
-      )).toList(),
-    );
-    
-    // 세션 기록 생성
-    final sessionRecord = ChargingSessionRecord(
-      id: _generateSessionId(),
-      startTime: _sessionStartTime!,
-      endTime: endTime,
-      startBatteryLevel: _startBatteryInfo!.level,
-      endBatteryLevel: endBatteryInfo.level,
-      batteryChange: batteryChange,
-      duration: duration,
-      avgCurrent: analysis.avgCurrent,
-      avgTemperature: analysis.avgTemperature,
-      maxCurrent: analysis.maxCurrent,
-      minCurrent: analysis.minCurrent,
-      efficiency: analysis.efficiency, // PHASE 3의 ChargingSessionAnalyzer에서 계산된 효율 사용
-      timeSlot: timeSlot,
-      sessionTitle: sessionTitle,
-      speedChanges: speedChanges.isNotEmpty ? speedChanges : List.unmodifiable(_speedChanges),
-      icon: TimeSlotUtils.getTimeSlotIcon(timeSlot),
-      color: TimeSlotUtils.getTimeSlotColor(timeSlot),
-      batteryCapacity: endBatteryInfo.capacity > 0 ? endBatteryInfo.capacity : null,
-      batteryVoltage: endBatteryInfo.voltage > 0 ? endBatteryInfo.voltage : null,
-      isValid: true,
-    );
-    
-    return sessionRecord;
-  }
-  
-  /// 세션 데이터 분석
-  /// PHASE 3의 ChargingSessionAnalyzer 사용
-  charging_session_analyzer.SessionAnalysisResult _analyzeSessionData() {
-    if (_collectedDataPoints.isEmpty || _startBatteryInfo == null) {
-      return charging_session_analyzer.SessionAnalysisResult(
-        avgCurrent: 0.0,
-        avgTemperature: 0.0,
-        maxCurrent: 0,
-        minCurrent: 0,
-        medianCurrent: 0,
-        currentStdDev: 0.0,
-        startBatteryLevel: _startBatteryInfo?.level ?? 0.0,
-        endBatteryLevel: _startBatteryInfo?.level ?? 0.0,
-        batteryChange: 0.0,
-        duration: Duration.zero,
-        efficiency: 0.0,
-        efficiencyGrade: '낮음',
-        currentStabilityScore: 0.0,
-      );
-    }
-    
-    // SessionDataPoint를 ChargingSessionAnalyzer의 SessionDataPoint로 변환
-    final dataPoints = _collectedDataPoints.map((p) => charging_session_analyzer.SessionDataPoint(
-      timestamp: p.timestamp,
-      currentMa: p.currentMa,
-      batteryLevel: p.batteryLevel,
-      temperature: p.temperature,
-    )).toList();
-    
-    // ChargingSessionAnalyzer 사용
-    final endBatteryInfo = _batteryService.currentBatteryInfo ?? _startBatteryInfo!;
-    final duration = _sessionStartTime != null
-        ? DateTime.now().difference(_sessionStartTime!)
-        : Duration.zero;
-    
-    return charging_session_analyzer.ChargingSessionAnalyzer.analyzeSession(
-      dataPoints: dataPoints,
-      startBatteryInfo: _startBatteryInfo!,
-      endBatteryInfo: endBatteryInfo,
-      duration: duration,
-      batteryCapacity: endBatteryInfo.capacity > 0 ? endBatteryInfo.capacity : null,
-      batteryVoltage: endBatteryInfo.voltage > 0 ? endBatteryInfo.voltage : null,
+    // 전류 변화 감지 및 데이터 포인트 추가
+    // (타이머가 자동으로 추가하지만, 전류 변화 시 즉시 추가)
+    _dataCollector.addDataPoint(
+      batteryInfo,
+      sessionStartTime: _stateManager.startTime,
+      isDisposed: () => _isDisposed,
     );
   }
   
   
-  /// 세션 ID 생성
-  String _generateSessionId() {
-    return 'session_${_sessionStartTime?.millisecondsSinceEpoch ?? DateTime.now().millisecondsSinceEpoch}';
-  }
   
   /// 세션 목록 변경 알림
   void _notifySessionsChanged() {
@@ -901,64 +480,25 @@ class ChargingSessionService {
   bool get isInitialized => _isInitialized;
 
   /// 현재 세션 상태 확인
-  SessionState get sessionState => _sessionState;
+  SessionState get sessionState => _stateManager.state;
 
   /// 세션 진행 중인지 확인
-  bool get isSessionActive => _sessionState == SessionState.active;
+  bool get isSessionActive => _stateManager.isActive;
   
   /// 세션 시작 시간 가져오기
-  DateTime? get sessionStartTime => _sessionStartTime;
+  DateTime? get sessionStartTime => _stateManager.startTime;
 
   /// 서비스 상태 검증 (디버깅 및 통합 테스트용)
   Map<String, dynamic> getServiceStatus() {
     return {
       'isInitialized': _isInitialized,
       'isDisposed': _isDisposed,
-      'sessionState': _sessionState.name,
-      'isSessionActive': _sessionState == SessionState.active,
-      'hasCurrentSession': _currentSession != null,
-      'collectedDataPoints': _collectedDataPoints.length,
-      'speedChanges': _speedChanges.length,
-      'hasDataCollectionTimer': _dataCollectionTimer != null,
-      'hasEndWaitTimer': _endWaitTimer != null,
-      'lastSavedDateKey': _lastSavedDateKey,
-      'wasCharging': _wasCharging,
+      'stateManagerStatus': _stateManager.getStatus(),
+      'dataCollectorStatus': _dataCollector.getStatus(),
+      'timerStatus': _timerManager.getTimerStatus(),
+      'dateChangeManagerStatus': _dateChangeManager.getStatus(),
     };
   }
 }
 
-// ==================== 내부 데이터 클래스 ====================
-
-/// 세션 데이터 포인트
-class SessionDataPoint {
-  final DateTime timestamp;
-  final int currentMa;
-  final double batteryLevel;
-  final double temperature;
-  
-  SessionDataPoint({
-    required this.timestamp,
-    required this.currentMa,
-    required this.batteryLevel,
-    required this.temperature,
-  });
-}
-
-/// 세션 분석 결과
-/// PHASE 3에서 SessionAnalysisResult로 대체됨
-/// 하위 호환성을 위해 유지하지만 사용하지 않음
-@Deprecated('SessionAnalysisResult를 사용하세요')
-class SessionAnalysis {
-  final double avgCurrent;
-  final double avgTemperature;
-  final int maxCurrent;
-  final int minCurrent;
-  
-  SessionAnalysis({
-    required this.avgCurrent,
-    required this.avgTemperature,
-    required this.maxCurrent,
-    required this.minCurrent,
-  });
-}
 
