@@ -165,6 +165,40 @@ class ChargingSessionConfig {
     return currentMa >= fastChargingThresholdMa;
   }
 
+  /// 충전 속도 타입을 레벨로 변환
+  /// 
+  /// 반환:
+  /// - 저속: 0
+  /// - 일반: 1
+  /// - 급속: 2
+  /// - 초고속: 3
+  static int getChargingSpeedLevel(String speedType) {
+    switch (speedType) {
+      case '저속':
+        return 0;
+      case '일반':
+        return 1;
+      case '급속':
+        return 2;
+      case '초고속':
+        return 3;
+      default:
+        return 0;
+    }
+  }
+
+  /// 두 충전 속도 간 단계 차이 계산
+  /// 
+  /// [prevSpeedType] 이전 충전 속도 타입
+  /// [newSpeedType] 새로운 충전 속도 타입
+  /// 
+  /// 반환: 단계 차이 (절댓값)
+  static int getSpeedLevelDifference(String prevSpeedType, String newSpeedType) {
+    final prevLevel = getChargingSpeedLevel(prevSpeedType);
+    final newLevel = getChargingSpeedLevel(newSpeedType);
+    return (newLevel - prevLevel).abs();
+  }
+
   /// 효율 등급 반환
   /// 
   /// 반환:

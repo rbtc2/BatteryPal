@@ -271,7 +271,9 @@ class ChargingChartService {
           ? Colors.blue[400]!
           : avgCurrent < 1500
               ? Colors.orange[400]!
-              : Colors.red[400]!;
+              : avgCurrent < 3000
+                  ? Colors.red[400]!
+                  : Colors.purple[400]!;
 
       bars.add(LineChartBarData(
         spots: spots,

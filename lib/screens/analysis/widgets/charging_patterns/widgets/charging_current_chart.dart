@@ -381,7 +381,8 @@ class _ChargingCurrentChartState extends State<ChargingCurrentChart> {
               children: [
                 _buildLegendItem('저속 (0-500mA)', Colors.blue[400]!),
                 _buildLegendItem('일반 (500-1500mA)', Colors.orange[400]!),
-                _buildLegendItem('급속 (1500mA+)', Colors.red[400]!),
+                _buildLegendItem('급속 (1500-3000mA)', Colors.red[400]!),
+                _buildLegendItem('초고속 (3000mA+)', Colors.purple[400]!),
               ],
             ),
           ),

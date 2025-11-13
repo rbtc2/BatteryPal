@@ -89,12 +89,13 @@ class CurrentChangeDetector {
         description: '충전 종료',
       );
     } else if (previousCurrent > 0 && newCurrent > 0) {
-      // 충전 속도 변화 - 충전 단위 간 전환만 기록
+      // 충전 속도 변화 - 2단계 이상 건너뛰는 경우만 기록
       final prevSpeedType = ChargingSessionConfig.getChargingSpeedType(previousCurrent);
       final newSpeedType = ChargingSessionConfig.getChargingSpeedType(newCurrent);
       
-      // 충전 단위(저속/일반/급속/초고속) 간 전환만 기록
-      if (prevSpeedType != newSpeedType) {
+      // 2단계 이상 건너뛰는 경우만 기록
+      final levelDifference = ChargingSessionConfig.getSpeedLevelDifference(prevSpeedType, newSpeedType);
+      if (levelDifference >= 2) {
         return CurrentChangeEvent(
           timestamp: timestamp,
           previousCurrent: previousCurrent,
@@ -103,7 +104,7 @@ class CurrentChangeDetector {
           description: '$prevSpeedType → $newSpeedType 전환 ⚡',
         );
       }
-      // 같은 충전 단위 내에서의 변화는 기록하지 않음
+      // 1단계 변화는 기록하지 않음
     }
     
     return null;
