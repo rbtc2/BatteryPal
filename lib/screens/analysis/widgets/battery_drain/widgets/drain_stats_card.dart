@@ -225,7 +225,7 @@ class _DrainStatsCardState extends State<DrainStatsCard> with WidgetsBindingObse
     }
   }
 
-  /// 화면 켜짐 시간 표시 텍스트 (시간과 분 형식)
+  /// 화면 켜짐 시간 표시 텍스트 (숫자만, unit과 분리)
   String _getScreenOnTimeText() {
     if (!_hasUsageStatsPermission) {
       return '권한 필요';
@@ -239,24 +239,54 @@ class _DrainStatsCardState extends State<DrainStatsCard> with WidgetsBindingObse
       return '--';
     }
     
-    return _formatScreenOnTime(_screenOnTime!);
+    return _formatScreenOnTimeValue(_screenOnTime!);
   }
 
-  /// 화면 켜짐 시간을 "XH YM" 형식으로 변환
-  String _formatScreenOnTime(double hours) {
+  /// 화면 켜짐 시간의 숫자 부분만 반환 (unit과 분리)
+  String _formatScreenOnTimeValue(double hours) {
     final totalMinutes = (hours * 60).round();
     final displayHours = totalMinutes ~/ 60;
     final displayMinutes = totalMinutes % 60;
     
-    if (displayHours > 0 && displayMinutes > 0) {
-      return '${displayHours}H ${displayMinutes}M';
-    } else if (displayHours > 0) {
-      return '${displayHours}H';
+    // 시간이 있으면 시간 숫자만, 없으면 분 숫자만
+    if (displayHours > 0) {
+      return displayHours.toString();
     } else if (displayMinutes > 0) {
-      return '${displayMinutes}M';
+      return displayMinutes.toString();
     } else {
-      return '0M';
+      return '0';
     }
+  }
+
+  /// 화면 켜짐 시간의 단위 부분 반환 (작은 폰트로 표시될 부분)
+  String _getScreenOnTimeUnit() {
+    if (!_hasUsageStatsPermission || _isLoadingScreenTime || _screenOnTime == null) {
+      return '';
+    }
+    
+    return _formatScreenOnTimeUnit(_screenOnTime!);
+  }
+
+  /// 화면 켜짐 시간의 단위 부분만 반환
+  String _formatScreenOnTimeUnit(double hours) {
+    final totalMinutes = (hours * 60).round();
+    final displayHours = totalMinutes ~/ 60;
+    final displayMinutes = totalMinutes % 60;
+    
+    final List<String> parts = [];
+    
+    if (displayHours > 0) {
+      parts.add('시간');
+      if (displayMinutes > 0) {
+        parts.add('${displayMinutes}분');
+      }
+    } else if (displayMinutes > 0) {
+      parts.add('분');
+    } else {
+      return '분';
+    }
+    
+    return parts.join(' ');
   }
 
   /// 화면 켜짐 서브 텍스트
@@ -485,7 +515,7 @@ class _DrainStatsCardState extends State<DrainStatsCard> with WidgetsBindingObse
                   child: StatCard(
                     title: '화면 켜짐',
                     mainValue: _getScreenOnTimeText(),
-                    unit: '', // 시간과 분이 이미 메인 값에 포함되어 있음
+                    unit: _getScreenOnTimeUnit(), // "시간", "분" 등을 작은 폰트로 표시
                     subValue: _getScreenOnTimeSubText(),
                     trend: '--',
                     trendColor: Colors.green,
