@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'widgets/battery_health_tab.dart';
+import 'widgets/battery_drain_tab.dart';
 import 'widgets/charging_patterns_tab.dart';
 import 'widgets/optimization_tab.dart';
 import '../../utils/dialog_utils.dart';
@@ -90,7 +90,7 @@ class _AnalysisTabState extends State<AnalysisTab> with TickerProviderStateMixin
       body: TabBarView(
         controller: _tabController,
         children: [
-          BatteryHealthTab(
+          BatteryDrainTab(
             isProUser: widget.isProUser,
             onProUpgrade: widget.onProToggle,
           ),
