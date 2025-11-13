@@ -487,6 +487,9 @@ class ChargingSessionService {
   
   /// 세션 시작 시간 가져오기
   DateTime? get sessionStartTime => _stateManager.startTime;
+  
+  /// 세션 시작 시 배터리 정보 가져오기
+  BatteryInfo? get startBatteryInfo => _stateManager.startBatteryInfo;
 
   /// 서비스 상태 검증 (디버깅 및 통합 테스트용)
   Map<String, dynamic> getServiceStatus() {
