@@ -11,6 +11,8 @@ import android.location.LocationManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.content.ContentResolver
+import android.app.usage.UsageStatsManager
+import android.app.usage.UsageEvents
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -107,6 +109,23 @@ class MainActivity : FlutterActivity() {
                 "openWriteSettingsPermission" -> {
                     openWriteSettingsPermission()
                     result.success(true)
+                }
+                "hasUsageStatsPermission" -> {
+                    val hasPermission = hasUsageStatsPermission()
+                    result.success(hasPermission)
+                }
+                "openUsageStatsSettings" -> {
+                    openUsageStatsSettings()
+                    result.success(true)
+                }
+                "getScreenOnTime" -> {
+                    val dateMillis = call.argument<Long>("dateMillis")
+                    if (dateMillis != null) {
+                        val screenOnTime = getScreenOnTime(dateMillis)
+                        result.success(screenOnTime) // 밀리초 단위로 반환
+                    } else {
+                        result.error("INVALID_ARGUMENT", "dateMillis is required", null)
+                    }
                 }
                 else -> {
                     result.notImplemented()
@@ -568,6 +587,109 @@ class MainActivity : FlutterActivity() {
             }
         } catch (e: Exception) {
             android.util.Log.e("BatteryPal", "권한 설정 화면 열기 실패", e)
+        }
+    }
+
+    // ========== Usage Stats 관련 메서드들 (화면 켜짐 시간 추적용) ==========
+
+    /// Usage Stats 권한 확인
+    private fun hasUsageStatsPermission(): Boolean {
+        return try {
+            val usageStatsManager = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+            val time = System.currentTimeMillis()
+            val stats = usageStatsManager.queryUsageStats(
+                UsageStatsManager.INTERVAL_DAILY,
+                time - 1000 * 60, // 1분 전
+                time
+            )
+            // 권한이 있으면 stats가 null이 아니고, 없으면 null 또는 빈 리스트
+            val hasPermission = stats != null
+            android.util.Log.d("BatteryPal", "Usage Stats 권한: $hasPermission")
+            hasPermission
+        } catch (e: Exception) {
+            android.util.Log.e("BatteryPal", "Usage Stats 권한 확인 실패", e)
+            false
+        }
+    }
+
+    /// Usage Stats 설정 화면으로 이동
+    private fun openUsageStatsSettings() {
+        try {
+            val intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
+            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            startActivity(intent)
+            android.util.Log.d("BatteryPal", "Usage Stats 설정 화면 열기")
+        } catch (e: Exception) {
+            android.util.Log.e("BatteryPal", "Usage Stats 설정 화면 열기 실패", e)
+        }
+    }
+
+    /// 특정 날짜의 화면 켜짐 시간 가져오기 (밀리초 단위)
+    /// 
+    /// [dateMillis] 조회할 날짜의 시작 시간 (밀리초)
+    /// Returns 화면 켜짐 시간 (밀리초), 권한이 없으면 -1
+    private fun getScreenOnTime(dateMillis: Long): Long {
+        return try {
+            if (!hasUsageStatsPermission()) {
+                android.util.Log.w("BatteryPal", "Usage Stats 권한이 없습니다")
+                return -1
+            }
+            
+            val usageStatsManager = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+            
+            // 해당 날짜의 시작 시간과 끝 시간 계산
+            val calendar = java.util.Calendar.getInstance()
+            calendar.timeInMillis = dateMillis
+            calendar.set(java.util.Calendar.HOUR_OF_DAY, 0)
+            calendar.set(java.util.Calendar.MINUTE, 0)
+            calendar.set(java.util.Calendar.SECOND, 0)
+            calendar.set(java.util.Calendar.MILLISECOND, 0)
+            val startTime = calendar.timeInMillis
+            
+            calendar.add(java.util.Calendar.DAY_OF_MONTH, 1)
+            val endTime = calendar.timeInMillis
+            
+            // UsageEvents를 사용하여 화면 켜짐/꺼짐 이벤트 추적
+            val usageEvents = usageStatsManager.queryEvents(startTime, endTime)
+            var screenOnTime = 0L
+            var lastScreenOnTime: Long? = null
+            
+            while (usageEvents.hasNextEvent()) {
+                val event = UsageEvents.Event()
+                usageEvents.getNextEvent(event)
+                
+                when (event.eventType) {
+                    UsageEvents.Event.SCREEN_INTERACTIVE -> {
+                        // 화면이 켜짐
+                        lastScreenOnTime = event.timeStamp
+                        android.util.Log.d("BatteryPal", "화면 켜짐: ${java.util.Date(event.timeStamp)}")
+                    }
+                    UsageEvents.Event.SCREEN_NON_INTERACTIVE -> {
+                        // 화면이 꺼짐
+                        if (lastScreenOnTime != null) {
+                            val duration = event.timeStamp - lastScreenOnTime
+                            screenOnTime += duration
+                            android.util.Log.d("BatteryPal", "화면 꺼짐: ${java.util.Date(event.timeStamp)}, 지속 시간: ${duration / 1000 / 60}분")
+                            lastScreenOnTime = null
+                        }
+                    }
+                }
+            }
+            
+            // 아직 화면이 켜져있는 경우 (마지막 이벤트가 SCREEN_INTERACTIVE인 경우)
+            if (lastScreenOnTime != null) {
+                val currentTime = System.currentTimeMillis()
+                val duration = currentTime - lastScreenOnTime
+                screenOnTime += duration
+                android.util.Log.d("BatteryPal", "화면이 아직 켜져있음, 추가 시간: ${duration / 1000 / 60}분")
+            }
+            
+            val hours = screenOnTime / 1000.0 / 60.0 / 60.0
+            android.util.Log.d("BatteryPal", "화면 켜짐 시간: ${"%.2f".format(hours)}시간 (${screenOnTime}ms)")
+            screenOnTime
+        } catch (e: Exception) {
+            android.util.Log.e("BatteryPal", "화면 켜짐 시간 가져오기 실패", e)
+            -1
         }
     }
 }

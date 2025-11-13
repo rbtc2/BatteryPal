@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../charging_patterns/widgets/stat_card.dart';
 import '../../../../../services/discharge_current_calculator.dart';
+import '../../../../../services/screen_time_service.dart';
 
 /// 소모 통계 카드 - 배터리 소모량 통계를 표시하는 위젯
 /// 
@@ -15,7 +16,7 @@ class DrainStatsCard extends StatefulWidget {
   State<DrainStatsCard> createState() => _DrainStatsCardState();
 }
 
-class _DrainStatsCardState extends State<DrainStatsCard> {
+class _DrainStatsCardState extends State<DrainStatsCard> with WidgetsBindingObserver {
   /// 선택된 날짜 탭 (0: 오늘, 1: 어제, 2: 2일 전, 3: 커스텀)
   int _selectedDateTab = 0;
   
@@ -27,20 +28,46 @@ class _DrainStatsCardState extends State<DrainStatsCard> {
   bool _isLoadingDischargeCurrent = false;
   bool _hasLoaded = false;
   
+  // 화면 켜짐 시간 관련 상태
+  double? _screenOnTime; // 시간 단위
+  bool _isLoadingScreenTime = false;
+  bool _hasUsageStatsPermission = false;
+  
   final DischargeCurrentCalculator _calculator = DischargeCurrentCalculator();
+  final ScreenTimeService _screenTimeService = ScreenTimeService();
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // 탭 진입 시 계산
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _calculateDischargeCurrent();
+      _checkUsageStatsPermission(); // 권한 확인
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    // 앱이 포그라운드로 돌아올 때 권한 상태 다시 확인
+    if (state == AppLifecycleState.resumed) {
+      _checkUsageStatsPermission();
+    }
   }
 
   /// Pull-to-Refresh를 위한 public 메서드
   Future<void> refresh() async {
     await _calculateDischargeCurrent(forceRefresh: true);
+    if (_hasUsageStatsPermission) {
+      await _loadScreenOnTime(forceRefresh: true);
+    }
   }
   
   /// 날짜 변경 시 재계산
@@ -49,6 +76,9 @@ class _DrainStatsCardState extends State<DrainStatsCard> {
       _hasLoaded = false; // 날짜 변경 시 리셋
     });
     _calculateDischargeCurrent(forceRefresh: true);
+    if (_hasUsageStatsPermission) {
+      _loadScreenOnTime(forceRefresh: true);
+    }
   }
   
   /// 방전 전류 계산
@@ -106,6 +136,22 @@ class _DrainStatsCardState extends State<DrainStatsCard> {
         return today;
     }
   }
+
+  /// 표시할 날짜 가져오기 (달력 표시용)
+  DateTime _getDisplayDate() {
+    // 커스텀 날짜가 선택되어 있으면 그 날짜 반환
+    if (_selectedDate != null) {
+      return _selectedDate!;
+    }
+    
+    // 탭이 선택되어 있으면 해당 날짜 반환
+    return _getTargetDate();
+  }
+
+  /// 날짜를 표시 형식으로 변환 (YYYY.MM.DD)
+  String _formatDisplayDate(DateTime date) {
+    return '${date.year}.${date.month.toString().padLeft(2, '0')}.${date.day.toString().padLeft(2, '0')}';
+  }
   
   /// 소모 전류 표시 텍스트
   String _getDischargeCurrentText() {
@@ -135,6 +181,110 @@ class _DrainStatsCardState extends State<DrainStatsCard> {
     }
     
     return '총 소모량';
+  }
+
+  /// Usage Stats 권한 확인 및 화면 켜짐 시간 로드
+  Future<void> _checkUsageStatsPermission() async {
+    final hasPermission = await _screenTimeService.hasUsageStatsPermission();
+    setState(() {
+      _hasUsageStatsPermission = hasPermission;
+    });
+    
+    if (hasPermission) {
+      await _loadScreenOnTime();
+    }
+  }
+
+  /// 화면 켜짐 시간 로드
+  Future<void> _loadScreenOnTime({bool forceRefresh = false}) async {
+    if (_isLoadingScreenTime && !forceRefresh) {
+      return;
+    }
+    
+    setState(() {
+      _isLoadingScreenTime = true;
+    });
+    
+    try {
+      final targetDate = _getTargetDate();
+      final screenOnTime = await _screenTimeService.getScreenOnTimeForDate(targetDate);
+      
+      if (mounted) {
+        setState(() {
+          _screenOnTime = screenOnTime;
+          _isLoadingScreenTime = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('화면 켜짐 시간 로드 실패: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingScreenTime = false;
+        });
+      }
+    }
+  }
+
+  /// 화면 켜짐 시간 표시 텍스트
+  String _getScreenOnTimeText() {
+    if (!_hasUsageStatsPermission) {
+      return '권한 필요';
+    }
+    
+    if (_isLoadingScreenTime) {
+      return '계산 중...';
+    }
+    
+    if (_screenOnTime == null) {
+      return '--';
+    }
+    
+    return _screenOnTime!.toStringAsFixed(1);
+  }
+
+  /// 화면 켜짐 서브 텍스트
+  String _getScreenOnTimeSubText() {
+    if (!_hasUsageStatsPermission) {
+      return '설정에서 허용';
+    }
+    
+    if (_isLoadingScreenTime || _screenOnTime == null) {
+      return '알 수 없음';
+    }
+    
+    return '오늘 사용 시간';
+  }
+
+  /// Usage Stats 권한 요청 다이얼로그
+  Future<void> _showUsageStatsPermissionDialog(BuildContext context) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('사용 통계 권한 필요'),
+        content: const Text(
+          '화면 켜짐 시간을 추적하려면 사용 통계 접근 권한이 필요합니다.\n\n'
+          '설정 화면에서 "Batterypal" 앱을 찾아 사용 통계 접근을 허용해주세요.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('설정 열기'),
+          ),
+        ],
+      ),
+    );
+    
+    if (result == true) {
+      await _screenTimeService.openUsageStatsSettings();
+      // 설정에서 돌아왔을 때 권한 다시 확인
+      Future.delayed(const Duration(seconds: 1), () {
+        _checkUsageStatsPermission();
+      });
+    }
   }
   
   /// 날짜 선택 다이얼로그 표시
@@ -239,9 +389,7 @@ class _DrainStatsCardState extends State<DrainStatsCard> {
                         Icon(Icons.calendar_today, size: 14),
                         const SizedBox(width: 6),
                         Text(
-                          _selectedDate != null
-                              ? '${_selectedDate!.year}.${_selectedDate!.month.toString().padLeft(2, '0')}.${_selectedDate!.day.toString().padLeft(2, '0')}'
-                              : DateTime.now().toString().split(' ')[0].replaceAll('-', '.'),
+                          _formatDisplayDate(_getDisplayDate()),
                           style: const TextStyle(fontSize: 12),
                         ),
                       ],
@@ -310,14 +458,22 @@ class _DrainStatsCardState extends State<DrainStatsCard> {
                 ),
                 
                 // 화면 켜짐
-                StatCard(
-                  title: '화면 켜짐',
-                  mainValue: '--',
-                  unit: 'h',
-                  subValue: '알 수 없음',
-                  trend: '--',
-                  trendColor: Colors.green,
-                  icon: Icons.phone_android,
+                GestureDetector(
+                  onTap: !_hasUsageStatsPermission 
+                      ? () async {
+                          // 권한 요청 다이얼로그 표시
+                          await _showUsageStatsPermissionDialog(context);
+                        }
+                      : null,
+                  child: StatCard(
+                    title: '화면 켜짐',
+                    mainValue: _getScreenOnTimeText(),
+                    unit: 'h',
+                    subValue: _getScreenOnTimeSubText(),
+                    trend: '--',
+                    trendColor: Colors.green,
+                    icon: Icons.phone_android,
+                  ),
                 ),
                 
                 // 1% 소모 평균 시간
