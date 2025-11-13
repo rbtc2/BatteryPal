@@ -74,7 +74,7 @@ class _AnalysisTabState extends State<AnalysisTab> with TickerProviderStateMixin
           tabs: const [
             Tab(
               icon: Icon(Icons.battery_full),
-              text: '배터리',
+              text: '소모',
             ),
             Tab(
               icon: Icon(Icons.charging_station),
