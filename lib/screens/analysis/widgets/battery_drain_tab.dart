@@ -111,8 +111,8 @@ class _BatteryDrainTabState extends State<BatteryDrainTab>
     
     debugPrint('소모 탭 실시간 업데이트 시작');
     
-    // 30초마다 업데이트 (오늘 탭일 때만)
-    _updateTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+    // 1분마다 업데이트
+    _updateTimer = Timer.periodic(const Duration(minutes: 1), (timer) {
       if (!mounted || !_isTabVisible) {
         timer.cancel();
         return;
