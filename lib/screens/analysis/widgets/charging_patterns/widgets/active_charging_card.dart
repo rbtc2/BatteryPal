@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../../services/battery_service.dart';
 import '../services/charging_session_service.dart';
+import '../config/charging_session_config.dart';
 
 /// 진행 중인 충전 세션을 표시하는 카드
 /// 
@@ -28,8 +29,8 @@ class ActiveChargingCard extends StatelessWidget {
     final minutes = elapsed.inMinutes;
     final seconds = elapsed.inSeconds % 60;
     
-    // 유의미한 세션이 되기까지 남은 시간 계산 (3분 = 180초)
-    const minSessionDuration = Duration(minutes: 3);
+    // 유의미한 세션이 되기까지 남은 시간 계산 (ChargingSessionConfig에서 가져옴)
+    final minSessionDuration = ChargingSessionConfig.minChargingDuration;
     final remainingTime = minSessionDuration - elapsed;
     final remainingMinutes = remainingTime.inMinutes.clamp(0, 999);
     final remainingSeconds = remainingTime.inSeconds.clamp(0, 59) % 60;
