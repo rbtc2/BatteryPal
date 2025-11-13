@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'battery_drain/widgets/drain_stats_card.dart';
 import 'battery_drain/widgets/drain_hourly_chart.dart';
@@ -23,11 +24,15 @@ import 'battery_drain/widgets/drain_period_list.dart';
 class BatteryDrainTab extends StatefulWidget {
   final bool isProUser;
   final VoidCallback? onProUpgrade;
+  final TabController? tabController; // TabController 추가
+  final int tabIndex; // 이 탭의 인덱스
 
   const BatteryDrainTab({
     super.key,
     required this.isProUser,
     this.onProUpgrade,
+    this.tabController,
+    required this.tabIndex,
   });
 
   @override
@@ -44,6 +49,10 @@ class _BatteryDrainTabState extends State<BatteryDrainTab>
   final GlobalKey _chartKey = GlobalKey();
   final GlobalKey _listKey = GlobalKey();
   
+  // 실시간 업데이트 관련
+  Timer? _updateTimer; // 실시간 업데이트 타이머
+  bool _isTabVisible = false; // 탭 가시성 상태
+  
   @override
   void initState() {
     super.initState();
@@ -59,10 +68,93 @@ class _BatteryDrainTabState extends State<BatteryDrainTab>
       curve: Curves.easeInOut,
     ));
     _animationController.forward();
+    
+    // TabController 리스너 추가
+    if (widget.tabController != null) {
+      widget.tabController!.addListener(_onTabControllerChanged);
+      // 초기 상태 확인
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _checkTabVisibility();
+      });
+    }
+  }
+  
+  /// TabController 변경 감지
+  void _onTabControllerChanged() {
+    if (!widget.tabController!.indexIsChanging) {
+      _checkTabVisibility();
+    }
+  }
+  
+  /// 탭 가시성 확인 및 업데이트 제어
+  void _checkTabVisibility() {
+    final isVisible = widget.tabController?.index == widget.tabIndex;
+    
+    if (isVisible != _isTabVisible) {
+      setState(() {
+        _isTabVisible = isVisible;
+      });
+      
+      if (isVisible) {
+        // 탭이 보일 때: 실시간 업데이트 시작
+        _startRealtimeUpdate();
+      } else {
+        // 탭이 안 보일 때: 실시간 업데이트 중지
+        _stopRealtimeUpdate();
+      }
+    }
+  }
+  
+  /// 실시간 업데이트 시작 (탭이 보일 때만)
+  void _startRealtimeUpdate() {
+    _stopRealtimeUpdate(); // 기존 타이머 정리
+    
+    debugPrint('소모 탭 실시간 업데이트 시작');
+    
+    // 30초마다 업데이트 (오늘 탭일 때만)
+    _updateTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      if (!mounted || !_isTabVisible) {
+        timer.cancel();
+        return;
+      }
+      
+      // DrainStatsCard의 refresh 호출
+      _refreshStatsCard();
+    });
+  }
+  
+  /// 실시간 업데이트 중지 (탭이 안 보일 때)
+  void _stopRealtimeUpdate() {
+    _updateTimer?.cancel();
+    _updateTimer = null;
+    debugPrint('소모 탭 실시간 업데이트 중지');
+  }
+  
+  /// DrainStatsCard 새로고침
+  void _refreshStatsCard() {
+    final statsState = _statsKey.currentState;
+    if (statsState != null) {
+      try {
+        final refreshMethod = (statsState as dynamic).refresh;
+        if (refreshMethod != null && refreshMethod is Function) {
+          refreshMethod();
+        }
+      } catch (e) {
+        debugPrint('DrainStatsCard 자동 새로고침 실패: $e');
+      }
+    }
   }
 
   @override
   void dispose() {
+    // TabController 리스너 제거
+    if (widget.tabController != null) {
+      widget.tabController!.removeListener(_onTabControllerChanged);
+    }
+    
+    // 타이머 정리
+    _stopRealtimeUpdate();
+    
     _animationController.dispose();
     super.dispose();
   }

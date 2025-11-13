@@ -32,6 +32,16 @@ class _AnalysisTabState extends State<AnalysisTab> with TickerProviderStateMixin
       vsync: this,
       initialIndex: widget.initialTabIndex,
     );
+    // 탭 변경 리스너 추가
+    _tabController.addListener(_onTabChanged);
+  }
+  
+  /// 탭 변경 감지
+  void _onTabChanged() {
+    if (!_tabController.indexIsChanging) {
+      // 탭 변경 완료 시 상태 업데이트 (BatteryDrainTab에 전달)
+      setState(() {});
+    }
   }
 
   @override
@@ -45,6 +55,7 @@ class _AnalysisTabState extends State<AnalysisTab> with TickerProviderStateMixin
 
   @override
   void dispose() {
+    _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
     super.dispose();
   }
@@ -93,6 +104,8 @@ class _AnalysisTabState extends State<AnalysisTab> with TickerProviderStateMixin
           BatteryDrainTab(
             isProUser: widget.isProUser,
             onProUpgrade: widget.onProToggle,
+            tabController: _tabController,
+            tabIndex: 0, // 소모 탭 인덱스
           ),
           ChargingPatternsTab(
             isProUser: widget.isProUser,

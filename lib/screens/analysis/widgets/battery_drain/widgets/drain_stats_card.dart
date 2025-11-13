@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../charging_patterns/widgets/stat_card.dart';
+import '../../../../../services/discharge_current_calculator.dart';
 
 /// 소모 통계 카드 - 배터리 소모량 통계를 표시하는 위젯
 /// 
@@ -20,11 +21,120 @@ class _DrainStatsCardState extends State<DrainStatsCard> {
   
   /// 수동으로 선택한 날짜 (커스텀 탭일 때 사용)
   DateTime? _selectedDate;
+  
+  // 소모 전류 관련 상태
+  int? _dischargeCurrent; // mAh
+  bool _isLoadingDischargeCurrent = false;
+  bool _hasLoaded = false;
+  
+  final DischargeCurrentCalculator _calculator = DischargeCurrentCalculator();
+
+  @override
+  void initState() {
+    super.initState();
+    // 탭 진입 시 계산
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _calculateDischargeCurrent();
+    });
+  }
 
   /// Pull-to-Refresh를 위한 public 메서드
   Future<void> refresh() async {
-    // 더미 데이터이므로 실제 새로고침 로직은 없음
-    await Future.delayed(const Duration(milliseconds: 500));
+    await _calculateDischargeCurrent(forceRefresh: true);
+  }
+  
+  /// 날짜 변경 시 재계산
+  void _onDateChanged() {
+    setState(() {
+      _hasLoaded = false; // 날짜 변경 시 리셋
+    });
+    _calculateDischargeCurrent(forceRefresh: true);
+  }
+  
+  /// 방전 전류 계산
+  Future<void> _calculateDischargeCurrent({bool forceRefresh = false}) async {
+    if (_isLoadingDischargeCurrent && !forceRefresh) {
+      return; // 이미 로딩 중이면 중복 호출 방지
+    }
+    
+    if (!forceRefresh && _hasLoaded) {
+      return; // 이미 로드되었으면 건너뜀 (탭 진입 시에만)
+    }
+    
+    setState(() {
+      _isLoadingDischargeCurrent = true;
+    });
+    
+    try {
+      final targetDate = _getTargetDate();
+      final dischargeCurrent = await _calculator.calculateDischargeCurrentForDate(targetDate);
+      
+      if (mounted) {
+        setState(() {
+          _dischargeCurrent = dischargeCurrent >= 0 ? dischargeCurrent : null;
+          _isLoadingDischargeCurrent = false;
+          _hasLoaded = true;
+        });
+      }
+    } catch (e) {
+      debugPrint('방전 전류 계산 실패: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingDischargeCurrent = false;
+        });
+      }
+    }
+  }
+  
+  /// 선택된 날짜 가져오기
+  DateTime _getTargetDate() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    
+    if (_selectedDate != null) {
+      return _selectedDate!;
+    }
+    
+    switch (_selectedDateTab) {
+      case 0: // 오늘
+        return today;
+      case 1: // 어제
+        return today.subtract(const Duration(days: 1));
+      case 2: // 2일 전
+        return today.subtract(const Duration(days: 2));
+      default:
+        return today;
+    }
+  }
+  
+  /// 소모 전류 표시 텍스트
+  String _getDischargeCurrentText() {
+    if (_isLoadingDischargeCurrent) {
+      return '계산 중...';
+    }
+    
+    if (_dischargeCurrent == null) {
+      return '--';
+    }
+    
+    if (_dischargeCurrent! < 0) {
+      return '알 수 없음';
+    }
+    
+    return _dischargeCurrent!.toString();
+  }
+  
+  /// 소모 전류 서브 텍스트
+  String _getDischargeCurrentSubText() {
+    if (_isLoadingDischargeCurrent) {
+      return '계산 중...';
+    }
+    
+    if (_dischargeCurrent == null || _dischargeCurrent! < 0) {
+      return '알 수 없음';
+    }
+    
+    return '총 소모량';
   }
   
   /// 날짜 선택 다이얼로그 표시
@@ -70,6 +180,8 @@ class _DrainStatsCardState extends State<DrainStatsCard> {
         _selectedDate = selectedDateOnly;
         _selectedDateTab = 3; // 커스텀 탭으로 변경
       });
+      // 날짜 변경 시 재계산
+      _onDateChanged();
     }
   }
 
@@ -167,9 +279,9 @@ class _DrainStatsCardState extends State<DrainStatsCard> {
                 // 소모 전류
                 StatCard(
                   title: '소모 전류',
-                  mainValue: '--',
+                  mainValue: _getDischargeCurrentText(),
                   unit: 'mAh',
-                  subValue: '알 수 없음',
+                  subValue: _getDischargeCurrentSubText(),
                   trend: '--',
                   trendColor: Colors.red,
                   icon: Icons.bolt,
@@ -239,6 +351,8 @@ class _DrainStatsCardState extends State<DrainStatsCard> {
             _selectedDate = null; // 탭 선택 시 커스텀 날짜 초기화
           }
         });
+        // 날짜 변경 시 재계산
+        _onDateChanged();
       },
       borderRadius: BorderRadius.circular(8),
       child: Container(
