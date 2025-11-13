@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../models/app_models.dart';
+import '../../models/models.dart';
 
 /// 배터리 정보 검증을 담당하는 클래스
 /// 

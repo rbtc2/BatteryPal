@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../models/app_models.dart';
+import '../../models/models.dart';
 import '../notification_service.dart';
 import '../settings_service.dart';
 

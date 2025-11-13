@@ -1,6 +1,6 @@
 import 'package:battery_plus/battery_plus.dart';
 import 'package:flutter/material.dart';
-import '../../models/app_models.dart';
+import '../../models/models.dart';
 import '../native_battery_service.dart';
 
 /// 배터리 정보 수집을 담당하는 클래스

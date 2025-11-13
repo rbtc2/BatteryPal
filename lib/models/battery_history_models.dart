@@ -1,6 +1,6 @@
 import 'package:json_annotation/json_annotation.dart';
 import 'package:battery_plus/battery_plus.dart';
-import 'app_models.dart';
+import 'battery_info.dart';
 
 part 'battery_history_models.g.dart';
 

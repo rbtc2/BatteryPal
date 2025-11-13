@@ -3,7 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import '../native_battery_service.dart';
 import '../battery_history_database_service.dart';
-import '../../models/app_models.dart';
+import '../../models/models.dart';
 
 /// 충전 전류 모니터링을 담당하는 클래스
 /// 

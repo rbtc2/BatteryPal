@@ -3,7 +3,7 @@
 
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import '../../../../../models/app_models.dart';
+import '../../../../../models/models.dart';
 import '../../../../../services/battery_service.dart';
 import '../../../../../services/last_charging_info_service.dart';
 import '../../../../../services/battery_history_database_service.dart';

@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../services/battery_service.dart';
 import '../../services/last_charging_info_service.dart';
-import '../../models/app_models.dart';
+import '../../models/models.dart';
 
 /// 실시간 충전 모니터 위젯
 /// 충전 중일 때 심전도 그래프처럼 충전 속도를 실시간으로 표시

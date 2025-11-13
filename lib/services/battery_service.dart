@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:battery_plus/battery_plus.dart';
 import 'package:flutter/material.dart';
 import 'native_battery_service.dart';
-import '../models/app_models.dart';
+import '../models/models.dart';
 import 'settings_service.dart';
 import 'battery/battery_info_validator.dart';
 import 'battery/battery_data_collector.dart';

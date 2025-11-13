@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import '../models/app_models.dart';
-import '../models/charging_models.dart';
+import '../models/models.dart';
 import '../constants/charging_constants.dart';
 import 'battery_service.dart';
 

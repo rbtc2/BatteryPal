@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../../../services/battery_service.dart';
 import '../services/charging_session_service.dart';
@@ -6,7 +7,7 @@ import '../config/charging_session_config.dart';
 /// 진행 중인 충전 세션을 표시하는 카드
 /// 
 /// 현재 진행 중인 충전 세션의 정보를 실시간으로 표시합니다.
-class ActiveChargingCard extends StatelessWidget {
+class ActiveChargingCard extends StatefulWidget {
   final BatteryService batteryService;
   final ChargingSessionService sessionService;
 
@@ -17,9 +18,35 @@ class ActiveChargingCard extends StatelessWidget {
   });
 
   @override
+  State<ActiveChargingCard> createState() => _ActiveChargingCardState();
+}
+
+class _ActiveChargingCardState extends State<ActiveChargingCard> {
+  Timer? _updateTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    // 1초마다 UI 업데이트
+    _updateTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (mounted) {
+        setState(() {});
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _updateTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final batteryInfo = batteryService.currentBatteryInfo;
-    final sessionStartTime = sessionService.sessionStartTime;
+    final batteryInfo = widget.batteryService.currentBatteryInfo;
+    final sessionStartTime = widget.sessionService.sessionStartTime;
     
     if (batteryInfo == null || sessionStartTime == null) {
       return const SizedBox.shrink();
@@ -32,8 +59,10 @@ class ActiveChargingCard extends StatelessWidget {
     // 유의미한 세션이 되기까지 남은 시간 계산 (ChargingSessionConfig에서 가져옴)
     final minSessionDuration = ChargingSessionConfig.minChargingDuration;
     final remainingTime = minSessionDuration - elapsed;
-    final remainingMinutes = remainingTime.inMinutes.clamp(0, 999);
-    final remainingSeconds = remainingTime.inSeconds.clamp(0, 59) % 60;
+    // remainingTime이 음수가 되지 않도록 clamp
+    final remainingTimeClamped = remainingTime.inSeconds > 0 ? remainingTime : Duration.zero;
+    final remainingMinutes = remainingTimeClamped.inMinutes;
+    final remainingSeconds = remainingTimeClamped.inSeconds % 60;
     
     final currentLevel = batteryInfo.level;
     

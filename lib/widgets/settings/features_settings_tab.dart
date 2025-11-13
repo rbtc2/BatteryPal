@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../services/settings_service.dart';
 import '../../widgets/settings/settings_widgets.dart';
 import '../../widgets/common/common_widgets.dart';
-import '../../models/app_models.dart';
+import '../../models/models.dart';
 import '../../screens/analysis/widgets/optimization/widgets/auto_optimization_card.dart';
 
 /// 기능 설정 탭 위젯

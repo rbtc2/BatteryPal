@@ -1,8 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:battery_plus/battery_plus.dart';
-import '../models/battery_history_models.dart';
-import '../models/app_models.dart';
+import '../models/models.dart';
 import '../services/battery_service.dart';
 import '../services/battery_history_database_service.dart';
 

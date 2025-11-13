@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../services/home_lifecycle_manager.dart';
 import '../../services/settings_service.dart';
-import '../../models/app_models.dart';
+import '../../models/models.dart';
 import '../../widgets/home/battery_status_card.dart';
 import '../../widgets/home/realtime_charging_monitor.dart';
 

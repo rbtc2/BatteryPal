@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import '../models/app_models.dart';
+import '../models/models.dart';
 import '../services/battery_service.dart';
 import '../services/battery_history_database_service.dart';
 import '../screens/analysis/widgets/charging_patterns/models/charging_data_models.dart';

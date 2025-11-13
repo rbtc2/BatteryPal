@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../models/app_models.dart';
+import '../models/models.dart';
 
 /// 설정 데이터를 관리하는 서비스
 class SettingsService extends ChangeNotifier {

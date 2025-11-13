@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../models/app_models.dart';
+import '../models/models.dart';
 import 'battery_service.dart';
 import 'settings_service.dart';
 import '../../screens/analysis/widgets/charging_patterns/services/charging_session_service.dart';

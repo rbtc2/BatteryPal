@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
 import 'dart:async';
-import '../../models/app_models.dart';
+import '../../models/models.dart';
 import '../../services/settings_service.dart';
 
 /// 표시할 정보 타입 열거형

@@ -2,7 +2,7 @@
 // 세션 데이터를 분석하고 효율을 계산하는 서비스
 
 import 'dart:math' as math;
-import '../../../../../models/app_models.dart';
+import '../../../../../models/models.dart';
 import '../models/charging_session_models.dart';
 import '../config/charging_session_config.dart';
 
