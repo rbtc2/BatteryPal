@@ -10,7 +10,12 @@ import '../../../../../services/screen_time_service.dart';
 /// - 평균 속도, 최대 속도
 /// - 화면 켜짐 시간, 1% 평균 시간
 class DrainStatsCard extends StatefulWidget {
-  const DrainStatsCard({super.key});
+  final ValueChanged<DateTime>? onDateChanged; // 날짜 변경 콜백
+  
+  const DrainStatsCard({
+    super.key,
+    this.onDateChanged,
+  });
 
   @override
   State<DrainStatsCard> createState() => _DrainStatsCardState();
@@ -42,6 +47,10 @@ class _DrainStatsCardState extends State<DrainStatsCard> with WidgetsBindingObse
     WidgetsBinding.instance.addObserver(this);
     // 탭 진입 시 계산
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // 초기 날짜 콜백 호출
+      final targetDate = _getTargetDate();
+      widget.onDateChanged?.call(targetDate);
+      
       _calculateDischargeCurrent();
       _checkUsageStatsPermission(); // 권한 확인
     });
@@ -70,11 +79,22 @@ class _DrainStatsCardState extends State<DrainStatsCard> with WidgetsBindingObse
     }
   }
   
+  /// 현재 선택된 날짜 가져오기 (public 메서드)
+  /// 다른 위젯에서 날짜를 가져올 수 있도록 제공
+  DateTime getTargetDate() {
+    return _getTargetDate();
+  }
+  
   /// 날짜 변경 시 재계산
   void _onDateChanged() {
     setState(() {
       _hasLoaded = false; // 날짜 변경 시 리셋
     });
+    
+    // 날짜 변경 콜백 호출
+    final targetDate = _getTargetDate();
+    widget.onDateChanged?.call(targetDate);
+    
     _calculateDischargeCurrent(forceRefresh: true);
     if (_hasUsageStatsPermission) {
       _loadScreenOnTime(forceRefresh: true);
@@ -278,7 +298,7 @@ class _DrainStatsCardState extends State<DrainStatsCard> with WidgetsBindingObse
     if (displayHours > 0) {
       parts.add('시간');
       if (displayMinutes > 0) {
-        parts.add('${displayMinutes}분');
+        parts.add('$displayMinutes분');
       }
     } else if (displayMinutes > 0) {
       parts.add('분');

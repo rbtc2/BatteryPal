@@ -53,6 +53,9 @@ class _BatteryDrainTabState extends State<BatteryDrainTab>
   Timer? _updateTimer; // 실시간 업데이트 타이머
   bool _isTabVisible = false; // 탭 가시성 상태
   
+  // 날짜 상태 관리 (DrainHourlyChart에 전달용)
+  DateTime? _currentTargetDate;
+  
   @override
   void initState() {
     super.initState();
@@ -75,6 +78,7 @@ class _BatteryDrainTabState extends State<BatteryDrainTab>
       // 초기 상태 확인
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _checkTabVisibility();
+        _updateTargetDate(); // 초기 날짜 설정
       });
     }
   }
@@ -139,10 +143,41 @@ class _BatteryDrainTabState extends State<BatteryDrainTab>
         if (refreshMethod != null && refreshMethod is Function) {
           refreshMethod();
         }
+        
+        // 날짜 업데이트
+        _updateTargetDate();
       } catch (e) {
         debugPrint('DrainStatsCard 자동 새로고침 실패: $e');
       }
     }
+  }
+  
+  /// DrainStatsCard에서 현재 날짜 가져오기
+  void _updateTargetDate() {
+    final statsState = _statsKey.currentState;
+    if (statsState != null) {
+      try {
+        final getTargetDateMethod = (statsState as dynamic).getTargetDate;
+        if (getTargetDateMethod != null && getTargetDateMethod is Function) {
+          final newDate = getTargetDateMethod() as DateTime;
+          if (_currentTargetDate == null || 
+              !_isSameDate(_currentTargetDate!, newDate)) {
+            setState(() {
+              _currentTargetDate = newDate;
+            });
+          }
+        }
+      } catch (e) {
+        debugPrint('날짜 가져오기 실패: $e');
+      }
+    }
+  }
+  
+  /// 두 날짜가 같은 날인지 확인
+  bool _isSameDate(DateTime date1, DateTime date2) {
+    return date1.year == date2.year &&
+           date1.month == date2.month &&
+           date1.day == date2.day;
   }
 
   @override
@@ -180,6 +215,9 @@ class _BatteryDrainTabState extends State<BatteryDrainTab>
         debugPrint('DrainStatsCard refresh 호출 실패: $e');
       }
     }
+    
+    // 날짜 업데이트
+    _updateTargetDate();
     
     // DrainHourlyChart의 refresh 메서드 호출
     if (chartState != null) {
@@ -229,6 +267,12 @@ class _BatteryDrainTabState extends State<BatteryDrainTab>
                 )),
                 child: DrainStatsCard(
                   key: _statsKey,
+                  onDateChanged: (date) {
+                    // 날짜 변경 시 DrainHourlyChart에 전달
+                    setState(() {
+                      _currentTargetDate = date;
+                    });
+                  },
                 ),
               ),
               
@@ -247,6 +291,7 @@ class _BatteryDrainTabState extends State<BatteryDrainTab>
                   key: _chartKey,
                   isProUser: widget.isProUser,
                   onProUpgrade: widget.onProUpgrade,
+                  targetDate: _currentTargetDate,
                 ),
               ),
               
