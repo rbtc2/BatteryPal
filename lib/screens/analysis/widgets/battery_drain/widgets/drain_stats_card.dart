@@ -208,9 +208,9 @@ class _DrainStatsCardState extends State<DrainStatsCard> {
                   icon: Icons.phone_android,
                 ),
                 
-                // 1% 평균
+                // 1% 소모 평균 시간
                 StatCard(
-                  title: '1% 평균',
+                  title: '1% 소모 평균 시간',
                   mainValue: '--',
                   unit: '분',
                   subValue: '알 수 없음',
