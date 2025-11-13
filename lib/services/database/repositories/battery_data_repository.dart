@@ -223,6 +223,63 @@ class BatteryDataRepository {
     }
   }
 
+  /// 모든 배터리 히스토리 데이터 삭제
+  /// 
+  /// [db]: 데이터베이스 인스턴스
+  /// 
+  /// Returns: 삭제된 데이터 개수
+  Future<int> deleteAllBatteryData(Database db) async {
+    try {
+      final deletedCount = await db.delete(
+        BatteryHistoryDatabaseConfig.tableName,
+      );
+      debugPrint('모든 배터리 히스토리 데이터 삭제 완료: $deletedCount개');
+      return deletedCount;
+    } catch (e, stackTrace) {
+      debugPrint('모든 배터리 히스토리 데이터 삭제 실패: $e');
+      debugPrint('스택 트레이스: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// 충전 전류 데이터만 삭제 (charging_current > 0인 데이터)
+  /// 
+  /// [db]: 데이터베이스 인스턴스
+  /// 
+  /// Returns: 삭제된 데이터 개수
+  Future<int> deleteAllChargingCurrentData(Database db) async {
+    try {
+      // 삭제 전 행 수 확인
+      final beforeCount = await db.rawQuery('''
+        SELECT COUNT(*) as count FROM ${BatteryHistoryDatabaseConfig.tableName}
+        WHERE charging_current > 0
+      ''');
+      
+      // 충전 전류 데이터만 삭제
+      await db.delete(
+        BatteryHistoryDatabaseConfig.tableName,
+        where: 'charging_current > 0',
+      );
+      
+      // 삭제 후 행 수 확인
+      final afterCount = await db.rawQuery('''
+        SELECT COUNT(*) as count FROM ${BatteryHistoryDatabaseConfig.tableName}
+        WHERE charging_current > 0
+      ''');
+      
+      final before = Sqflite.firstIntValue(beforeCount) ?? 0;
+      final after = Sqflite.firstIntValue(afterCount) ?? 0;
+      final deletedCount = before - after;
+      
+      debugPrint('모든 충전 전류 데이터 삭제 완료: $deletedCount개');
+      return deletedCount;
+    } catch (e, stackTrace) {
+      debugPrint('모든 충전 전류 데이터 삭제 실패: $e');
+      debugPrint('스택 트레이스: $stackTrace');
+      rethrow;
+    }
+  }
+
   /// 데이터 포인트를 Map으로 변환
   Map<String, dynamic> _dataPointToMap(BatteryHistoryDataPoint dataPoint) {
     return {

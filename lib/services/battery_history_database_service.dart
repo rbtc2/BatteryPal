@@ -483,6 +483,59 @@ class BatteryHistoryDatabaseService {
     }
   }
 
+  // ==================== 데이터 삭제 ====================
+
+  /// 모든 배터리 히스토리 데이터 삭제
+  /// 
+  /// Returns: 삭제된 데이터 개수
+  /// 
+  /// Throws: 데이터베이스가 초기화되지 않았거나 삭제 실패 시 예외 발생
+  Future<int> deleteAllBatteryData() async {
+    final db = await _ensureInitialized();
+    
+    try {
+      return await _batteryDataRepository.deleteAllBatteryData(db);
+    } catch (e, stackTrace) {
+      debugPrint('모든 배터리 히스토리 데이터 삭제 실패: $e');
+      debugPrint('스택 트레이스: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// 모든 충전 전류 데이터 삭제
+  /// 
+  /// Returns: 삭제된 데이터 개수
+  /// 
+  /// Throws: 데이터베이스가 초기화되지 않았거나 삭제 실패 시 예외 발생
+  Future<int> deleteAllChargingCurrentData() async {
+    final db = await _ensureInitialized();
+    
+    try {
+      return await _batteryDataRepository.deleteAllChargingCurrentData(db);
+    } catch (e, stackTrace) {
+      debugPrint('모든 충전 전류 데이터 삭제 실패: $e');
+      debugPrint('스택 트레이스: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// 모든 충전 세션 데이터 삭제
+  /// 
+  /// Returns: 삭제된 세션 개수
+  /// 
+  /// Throws: 데이터베이스가 초기화되지 않았거나 삭제 실패 시 예외 발생
+  Future<int> deleteAllChargingSessions() async {
+    final db = await _ensureInitialized();
+    
+    try {
+      return await _chargingSessionRepository.deleteAllChargingSessions(db);
+    } catch (e, stackTrace) {
+      debugPrint('모든 충전 세션 데이터 삭제 실패: $e');
+      debugPrint('스택 트레이스: $stackTrace');
+      rethrow;
+    }
+  }
+
   // ==================== 내부 헬퍼 메서드 ====================
 
   /// 데이터베이스 초기화 확인 및 인스턴스 반환

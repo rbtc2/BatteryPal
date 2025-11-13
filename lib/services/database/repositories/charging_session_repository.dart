@@ -209,5 +209,38 @@ class ChargingSessionRepository {
       rethrow;
     }
   }
+
+  /// 모든 충전 세션 데이터 삭제
+  /// 
+  /// [db]: 데이터베이스 인스턴스
+  /// 
+  /// Returns: 삭제된 세션 개수
+  Future<int> deleteAllChargingSessions(Database db) async {
+    try {
+      // 삭제 전 행 수 확인
+      final beforeCount = await db.rawQuery('''
+        SELECT COUNT(*) as count FROM charging_sessions
+      ''');
+      
+      // 모든 세션 데이터 삭제
+      await db.delete('charging_sessions');
+      
+      // 삭제 후 행 수 확인
+      final afterCount = await db.rawQuery('''
+        SELECT COUNT(*) as count FROM charging_sessions
+      ''');
+      
+      final before = Sqflite.firstIntValue(beforeCount) ?? 0;
+      final after = Sqflite.firstIntValue(afterCount) ?? 0;
+      final deletedCount = before - after;
+      
+      debugPrint('모든 충전 세션 데이터 삭제 완료: $deletedCount개');
+      return deletedCount;
+    } catch (e, stackTrace) {
+      debugPrint('모든 충전 세션 데이터 삭제 실패: $e');
+      debugPrint('스택 트레이스: $stackTrace');
+      rethrow;
+    }
+  }
 }
 
