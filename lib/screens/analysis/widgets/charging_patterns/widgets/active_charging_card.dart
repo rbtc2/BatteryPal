@@ -159,34 +159,50 @@ class _ActiveChargingCardState extends State<ActiveChargingCard> {
           
           // 기록 조건 배지 (컴팩트 스타일)
           const SizedBox(height: 12),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
+          Row(
             children: [
-              _buildConditionBadge(
-                context,
-                isMet: isDurationMet,
-                label: '3분',
-                icon: isDurationMet ? Icons.check_circle : Icons.radio_button_unchecked,
+              Expanded(
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    _buildConditionBadge(
+                      context,
+                      isMet: isDurationMet,
+                      label: '3분',
+                      icon: isDurationMet ? Icons.check_circle : Icons.radio_button_unchecked,
+                    ),
+                    _buildConditionBadge(
+                      context,
+                      isMet: isCurrentMet,
+                      label: '100mA',
+                      icon: isCurrentMet ? Icons.check_circle : Icons.radio_button_unchecked,
+                    ),
+                    _buildConditionBadge(
+                      context,
+                      isMet: isBatteryChangeMet,
+                      label: '1% ↗',
+                      icon: isBatteryChangeMet ? Icons.check_circle : Icons.radio_button_unchecked,
+                    ),
+                  ],
+                ),
               ),
-              _buildConditionBadge(
-                context,
-                isMet: isCurrentMet,
-                label: '100mA',
-                icon: isCurrentMet ? Icons.check_circle : Icons.radio_button_unchecked,
-              ),
-              _buildConditionBadge(
-                context,
-                isMet: isBatteryChangeMet,
-                label: '1% ↗',
-                icon: isBatteryChangeMet ? Icons.check_circle : Icons.radio_button_unchecked,
-              ),
-              _buildConditionBadge(
-                context,
-                isMet: false, // 충전 중에는 항상 대기 중
-                label: '30초',
-                icon: Icons.access_time,
-                isWaiting: true,
+              // 정보 아이콘
+              GestureDetector(
+                onTap: () => _showRecordingConditionsDialog(context),
+                child: Container(
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.info_outline,
+                    size: 16,
+                    color: Colors.blue[700],
+                  ),
+                ),
               ),
             ],
           ),
@@ -240,11 +256,8 @@ class _ActiveChargingCardState extends State<ActiveChargingCard> {
     required bool isMet,
     required String label,
     required IconData icon,
-    bool isWaiting = false,
   }) {
-    final color = isMet 
-        ? Colors.green 
-        : (isWaiting ? Colors.orange : Colors.grey);
+    final color = isMet ? Colors.green : Colors.grey;
     
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -275,6 +288,140 @@ class _ActiveChargingCardState extends State<ActiveChargingCard> {
           ),
         ],
       ),
+    );
+  }
+  
+  /// 기록 조건 안내 다이얼로그 표시
+  void _showRecordingConditionsDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: Row(
+          children: [
+            Icon(
+              Icons.info_outline,
+              size: 20,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              '기록 조건 안내',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '충전 세션이 기록되려면 다음 조건을 모두 만족해야 합니다:',
+              style: TextStyle(
+                fontSize: 14,
+                height: 1.5,
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
+              ),
+            ),
+            const SizedBox(height: 16),
+            _buildConditionItem(
+              context,
+              icon: Icons.access_time,
+              label: '3분 이상 충전',
+              color: Colors.blue,
+            ),
+            const SizedBox(height: 12),
+            _buildConditionItem(
+              context,
+              icon: Icons.speed,
+              label: '평균 전류 100mA 이상',
+              color: Colors.blue,
+            ),
+            const SizedBox(height: 12),
+            _buildConditionItem(
+              context,
+              icon: Icons.trending_up,
+              label: '배터리 레벨 1% 이상 상승',
+              color: Colors.blue,
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: Colors.orange.withValues(alpha: 0.3),
+                ),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.access_time,
+                    size: 16,
+                    color: Colors.orange[700],
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '위 조건을 모두 충족한 후, 충전기가 떨어진 상태로 30초가 지나면 세션이 기록됩니다.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        height: 1.4,
+                        color: Colors.orange[700],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(
+              '확인',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  /// 조건 항목 빌더
+  Widget _buildConditionItem(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required Color color,
+  }) {
+    return Row(
+      children: [
+        Icon(
+          icon,
+          size: 18,
+          color: color,
+        ),
+        const SizedBox(width: 8),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
+        ),
+      ],
     );
   }
 }

@@ -59,7 +59,7 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
   void _initializeControllers() {
     // 날짜 선택 컨트롤러
     _dateController = DateSelectorController();
-    
+      
     // 데이터 로더
     _dataLoader = ChargingSessionDataLoader(
       sessionService: _sessionService,
@@ -82,9 +82,9 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
   
   /// 통계 컨트롤러 상태 변경 핸들러
   void _onStatsChanged() {
-    if (mounted) {
+      if (mounted) {
       setState(() {});
-    }
+      }
   }
   
   /// 서비스 초기화 및 데이터 로드
@@ -301,40 +301,40 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
               if (_dateController.isToday && _sessionService.isSessionActive)
                 const SizedBox.shrink()
               else
-                Padding(
-                  padding: const EdgeInsets.all(32),
-                  child: Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.battery_charging_full,
-                          size: 48,
-                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
-                        ),
-                        SizedBox(height: 16),
-                        Text(
+              Padding(
+                padding: const EdgeInsets.all(32),
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.battery_charging_full,
+                        size: 48,
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+                      ),
+                      SizedBox(height: 16),
+                      Text(
                           '${_dateController.getDateDisplayText()} 충전 세션이 없습니다',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                          ),
-                          textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                         ),
-                        SizedBox(height: 8),
-                        Text(
-                          '해당 날짜에 기록된 충전 세션이 없습니다',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
-                          ),
-                          textAlign: TextAlign.center,
+                        textAlign: TextAlign.center,
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        '해당 날짜에 기록된 충전 세션이 없습니다',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                         ),
-                      ],
-                    ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
                   ),
-                )
+                ),
+              )
             else
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
