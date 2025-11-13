@@ -249,7 +249,7 @@ class ChargingSessionDetailDialog extends StatelessWidget {
         crossAxisCount: 2,
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
-        childAspectRatio: 3.0,
+        childAspectRatio: 1.8, // 세로 공간을 충분히 확보하여 overflow 방지
       ),
       itemCount: items.length,
       itemBuilder: (context, index) {
@@ -261,7 +261,7 @@ class ChargingSessionDetailDialog extends StatelessWidget {
 
   Widget _buildInfoCard(BuildContext context, _InfoItem item) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: item.color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
@@ -276,8 +276,8 @@ class ChargingSessionDetailDialog extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(item.icon, size: 14, color: item.color),
-              const SizedBox(width: 6),
+              Icon(item.icon, size: 13, color: item.color),
+              const SizedBox(width: 4),
               Expanded(
                 child: Text(
                   item.label,
@@ -291,15 +291,15 @@ class ChargingSessionDetailDialog extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           Text(
             item.value,
             style: TextStyle(
-              fontSize: 13,
+              fontSize: 12,
               fontWeight: FontWeight.bold,
               color: item.color,
             ),
-            maxLines: 1,
+            maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
         ],
