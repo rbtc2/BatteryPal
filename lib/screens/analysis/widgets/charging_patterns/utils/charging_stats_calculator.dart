@@ -50,8 +50,8 @@ class ChargingStatsCalculator {
       return ChargingStats.empty();
     }
     
-    // 유효한 세션만 필터링 (5분 이상 충전된 세션만 포함)
-    // validate() 메서드를 호출하여 실제로 5분 이상인 세션만 필터링
+    // 유효한 세션만 필터링 (3분 이상 충전된 세션만 포함)
+    // validate() 메서드를 호출하여 실제로 3분 이상인 세션만 필터링
     final validSessions = sessions.where((s) => s.validate()).toList();
     
     if (validSessions.isEmpty) {

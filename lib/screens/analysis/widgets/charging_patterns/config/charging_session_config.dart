@@ -7,8 +7,8 @@ class ChargingSessionConfig {
   // ==================== 세션 감지 관련 상수 ====================
 
   /// 최소 충전 시간 (분)
-  /// 5분 이상 충전한 세션만 기록
-  static const int minChargingDurationMinutes = 5;
+  /// 3분 이상 충전한 세션만 기록
+  static const int minChargingDurationMinutes = 3;
 
   /// 최소 충전 시간 (Duration)
   static const Duration minChargingDuration = Duration(minutes: minChargingDurationMinutes);

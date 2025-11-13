@@ -1,6 +1,7 @@
 // 충전 세션 기록을 위한 데이터 모델들
 
 import 'package:flutter/material.dart';
+import '../config/charging_session_config.dart';
 
 /// 시간대 분류 enum
 /// 충전 세션을 시간대별로 분류하기 위한 enum
@@ -93,7 +94,7 @@ class CurrentChangeEvent {
 }
 
 /// 충전 세션 기록 모델
-/// 5분 이상 유의미한 충전 세션에 대한 완전한 기록
+/// 3분 이상 유의미한 충전 세션에 대한 완전한 기록
 class ChargingSessionRecord {
   /// 고유 ID (UUID 또는 타임스탬프 기반)
   final String id;
@@ -152,7 +153,7 @@ class ChargingSessionRecord {
   /// 배터리 전압 (mV) - 효율 계산에 사용
   final int? batteryVoltage;
   
-  /// 세션이 유효한지 여부 (5분 이상, 유의미한 충전)
+  /// 세션이 유효한지 여부 (3분 이상, 유의미한 충전)
   final bool isValid;
 
   ChargingSessionRecord({
@@ -186,8 +187,8 @@ class ChargingSessionRecord {
       return false;
     }
     
-    // 2. 최소 충전 시간 검증 (3분)
-    if (duration.inMinutes < 3) {
+    // 2. 최소 충전 시간 검증 (ChargingSessionConfig에서 가져옴)
+    if (duration < ChargingSessionConfig.minChargingDuration) {
       return false;
     }
     

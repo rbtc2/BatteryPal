@@ -363,7 +363,7 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
                         ],
                       ),
                     ),
-                    // 세션 목록 (5분 이상인 세션만 표시)
+                    // 세션 목록 (3분 이상인 세션만 표시)
                     ..._statsController.currentSessions.where((s) => s.validate()).map((session) {
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 8),

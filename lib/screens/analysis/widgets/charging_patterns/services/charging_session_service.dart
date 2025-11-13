@@ -1,5 +1,5 @@
 // 충전 세션 감지 및 추적 서비스
-// 5분 이상 유의미한 충전 세션을 감지하고 추적하는 서비스
+// 3분 이상 유의미한 충전 세션을 감지하고 추적하는 서비스
 
 import 'dart:async';
 import 'package:flutter/foundation.dart';
