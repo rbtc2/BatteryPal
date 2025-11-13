@@ -225,7 +225,7 @@ class _DrainStatsCardState extends State<DrainStatsCard> with WidgetsBindingObse
     }
   }
 
-  /// 화면 켜짐 시간 표시 텍스트
+  /// 화면 켜짐 시간 표시 텍스트 (시간과 분 형식)
   String _getScreenOnTimeText() {
     if (!_hasUsageStatsPermission) {
       return '권한 필요';
@@ -239,7 +239,24 @@ class _DrainStatsCardState extends State<DrainStatsCard> with WidgetsBindingObse
       return '--';
     }
     
-    return _screenOnTime!.toStringAsFixed(1);
+    return _formatScreenOnTime(_screenOnTime!);
+  }
+
+  /// 화면 켜짐 시간을 "XH YM" 형식으로 변환
+  String _formatScreenOnTime(double hours) {
+    final totalMinutes = (hours * 60).round();
+    final displayHours = totalMinutes ~/ 60;
+    final displayMinutes = totalMinutes % 60;
+    
+    if (displayHours > 0 && displayMinutes > 0) {
+      return '${displayHours}H ${displayMinutes}M';
+    } else if (displayHours > 0) {
+      return '${displayHours}H';
+    } else if (displayMinutes > 0) {
+      return '${displayMinutes}M';
+    } else {
+      return '0M';
+    }
   }
 
   /// 화면 켜짐 서브 텍스트
@@ -468,7 +485,7 @@ class _DrainStatsCardState extends State<DrainStatsCard> with WidgetsBindingObse
                   child: StatCard(
                     title: '화면 켜짐',
                     mainValue: _getScreenOnTimeText(),
-                    unit: 'h',
+                    unit: '', // 시간과 분이 이미 메인 값에 포함되어 있음
                     subValue: _getScreenOnTimeSubText(),
                     trend: '--',
                     trendColor: Colors.green,
