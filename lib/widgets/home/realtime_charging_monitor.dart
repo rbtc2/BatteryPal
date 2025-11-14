@@ -491,48 +491,58 @@ class _RealtimeChargingMonitorState extends State<RealtimeChargingMonitor> {
           // 충전 속도와 지속 시간 (한 줄에 배치)
           SizedBox(
             height: 60, // 고정 높이로 스크롤 방지
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                // 충전 속도 (좌측)
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      '${_dataPoints.isNotEmpty ? _dataPoints.last.toInt() : currentAbs}',
-                      style: const TextStyle(
-                        color: Colors.green,
-                        fontSize: 48,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
-                      child: Text(
-                        'mA',
-                        style: TextStyle(
-                          color: Colors.green.withValues(alpha: 0.7),
-                          fontSize: 20,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                
-                // 지속 시간 (오른쪽 하단, 설정에 따라 조건부 렌더링)
-                if (displayMode == ChargingMonitorDisplayMode.currentWithDuration)
-                  _buildDurationDisplay(context)
-                else
-                  const SizedBox.shrink(),
-              ],
-            ),
+            child: _buildChargingInfoRow(context, displayMode, currentAbs),
           ),
 
         ],
       ),
+    );
+  }
+
+  /// 충전 정보 행 (충전 속도 + 지속 시간)
+  Widget _buildChargingInfoRow(BuildContext context, ChargingMonitorDisplayMode displayMode, int currentAbs) {
+    final showDuration = displayMode == ChargingMonitorDisplayMode.currentWithDuration;
+    final durationWidget = showDuration ? _buildDurationDisplay(context) : null;
+    
+    // 지속 시간이 있으면 spaceBetween, 없으면 center
+    final mainAxisAlignment = durationWidget != null 
+        ? MainAxisAlignment.spaceBetween 
+        : MainAxisAlignment.center;
+    
+    return Row(
+      mainAxisAlignment: mainAxisAlignment,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        // 충전 속도
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              '${_dataPoints.isNotEmpty ? _dataPoints.last.toInt() : currentAbs}',
+              style: const TextStyle(
+                color: Colors.green,
+                fontSize: 48,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Text(
+                'mA',
+                style: TextStyle(
+                  color: Colors.green.withValues(alpha: 0.7),
+                  fontSize: 20,
+                ),
+              ),
+            ),
+          ],
+        ),
+        
+        // 지속 시간 (오른쪽 하단, 설정에 따라 조건부 렌더링)
+        if (durationWidget != null) durationWidget,
+      ],
     );
   }
 
