@@ -1,4 +1,5 @@
 import 'battery_display_cycle_speed.dart';
+import 'charging_monitor_display_mode.dart';
 
 /// 설정 데이터 모델
 class AppSettings {
@@ -33,6 +34,9 @@ class AppSettings {
   final bool enableTapToSwitch; // 탭으로 전환 여부
   final bool enableSwipeToSwitch; // 스와이프로 전환 여부
   
+  // 실시간 충전 모니터 표시 설정
+  final ChargingMonitorDisplayMode chargingMonitorDisplayMode; // 충전 모니터 표시 방식
+  
   final DateTime lastUpdated;
   
   const AppSettings({
@@ -66,6 +70,9 @@ class AppSettings {
     this.showBatteryTemperature = true,
     this.enableTapToSwitch = true,
     this.enableSwipeToSwitch = true,
+    
+    // 실시간 충전 모니터 표시 설정 기본값
+    this.chargingMonitorDisplayMode = ChargingMonitorDisplayMode.currentOnly,
     
     required this.lastUpdated,
   });
@@ -106,6 +113,9 @@ class AppSettings {
       'showBatteryTemperature': showBatteryTemperature,
       'enableTapToSwitch': enableTapToSwitch,
       'enableSwipeToSwitch': enableSwipeToSwitch,
+      
+      // 실시간 충전 모니터 표시 설정
+      'chargingMonitorDisplayMode': chargingMonitorDisplayMode.name,
       
       'lastUpdated': lastUpdated.toIso8601String(),
     };
@@ -150,6 +160,12 @@ class AppSettings {
       enableTapToSwitch: json['enableTapToSwitch'] ?? true,
       enableSwipeToSwitch: json['enableSwipeToSwitch'] ?? true,
       
+      // 실시간 충전 모니터 표시 설정
+      chargingMonitorDisplayMode: ChargingMonitorDisplayMode.values.firstWhere(
+        (e) => e.name == json['chargingMonitorDisplayMode'],
+        orElse: () => ChargingMonitorDisplayMode.currentOnly,
+      ),
+      
       lastUpdated: DateTime.parse(json['lastUpdated']),
     );
   }
@@ -187,6 +203,9 @@ class AppSettings {
     bool? enableTapToSwitch,
     bool? enableSwipeToSwitch,
     
+    // 실시간 충전 모니터 표시 설정
+    ChargingMonitorDisplayMode? chargingMonitorDisplayMode,
+    
     DateTime? lastUpdated,
   }) {
     return AppSettings(
@@ -221,6 +240,9 @@ class AppSettings {
       enableTapToSwitch: enableTapToSwitch ?? this.enableTapToSwitch,
       enableSwipeToSwitch: enableSwipeToSwitch ?? this.enableSwipeToSwitch,
       
+      // 실시간 충전 모니터 표시 설정
+      chargingMonitorDisplayMode: chargingMonitorDisplayMode ?? this.chargingMonitorDisplayMode,
+      
       lastUpdated: lastUpdated ?? this.lastUpdated,
     );
   }
@@ -252,6 +274,7 @@ class AppSettings {
         other.showBatteryTemperature == showBatteryTemperature &&
         other.enableTapToSwitch == enableTapToSwitch &&
         other.enableSwipeToSwitch == enableSwipeToSwitch &&
+        other.chargingMonitorDisplayMode == chargingMonitorDisplayMode &&
         other.lastUpdated == lastUpdated;
   }
   
@@ -275,6 +298,7 @@ class AppSettings {
       showBatteryTemperature,
       enableTapToSwitch,
       enableSwipeToSwitch,
+      chargingMonitorDisplayMode,
       lastUpdated,
     );
   }

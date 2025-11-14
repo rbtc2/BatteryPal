@@ -5,6 +5,7 @@
 export 'battery_info.dart';
 export 'app_usage_data.dart';
 export 'battery_display_cycle_speed.dart';
+export 'charging_monitor_display_mode.dart';
 export 'app_settings.dart';
 export 'optimization_result.dart';
 

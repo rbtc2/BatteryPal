@@ -44,6 +44,24 @@ class FeaturesSettingsTab extends StatelessWidget {
               
               const SizedBox(height: 16),
               
+              // 실시간 충전 모니터 설정
+              _buildFeatureSettingsCard(
+                context,
+                '실시간 충전 모니터',
+                Icons.monitor_heart,
+                '홈 화면 충전 심전도 그래프 표시 방식 설정',
+                [
+                  SettingsActionItem(
+                    title: '충전 모니터 표시 방식',
+                    subtitle: _getChargingMonitorDisplaySubtitle(),
+                    icon: Icons.show_chart,
+                    onTap: () => _showChargingMonitorDisplayDialog(context),
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 16),
+              
               // 배터리 알림 설정 (Pro 기능)
               _buildFeatureSettingsCard(
                 context,
@@ -162,6 +180,10 @@ class FeaturesSettingsTab extends StatelessWidget {
       settingsService.appSettings.showBatteryTemperature,
     ].where((e) => e).length;
     return '$speedText 속도, $enabledCount개 정보 표시';
+  }
+
+  String _getChargingMonitorDisplaySubtitle() {
+    return settingsService.appSettings.chargingMonitorDisplayMode.displayName;
   }
 
   String _getChargingCompleteNotificationSubtitle() {
@@ -729,6 +751,78 @@ class FeaturesSettingsTab extends StatelessWidget {
             child: const Text('추가'),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showChargingMonitorDisplayDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.monitor_heart),
+              SizedBox(width: 8),
+              Text('충전 모니터 표시 방식'),
+            ],
+          ),
+          contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+          content: SizedBox(
+            width: MediaQuery.of(context).size.width * 0.9,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '표시 방식 선택',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // 충전 속도만 표시
+                  RadioListTile<ChargingMonitorDisplayMode>(
+                    title: const Text('충전 속도만 표시'),
+                    subtitle: const Text('현재 충전 전류만 실시간으로 표시'),
+                    value: ChargingMonitorDisplayMode.currentOnly,
+                    groupValue: settingsService.appSettings.chargingMonitorDisplayMode,
+                    onChanged: (value) {
+                      if (value != null) {
+                        settingsService.updateChargingMonitorDisplayMode(value);
+                        setState(() {}); // 다이얼로그 상태 업데이트
+                      }
+                    },
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  const SizedBox(height: 8),
+                  // 충전 속도 + 지속 시간 표시
+                  RadioListTile<ChargingMonitorDisplayMode>(
+                    title: const Text('충전 속도 + 지속 시간 표시'),
+                    subtitle: const Text('충전 속도와 함께 이 세션의 충전 지속 시간을 표시'),
+                    value: ChargingMonitorDisplayMode.currentWithDuration,
+                    groupValue: settingsService.appSettings.chargingMonitorDisplayMode,
+                    onChanged: (value) {
+                      if (value != null) {
+                        settingsService.updateChargingMonitorDisplayMode(value);
+                        setState(() {}); // 다이얼로그 상태 업데이트
+                      }
+                    },
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('확인'),
+            ),
+          ],
+        ),
       ),
     );
   }

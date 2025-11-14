@@ -48,6 +48,9 @@ class SettingsService extends ChangeNotifier {
     enableTapToSwitch: true,
     enableSwipeToSwitch: true,
     
+    // 실시간 충전 모니터 표시 설정 기본값
+    chargingMonitorDisplayMode: ChargingMonitorDisplayMode.currentOnly,
+    
     lastUpdated: DateTime.now(),
   );
 
@@ -104,6 +107,9 @@ class SettingsService extends ChangeNotifier {
       await prefs.setBool('enableTapToSwitch', settingsJson['enableTapToSwitch'] as bool);
       await prefs.setBool('enableSwipeToSwitch', settingsJson['enableSwipeToSwitch'] as bool);
       
+      // 실시간 충전 모니터 표시 설정
+      await prefs.setString('chargingMonitorDisplayMode', settingsJson['chargingMonitorDisplayMode'] as String);
+      
     } catch (e) {
       debugPrint('설정 저장 실패: $e');
     }
@@ -150,6 +156,12 @@ class SettingsService extends ChangeNotifier {
         showBatteryTemperature: prefs.getBool('showBatteryTemperature') ?? true,
         enableTapToSwitch: prefs.getBool('enableTapToSwitch') ?? true,
         enableSwipeToSwitch: prefs.getBool('enableSwipeToSwitch') ?? true,
+        
+        // 실시간 충전 모니터 표시 설정
+        chargingMonitorDisplayMode: ChargingMonitorDisplayMode.values.firstWhere(
+          (e) => e.name == prefs.getString('chargingMonitorDisplayMode'),
+          orElse: () => ChargingMonitorDisplayMode.currentOnly,
+        ),
         
         lastUpdated: DateTime.now(),
       );
@@ -429,6 +441,16 @@ class SettingsService extends ChangeNotifier {
     _autoSave();
   }
 
+  /// 실시간 충전 모니터 표시 방식 설정 변경
+  void updateChargingMonitorDisplayMode(ChargingMonitorDisplayMode mode) {
+    _appSettings = _appSettings.copyWith(
+      chargingMonitorDisplayMode: mode,
+      lastUpdated: DateTime.now(),
+    );
+    notifyListeners();
+    _autoSave();
+  }
+
   /// 설정 초기화
   void resetToDefaults() {
     _appSettings = AppSettings(
@@ -462,6 +484,9 @@ class SettingsService extends ChangeNotifier {
       showBatteryTemperature: true,
       enableTapToSwitch: true,
       enableSwipeToSwitch: true,
+      
+      // 실시간 충전 모니터 표시 설정 기본값
+      chargingMonitorDisplayMode: ChargingMonitorDisplayMode.currentOnly,
       
       lastUpdated: DateTime.now(),
     );
