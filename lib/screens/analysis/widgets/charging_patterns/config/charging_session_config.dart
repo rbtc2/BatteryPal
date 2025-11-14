@@ -18,8 +18,12 @@ class ChargingSessionConfig {
   static const int minSignificantCurrentMa = 100;
 
   /// 세션 종료 대기 시간 (초)
-  /// 전류가 0으로 떨어진 후 30초 이상 유지되면 세션 종료로 판단
-  static const int sessionEndWaitSeconds = 30;
+  /// 전류가 0으로 떨어진 후 20초 이상 유지되면 세션 종료로 판단
+  /// 
+  /// 참고:
+  /// - 20초 이내 재연결 시 같은 충전기면 한 세션으로 처리
+  /// - 다른 충전기로 연결 시 즉시 저장 후 새 세션 시작
+  static const int sessionEndWaitSeconds = 20;
 
   /// 세션 종료 대기 시간 (Duration)
   static const Duration sessionEndWaitDuration = Duration(seconds: sessionEndWaitSeconds);
