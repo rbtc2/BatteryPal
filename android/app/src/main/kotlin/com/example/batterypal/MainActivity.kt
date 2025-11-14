@@ -13,6 +13,7 @@ import android.net.NetworkCapabilities
 import android.content.ContentResolver
 import android.app.usage.UsageStatsManager
 import android.app.usage.UsageEvents
+import android.app.AppOpsManager
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -593,19 +594,35 @@ class MainActivity : FlutterActivity() {
     // ========== Usage Stats 관련 메서드들 (화면 켜짐 시간 추적용) ==========
 
     /// Usage Stats 권한 확인
+    /// AppOpsManager를 사용하여 정확한 권한 상태를 확인합니다
     private fun hasUsageStatsPermission(): Boolean {
         return try {
-            val usageStatsManager = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
-            val time = System.currentTimeMillis()
-            val stats = usageStatsManager.queryUsageStats(
-                UsageStatsManager.INTERVAL_DAILY,
-                time - 1000 * 60, // 1분 전
-                time
+            // AppOpsManager를 사용한 권한 확인 (가장 정확한 방법)
+            val appOps = getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
+            val mode = appOps.checkOpNoThrow(
+                AppOpsManager.OPSTR_GET_USAGE_STATS,
+                android.os.Process.myUid(),
+                packageName
             )
-            // 권한이 있으면 stats가 null이 아니고, 없으면 null 또는 빈 리스트
-            val hasPermission = stats != null
-            android.util.Log.d("BatteryPal", "Usage Stats 권한: $hasPermission")
+            
+            // MODE_ALLOWED = 0 (권한 허용됨)
+            val hasPermission = mode == AppOpsManager.MODE_ALLOWED
+            
+            // 디버깅을 위한 상세 로그
+            val modeString = when (mode) {
+                AppOpsManager.MODE_ALLOWED -> "ALLOWED"
+                AppOpsManager.MODE_IGNORED -> "IGNORED"
+                AppOpsManager.MODE_ERRORED -> "ERRORED"
+                AppOpsManager.MODE_DEFAULT -> "DEFAULT"
+                else -> "UNKNOWN($mode)"
+            }
+            android.util.Log.d("BatteryPal", "Usage Stats 권한: $hasPermission (mode: $modeString)")
+            
             hasPermission
+        } catch (e: SecurityException) {
+            // SecurityException이 발생하면 권한이 없는 것으로 간주
+            android.util.Log.w("BatteryPal", "Usage Stats 권한 확인 중 SecurityException 발생: ${e.message}")
+            false
         } catch (e: Exception) {
             android.util.Log.e("BatteryPal", "Usage Stats 권한 확인 실패", e)
             false
@@ -651,11 +668,21 @@ class MainActivity : FlutterActivity() {
             
             // UsageEvents를 사용하여 화면 켜짐/꺼짐 이벤트 추적
             val usageEvents = usageStatsManager.queryEvents(startTime, endTime)
+            
+            if (usageEvents == null) {
+                android.util.Log.w("BatteryPal", "UsageEvents가 null입니다")
+                return 0
+            }
+            
             var screenOnTime = 0L
             var lastScreenOnTime: Long? = null
             
+            // 이벤트 객체는 루프 밖에서 한 번만 생성 (재사용 방식)
+            val event = UsageEvents.Event()
+            
+            android.util.Log.d("BatteryPal", "화면 켜짐 시간 조회: ${java.util.Date(startTime)} ~ ${java.util.Date(endTime)}")
+            
             while (usageEvents.hasNextEvent()) {
-                val event = UsageEvents.Event()
                 usageEvents.getNextEvent(event)
                 
                 when (event.eventType) {
