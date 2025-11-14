@@ -43,6 +43,11 @@ class SessionStateManager {
   /// 세션 시작 시 배터리 정보
   BatteryInfo? _startBatteryInfo;
   
+  /// 세션 시작 시 충전기 정보 (충전기 구분용)
+  /// ending 상태에서 재연결 시 같은 충전기인지 확인하기 위해 저장
+  String? _lastChargingType;
+  int? _lastInitialChargingCurrent;
+  
   // ==================== 상태 접근 ====================
   
   /// 현재 세션 상태
@@ -91,6 +96,9 @@ class SessionStateManager {
     _endWaitStartTime = null;
     _currentSession = null;
     
+    // 충전기 정보 저장 (30초 이내 재연결 시 비교용)
+    _saveChargerInfo(batteryInfo);
+    
     debugPrint('SessionStateManager: 세션 시작 - 상태: ${_state.name}, 시작 시간: $_startTime');
     return true;
   }
@@ -123,13 +131,78 @@ class SessionStateManager {
   }
   
   /// 세션 리셋 (idle 상태로 전환)
+  /// 
+  /// 주의: 충전기 정보(_lastChargingType, _lastInitialChargingCurrent)는 유지됩니다.
+  /// ending 상태에서 재연결 시 비교하기 위해 필요합니다.
   void reset() {
     _state = SessionState.idle;
     _currentSession = null;
     _startTime = null;
     _endWaitStartTime = null;
     _startBatteryInfo = null;
+    // 충전기 정보는 유지 (ending 상태에서 재연결 시 비교용)
     debugPrint('SessionStateManager: 세션 리셋 - 상태: ${_state.name}');
+  }
+  
+  /// 세션 완전 종료 시 충전기 정보도 초기화
+  /// 세션이 완전히 종료되어 저장된 후 호출
+  void clearChargerInfo() {
+    _lastChargingType = null;
+    _lastInitialChargingCurrent = null;
+    debugPrint('SessionStateManager: 충전기 정보 초기화');
+  }
+  
+  // ==================== 충전기 구분 ====================
+  
+  /// 세션 시작 시 충전기 정보 저장
+  void _saveChargerInfo(BatteryInfo batteryInfo) {
+    _lastChargingType = batteryInfo.chargingType;
+    _lastInitialChargingCurrent = batteryInfo.chargingCurrent;
+    debugPrint('SessionStateManager: 충전기 정보 저장 - type: $_lastChargingType, current: $_lastInitialChargingCurrent mA');
+  }
+  
+  /// 충전기가 같은지 확인
+  /// 
+  /// [batteryInfo] 현재 충전기 정보
+  /// 
+  /// 반환: 같은 충전기면 true, 다른 충전기면 false
+  /// 
+  /// 판단 기준:
+  /// 1. chargingType이 다르면 → 다른 충전기
+  /// 2. chargingType이 같고 초기 충전 전류가 크게 다르면 → 다른 충전기 (30% 이상 차이)
+  /// 3. chargingType이 같고 초기 충전 전류가 비슷하면 → 같은 충전기
+  bool isSameCharger(BatteryInfo batteryInfo) {
+    if (_lastChargingType == null || _lastInitialChargingCurrent == null) {
+      debugPrint('SessionStateManager: 이전 충전기 정보가 없어 다른 충전기로 판단');
+      return false; // 이전 정보가 없으면 다른 충전기로 판단
+    }
+    
+    // chargingType이 다르면 다른 충전기
+    if (_lastChargingType != batteryInfo.chargingType) {
+      debugPrint('SessionStateManager: 충전기 타입이 다름 - 이전: $_lastChargingType, 현재: ${batteryInfo.chargingType}');
+      return false;
+    }
+    
+    // chargingType이 같으면 초기 전류 비교
+    final currentInitial = batteryInfo.chargingCurrent;
+    final lastInitial = _lastInitialChargingCurrent!;
+    
+    // 전류가 0이거나 음수면 비교 불가 (다른 충전기로 판단)
+    if (currentInitial <= 0 || lastInitial <= 0) {
+      debugPrint('SessionStateManager: 전류 정보가 유효하지 않음 - 이전: $lastInitial mA, 현재: $currentInitial mA');
+      return false;
+    }
+    
+    // 전류 차이 비율 계산 (큰 값을 기준으로)
+    final currentMax = currentInitial > lastInitial ? currentInitial : lastInitial;
+    final currentMin = currentInitial < lastInitial ? currentInitial : lastInitial;
+    final differencePercent = ((currentMax - currentMin) / currentMax) * 100;
+    
+    // 30% 이내 차이면 같은 충전기로 판단
+    final isSame = differencePercent <= 30.0;
+    debugPrint('SessionStateManager: 충전기 비교 - 이전: $lastInitial mA, 현재: $currentInitial mA, 차이: ${differencePercent.toStringAsFixed(1)}% → ${isSame ? "같은 충전기" : "다른 충전기"}');
+    
+    return isSame;
   }
   
   // ==================== 충전 상태 추적 ====================
@@ -158,6 +231,8 @@ class SessionStateManager {
       'hasCurrentSession': _currentSession != null,
       'wasCharging': _wasCharging,
       'hasStartBatteryInfo': _startBatteryInfo != null,
+      'lastChargingType': _lastChargingType,
+      'lastInitialChargingCurrent': _lastInitialChargingCurrent,
     };
   }
 }

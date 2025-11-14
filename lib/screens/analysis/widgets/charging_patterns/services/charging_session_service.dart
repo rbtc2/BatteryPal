@@ -222,8 +222,42 @@ class ChargingSessionService {
       if (isCurrentlyCharging && !_stateManager.wasCharging) {
         // 충전 시작
         debugPrint('ChargingSessionService: 충전 시작 감지');
-        _startSession(batteryInfo);
-        _stateManager.setWasCharging(true);
+        
+        // ending 상태에서 재연결된 경우 (30초 이내 재연결)
+        if (_stateManager.isEnding) {
+          // 같은 충전기인지 확인
+          if (_stateManager.isSameCharger(batteryInfo)) {
+            // 같은 충전기 → 세션 재활성화 (한 세션으로 처리)
+            debugPrint('ChargingSessionService: 같은 충전기로 재연결 - 세션 재활성화');
+            _stateManager.reactivateSession();
+            _timerManager.stopEndWaitTimer(); // 종료 대기 타이머 취소
+            _stateManager.setWasCharging(true);
+            // 충전 중 업데이트 처리 (데이터 수집 재개)
+            _handleChargingUpdate(batteryInfo);
+          } else {
+            // 다른 충전기 → 기존 세션 즉시 저장 후 새 세션 시작
+            debugPrint('ChargingSessionService: 다른 충전기로 연결 - 기존 세션 즉시 저장 후 새 세션 시작');
+            // 기존 세션 즉시 종료 (30초 대기 없이)
+            _endSessionImmediately().then((_) {
+              // 세션 종료 후 새 세션 시작
+              if (!_isDisposed) {
+                _startSession(batteryInfo);
+                _stateManager.setWasCharging(true);
+              }
+            }).catchError((e) {
+              debugPrint('ChargingSessionService: 세션 종료 실패 - $e');
+              // 에러 발생해도 새 세션 시작 시도
+              if (!_isDisposed) {
+                _startSession(batteryInfo);
+                _stateManager.setWasCharging(true);
+              }
+            });
+          }
+        } else {
+          // 일반적인 새 세션 시작
+          _startSession(batteryInfo);
+          _stateManager.setWasCharging(true);
+        }
         
       } else if (!isCurrentlyCharging && _stateManager.wasCharging) {
         // 충전 종료
@@ -321,7 +355,7 @@ class ChargingSessionService {
   }
   
   
-  /// 세션 종료
+  /// 세션 종료 (30초 대기 후)
   Future<void> _endSession() async {
     if (_stateManager.isIdle || _isDisposed) {
       return;
@@ -410,11 +444,31 @@ class ChargingSessionService {
       // 세션 초기화
       _resetSession();
       
+      // 세션이 완전히 종료되었으므로 충전기 정보도 초기화
+      _stateManager.clearChargerInfo();
+      
     } catch (e, stackTrace) {
       debugPrint('ChargingSessionService: 세션 종료 실패 - $e');
       debugPrint('스택 트레이스: $stackTrace');
       _resetSession();
+      _stateManager.clearChargerInfo();
     }
+  }
+  
+  /// 세션 즉시 종료 (30초 대기 없이)
+  /// 다른 충전기로 연결된 경우 기존 세션을 즉시 저장하기 위해 사용
+  Future<void> _endSessionImmediately() async {
+    if (_stateManager.isIdle || _isDisposed) {
+      return;
+    }
+    
+    debugPrint('ChargingSessionService: 세션 즉시 종료 처리 시작 (30초 대기 없이)');
+    
+    // 종료 대기 타이머 취소
+    _timerManager.stopEndWaitTimer();
+    
+    // _endSession과 동일한 로직이지만 즉시 실행
+    await _endSession();
   }
   
   /// 세션 초기화
@@ -436,13 +490,16 @@ class ChargingSessionService {
   
   /// 충전 중 업데이트 처리
   void _handleChargingUpdate(BatteryInfo batteryInfo) {
-    if (!_stateManager.isActive) {
+    // active 또는 ending 상태에서 모두 처리 가능
+    // ending 상태에서 재연결된 경우는 _onBatteryInfoUpdate에서 이미 reactivateSession 호출됨
+    if (!_stateManager.isActive && !_stateManager.isEnding) {
       return;
     }
     
-    // 종료 대기 상태였다면 다시 활성 상태로
+    // 종료 대기 상태였다면 다시 활성 상태로 (추가 안전장치)
     if (_stateManager.isEnding) {
       _stateManager.reactivateSession();
+      _timerManager.stopEndWaitTimer(); // 종료 대기 타이머 취소
     }
     
     // 전류 변화 감지 및 데이터 포인트 추가
