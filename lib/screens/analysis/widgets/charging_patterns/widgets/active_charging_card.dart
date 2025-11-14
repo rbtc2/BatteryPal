@@ -68,7 +68,7 @@ class _ActiveChargingCardState extends State<ActiveChargingCard> {
     final isDurationMet = elapsed >= minSessionDuration;
     final isCurrentMet = batteryInfo.chargingCurrent >= ChargingSessionConfig.minSignificantCurrentMa;
     final isBatteryChangeMet = batteryChange >= ChargingSessionConfig.minBatteryChangePercent;
-    // 30초 대기는 충전 중에는 항상 대기 중
+    // 종료 대기 시간(ChargingSessionConfig.sessionEndWaitSeconds)은 충전 중에는 항상 대기 중
     
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -370,7 +370,7 @@ class _ActiveChargingCardState extends State<ActiveChargingCard> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '위 조건을 모두 충족한 후, 충전기가 떨어진 상태로 30초가 지나면 세션이 기록됩니다.',
+                      '위 조건을 모두 충족한 후, 충전기가 떨어진 상태로 ${ChargingSessionConfig.sessionEndWaitSeconds}초가 지나면 세션이 기록됩니다.',
                       style: TextStyle(
                         fontSize: 13,
                         height: 1.4,

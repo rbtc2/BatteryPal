@@ -96,7 +96,7 @@ class SessionStateManager {
     _endWaitStartTime = null;
     _currentSession = null;
     
-    // 충전기 정보 저장 (30초 이내 재연결 시 비교용)
+    // 충전기 정보 저장 (20초 이내 재연결 시 비교용)
     _saveChargerInfo(batteryInfo);
     
     debugPrint('SessionStateManager: 세션 시작 - 상태: ${_state.name}, 시작 시간: $_startTime');

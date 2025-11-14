@@ -223,7 +223,7 @@ class ChargingSessionService {
         // 충전 시작
         debugPrint('ChargingSessionService: 충전 시작 감지');
         
-        // ending 상태에서 재연결된 경우 (30초 이내 재연결)
+        // ending 상태에서 재연결된 경우 (20초 이내 재연결)
         if (_stateManager.isEnding) {
           // 같은 충전기인지 확인
           if (_stateManager.isSameCharger(batteryInfo)) {
@@ -355,7 +355,7 @@ class ChargingSessionService {
   }
   
   
-  /// 세션 종료 (30초 대기 후)
+  /// 세션 종료 (20초 대기 후)
   Future<void> _endSession() async {
     if (_stateManager.isIdle || _isDisposed) {
       return;
@@ -455,14 +455,14 @@ class ChargingSessionService {
     }
   }
   
-  /// 세션 즉시 종료 (30초 대기 없이)
+  /// 세션 즉시 종료 (20초 대기 없이)
   /// 다른 충전기로 연결된 경우 기존 세션을 즉시 저장하기 위해 사용
   Future<void> _endSessionImmediately() async {
     if (_stateManager.isIdle || _isDisposed) {
       return;
     }
     
-    debugPrint('ChargingSessionService: 세션 즉시 종료 처리 시작 (30초 대기 없이)');
+    debugPrint('ChargingSessionService: 세션 즉시 종료 처리 시작 (20초 대기 없이)');
     
     // 종료 대기 타이머 취소
     _timerManager.stopEndWaitTimer();
