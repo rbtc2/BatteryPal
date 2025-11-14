@@ -10,9 +10,118 @@ import android.util.Log
 
 /// 배터리 상태 변화를 감지하는 독립적인 BroadcastReceiver
 /// 앱이 백그라운드에 있거나 화면이 꺼진 상태에서도 작동
+/// AndroidManifest에 정적으로 등록되어 앱이 완전히 종료되어도 작동
 class BatteryStateReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action == Intent.ACTION_BATTERY_CHANGED) {
+        when (intent.action) {
+            Intent.ACTION_POWER_CONNECTED -> {
+                handlePowerConnected(context)
+            }
+            Intent.ACTION_POWER_DISCONNECTED -> {
+                handlePowerDisconnected(context)
+            }
+            Intent.ACTION_BATTERY_CHANGED -> {
+                handleBatteryChanged(context, intent)
+            }
+        }
+    }
+    
+    /// 충전기 연결 처리
+    private fun handlePowerConnected(context: Context) {
+        try {
+            val now = System.currentTimeMillis()
+            val batteryStatePrefs = context.getSharedPreferences("battery_state", Context.MODE_PRIVATE)
+            
+            // 충전 시작 시간 저장
+            batteryStatePrefs.edit()
+                .putLong("charging_session_start_time", now)
+                .putBoolean("is_charging_active", true)
+                .apply()
+            
+            Log.d("BatteryPal", "BatteryStateReceiver: 충전기 연결 감지 - 시작 시간: $now")
+            
+            // 배터리 정보 가져오기 (충전 시작 시점의 배터리 레벨 저장)
+            val batteryIntent = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+            batteryIntent?.let {
+                val level = it.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+                val scale = it.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+                val batteryPercent = if (level != -1 && scale != -1 && scale > 0) {
+                    (level * 100.0) / scale
+                } else -1.0
+                
+                val plugged = it.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1)
+                val chargingType = when (plugged) {
+                    BatteryManager.BATTERY_PLUGGED_AC -> "AC"
+                    BatteryManager.BATTERY_PLUGGED_USB -> "USB"
+                    BatteryManager.BATTERY_PLUGGED_WIRELESS -> "Wireless"
+                    else -> "Unknown"
+                }
+                
+                // 충전 시작 정보 저장
+                batteryStatePrefs.edit()
+                    .putFloat("charging_start_battery_level", batteryPercent.toFloat())
+                    .putString("charging_type", chargingType)
+                    .apply()
+                
+                Log.d("BatteryPal", "BatteryStateReceiver: 충전 시작 정보 저장 - 레벨: $batteryPercent%, 타입: $chargingType")
+            }
+            
+        } catch (e: Exception) {
+            Log.e("BatteryPal", "BatteryStateReceiver: 충전기 연결 처리 오류", e)
+        }
+    }
+    
+    /// 충전기 분리 처리
+    private fun handlePowerDisconnected(context: Context) {
+        try {
+            val now = System.currentTimeMillis()
+            val batteryStatePrefs = context.getSharedPreferences("battery_state", Context.MODE_PRIVATE)
+            
+            val startTime = batteryStatePrefs.getLong("charging_session_start_time", -1)
+            
+            if (startTime > 0) {
+                // 충전 종료 시간 저장
+                batteryStatePrefs.edit()
+                    .putLong("charging_session_end_time", now)
+                    .putBoolean("is_charging_active", false)
+                    .apply()
+                
+                val duration = now - startTime
+                Log.d("BatteryPal", "BatteryStateReceiver: 충전기 분리 감지 - 종료 시간: $now, 지속 시간: ${duration / 1000}초")
+                
+                // 배터리 정보 가져오기 (충전 종료 시점의 배터리 레벨 저장)
+                val batteryIntent = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+                batteryIntent?.let {
+                    val level = it.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+                    val scale = it.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+                    val batteryPercent = if (level != -1 && scale != -1 && scale > 0) {
+                        (level * 100.0) / scale
+                    } else -1.0
+                    
+                    // 충전 종료 정보 저장
+                    batteryStatePrefs.edit()
+                        .putFloat("charging_end_battery_level", batteryPercent.toFloat())
+                        .apply()
+                    
+                    Log.d("BatteryPal", "BatteryStateReceiver: 충전 종료 정보 저장 - 레벨: $batteryPercent%")
+                }
+            } else {
+                // 시작 시간이 없으면 종료 시간만 저장
+                batteryStatePrefs.edit()
+                    .putLong("charging_session_end_time", now)
+                    .putBoolean("is_charging_active", false)
+                    .apply()
+                
+                Log.d("BatteryPal", "BatteryStateReceiver: 충전기 분리 감지 (시작 시간 없음) - 종료 시간: $now")
+            }
+            
+        } catch (e: Exception) {
+            Log.e("BatteryPal", "BatteryStateReceiver: 충전기 분리 처리 오류", e)
+        }
+    }
+    
+    /// 배터리 상태 변화 처리 (기존 로직)
+    private fun handleBatteryChanged(context: Context, intent: Intent) {
             try {
                 val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
                 val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)

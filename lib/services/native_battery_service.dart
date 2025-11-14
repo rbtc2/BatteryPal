@@ -120,4 +120,68 @@ class NativeBatteryService {
       return -1;
     }
   }
+
+  /// 충전 세션 정보 가져오기 (SharedPreferences에서 읽기)
+  /// BatteryStateReceiver에서 저장한 충전 세션 정보를 읽어옵니다
+  static Future<ChargingSessionInfo?> getChargingSessionInfo() async {
+    try {
+      debugPrint('네이티브 충전 세션 정보 요청...');
+      final Map<dynamic, dynamic> sessionInfo = await _channel.invokeMethod('getChargingSessionInfo');
+      debugPrint('네이티브 충전 세션 정보 응답: $sessionInfo');
+      
+      final startTime = sessionInfo['startTime'] as int?;
+      final endTime = sessionInfo['endTime'] as int?;
+      final isChargingActive = sessionInfo['isChargingActive'] as bool? ?? false;
+      final startBatteryLevel = sessionInfo['startBatteryLevel'] as double?;
+      final endBatteryLevel = sessionInfo['endBatteryLevel'] as double?;
+      final chargingType = sessionInfo['chargingType'] as String?;
+      
+      if (startTime == null && endTime == null && !isChargingActive) {
+        // 세션 정보가 없으면 null 반환
+        return null;
+      }
+      
+      return ChargingSessionInfo(
+        startTime: startTime != null ? DateTime.fromMillisecondsSinceEpoch(startTime) : null,
+        endTime: endTime != null ? DateTime.fromMillisecondsSinceEpoch(endTime) : null,
+        isChargingActive: isChargingActive,
+        startBatteryLevel: startBatteryLevel,
+        endBatteryLevel: endBatteryLevel,
+        chargingType: chargingType,
+      );
+    } catch (e) {
+      debugPrint('충전 세션 정보 가져오기 실패: $e');
+      return null;
+    }
+  }
+}
+
+/// 충전 세션 정보 모델
+class ChargingSessionInfo {
+  final DateTime? startTime;
+  final DateTime? endTime;
+  final bool isChargingActive;
+  final double? startBatteryLevel;
+  final double? endBatteryLevel;
+  final String? chargingType;
+
+  ChargingSessionInfo({
+    this.startTime,
+    this.endTime,
+    required this.isChargingActive,
+    this.startBatteryLevel,
+    this.endBatteryLevel,
+    this.chargingType,
+  });
+
+  @override
+  String toString() {
+    return 'ChargingSessionInfo('
+        'startTime: $startTime, '
+        'endTime: $endTime, '
+        'isChargingActive: $isChargingActive, '
+        'startBatteryLevel: $startBatteryLevel, '
+        'endBatteryLevel: $endBatteryLevel, '
+        'chargingType: $chargingType)';
+  }
 }

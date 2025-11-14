@@ -41,18 +41,24 @@ class _RealtimeChargingMonitorState extends State<RealtimeChargingMonitor> {
     _controller = ChargingMonitorController();
     _controller.addListener(_onControllerChanged);
     
-    // 충전 중일 때만 모니터링 시작
-    if (widget.batteryInfo?.isCharging == true) {
-      _controller.handleChargingStart();
-      
-      // 앱 재시작 후 충전 중인 경우를 대비해 세션 시작 시간 재확인
-      // (세션이 나중에 시작될 수 있으므로)
-      Future.delayed(const Duration(seconds: 2), () {
-        if (mounted && widget.batteryInfo?.isCharging == true) {
-          _controller.checkAndUpdateSessionStartTime();
-        }
-      });
-    }
+    // 네이티브에서 저장한 충전 세션 정보 복구 (앱 재시작 후 지속 시간 복구)
+    _controller.restoreSessionFromNative().then((_) {
+      // 충전 중일 때만 모니터링 시작
+      if (mounted && widget.batteryInfo?.isCharging == true) {
+        _controller.handleChargingStart();
+        
+        // 앱 재시작 후 충전 중인 경우를 대비해 세션 시작 시간 재확인
+        // (세션이 나중에 시작될 수 있으므로)
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted && widget.batteryInfo?.isCharging == true) {
+            _controller.checkAndUpdateSessionStartTime();
+            // 네이티브 세션 정보도 다시 확인 (동기화)
+            _controller.restoreSessionFromNative();
+          }
+        });
+      }
+    });
+    
     // 마지막 충전 정보 로드
     _controller.loadLastChargingInfo();
   }
@@ -78,7 +84,12 @@ class _RealtimeChargingMonitorState extends State<RealtimeChargingMonitor> {
     final isCharging = widget.batteryInfo?.isCharging ?? false;
 
     if (!wasCharging && isCharging) {
-      _controller.handleChargingStart();
+      // 충전 시작 시 네이티브 세션 정보 복구 후 처리
+      _controller.restoreSessionFromNative().then((_) {
+        if (mounted) {
+          _controller.handleChargingStart();
+        }
+      });
     } else if (wasCharging && !isCharging) {
       _controller.handleChargingEnd();
     } else if (isCharging) {

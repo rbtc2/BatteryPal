@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../../../services/battery_service.dart';
 import '../../../services/last_charging_info_service.dart';
 import '../../../services/settings_service.dart';
+import '../../../services/native_battery_service.dart';
 import '../../../models/models.dart';
 import '../../../screens/analysis/widgets/charging_patterns/services/charging_session_service.dart';
 import '../../../models/charging_monitor_display_mode.dart';
@@ -98,6 +99,45 @@ class ChargingMonitorController extends ChangeNotifier {
     } catch (e) {
       // 세션 서비스 오류 시 조용히 처리
       debugPrint('ChargingMonitorController: 세션 시작 시간 업데이트 실패 - $e');
+    }
+  }
+
+  /// 네이티브에서 저장한 충전 세션 정보 복구
+  /// 앱 재시작 후에도 지속 시간을 정확히 표시하기 위해 사용
+  Future<void> restoreSessionFromNative() async {
+    try {
+      final sessionInfo = await NativeBatteryService.getChargingSessionInfo();
+      
+      if (sessionInfo == null) {
+        debugPrint('ChargingMonitorController: 네이티브 세션 정보 없음');
+        return;
+      }
+      
+      debugPrint('ChargingMonitorController: 네이티브 세션 정보 복구 - $sessionInfo');
+      
+      // 충전 중이고 세션 시작 시간이 있으면 복구
+      if (sessionInfo.isChargingActive && sessionInfo.startTime != null) {
+        // 네이티브에서 저장한 시작 시간이 더 이전이면 사용
+        // (앱이 꺼진 상태에서 충전이 시작되었을 수 있음)
+        if (_sessionStartTime == null || 
+            sessionInfo.startTime!.isBefore(_sessionStartTime!)) {
+          _sessionStartTime = sessionInfo.startTime;
+          debugPrint('ChargingMonitorController: 세션 시작 시간 복구됨 - $_sessionStartTime');
+          notifyListeners();
+          
+          // 지속 시간 타이머 업데이트
+          _updateDurationTimerBasedOnSettings();
+        }
+      } else if (!sessionInfo.isChargingActive) {
+        // 충전이 종료된 상태면 세션 시작 시간 초기화
+        if (_sessionStartTime != null) {
+          _sessionStartTime = null;
+          debugPrint('ChargingMonitorController: 충전 종료 상태로 세션 시작 시간 초기화');
+          notifyListeners();
+        }
+      }
+    } catch (e) {
+      debugPrint('ChargingMonitorController: 네이티브 세션 정보 복구 실패 - $e');
     }
   }
   

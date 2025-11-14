@@ -60,6 +60,10 @@ class MainActivity : FlutterActivity() {
                     val chargingCurrent = getChargingCurrentOnly()
                     result.success(chargingCurrent)
                 }
+                "getChargingSessionInfo" -> {
+                    val sessionInfo = getChargingSessionInfo()
+                    result.success(sessionInfo)
+                }
                 else -> {
                     result.notImplemented()
                 }
@@ -396,6 +400,43 @@ class MainActivity : FlutterActivity() {
         } catch (e: Exception) {
             android.util.Log.e("BatteryPal", "충전 전류만 가져오기 실패", e)
             return -1
+        }
+    }
+
+    /// 충전 세션 정보 가져오기 (SharedPreferences에서 읽기)
+    /// BatteryStateReceiver에서 저장한 충전 세션 정보를 읽어옵니다
+    private fun getChargingSessionInfo(): Map<String, Any?> {
+        return try {
+            val batteryStatePrefs = applicationContext.getSharedPreferences("battery_state", Context.MODE_PRIVATE)
+            
+            val startTime = batteryStatePrefs.getLong("charging_session_start_time", -1)
+            val endTime = batteryStatePrefs.getLong("charging_session_end_time", -1)
+            val isChargingActive = batteryStatePrefs.getBoolean("is_charging_active", false)
+            val startBatteryLevel = batteryStatePrefs.getFloat("charging_start_battery_level", -1f)
+            val endBatteryLevel = batteryStatePrefs.getFloat("charging_end_battery_level", -1f)
+            val chargingType = batteryStatePrefs.getString("charging_type", null)
+            
+            val result = mapOf<String, Any?>(
+                "startTime" to (if (startTime > 0) startTime else null),
+                "endTime" to (if (endTime > 0) endTime else null),
+                "isChargingActive" to isChargingActive,
+                "startBatteryLevel" to (if (startBatteryLevel >= 0) startBatteryLevel.toDouble() else null),
+                "endBatteryLevel" to (if (endBatteryLevel >= 0) endBatteryLevel.toDouble() else null),
+                "chargingType" to chargingType
+            )
+            
+            android.util.Log.d("BatteryPal", "충전 세션 정보: $result")
+            result
+        } catch (e: Exception) {
+            android.util.Log.e("BatteryPal", "충전 세션 정보 가져오기 실패", e)
+            mapOf<String, Any?>(
+                "startTime" to null,
+                "endTime" to null,
+                "isChargingActive" to false,
+                "startBatteryLevel" to null,
+                "endBatteryLevel" to null,
+                "chargingType" to null
+            )
         }
     }
 
