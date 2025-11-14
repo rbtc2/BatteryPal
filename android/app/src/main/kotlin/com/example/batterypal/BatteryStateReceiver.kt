@@ -122,88 +122,87 @@ class BatteryStateReceiver : BroadcastReceiver() {
     
     /// 배터리 상태 변화 처리 (기존 로직)
     private fun handleBatteryChanged(context: Context, intent: Intent) {
-            try {
-                val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
-                val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
-                val plugged = intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1)
-                val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+        try {
+            val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+            val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+            val plugged = intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1)
+            val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+            
+            val batteryPercent = if (level != -1 && scale != -1 && scale > 0) {
+                (level * 100.0) / scale
+            } else -1.0
+            
+            val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING || 
+                            status == BatteryManager.BATTERY_STATUS_FULL ||
+                            plugged != 0
+            
+            // 충전 타입 구분
+            val chargingType = when (plugged) {
+                BatteryManager.BATTERY_PLUGGED_AC -> "AC"
+                BatteryManager.BATTERY_PLUGGED_USB -> "USB"
+                BatteryManager.BATTERY_PLUGGED_WIRELESS -> "Wireless"
+                else -> "Unknown"
+            }
+            
+            Log.d("BatteryPal", "BatteryStateReceiver: 배터리 상태 변화 - ${batteryPercent}%, 충전중: $isCharging, 타입: $chargingType")
+            
+            // SharedPreferences를 통해 마지막 배터리 레벨 확인
+            val batteryStatePrefs = context.getSharedPreferences("battery_state", Context.MODE_PRIVATE)
+            val lastBatteryLevel = batteryStatePrefs.getFloat("last_battery_level", -1f)
+            val hasNotified = batteryStatePrefs.getBoolean("has_notified_charging_complete", false)
+            
+            // Flutter SharedPreferences에서 설정 읽기
+            val flutterPrefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+            
+            // 충전 완료 알림 체크 (100% 도달 시)
+            if (isCharging && 
+                batteryPercent >= 100.0 && 
+                lastBatteryLevel < 100.0 && 
+                !hasNotified) {
                 
-                val batteryPercent = if (level != -1 && scale != -1 && scale > 0) {
-                    (level * 100.0) / scale
-                } else -1.0
+                // 충전 완료 알림 설정 확인 (Flutter SharedPreferences에서 읽기)
+                // Flutter SharedPreferences는 키를 그대로 저장하므로 접두사 없이 읽기
+                val chargingCompleteEnabled = flutterPrefs.getBoolean("chargingCompleteNotificationEnabled", false)
+                val notifyOnFastCharging = flutterPrefs.getBoolean("chargingCompleteNotifyOnFastCharging", true)
+                val notifyOnNormalCharging = flutterPrefs.getBoolean("chargingCompleteNotifyOnNormalCharging", true)
                 
-                val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING || 
-                                status == BatteryManager.BATTERY_STATUS_FULL ||
-                                plugged != 0
+                Log.d("BatteryPal", "BatteryStateReceiver: 알림 설정 확인 - enabled: $chargingCompleteEnabled, fast: $notifyOnFastCharging, normal: $notifyOnNormalCharging")
                 
-                // 충전 타입 구분
-                val chargingType = when (plugged) {
-                    BatteryManager.BATTERY_PLUGGED_AC -> "AC"
-                    BatteryManager.BATTERY_PLUGGED_USB -> "USB"
-                    BatteryManager.BATTERY_PLUGGED_WIRELESS -> "Wireless"
-                    else -> "Unknown"
-                }
-                
-                Log.d("BatteryPal", "BatteryStateReceiver: 배터리 상태 변화 - ${batteryPercent}%, 충전중: $isCharging, 타입: $chargingType")
-                
-                // SharedPreferences를 통해 마지막 배터리 레벨 확인
-                val batteryStatePrefs = context.getSharedPreferences("battery_state", Context.MODE_PRIVATE)
-                val lastBatteryLevel = batteryStatePrefs.getFloat("last_battery_level", -1f)
-                val hasNotified = batteryStatePrefs.getBoolean("has_notified_charging_complete", false)
-                
-                // Flutter SharedPreferences에서 설정 읽기
-                val flutterPrefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-                
-                // 충전 완료 알림 체크 (100% 도달 시)
-                if (isCharging && 
-                    batteryPercent >= 100.0 && 
-                    lastBatteryLevel < 100.0 && 
-                    !hasNotified) {
+                if (chargingCompleteEnabled) {
+                    // 충전 타입 필터 확인
+                    val shouldNotify = when {
+                        notifyOnFastCharging && notifyOnNormalCharging -> true
+                        notifyOnFastCharging && chargingType == "AC" -> true
+                        notifyOnNormalCharging && (chargingType == "USB" || chargingType == "Wireless") -> true
+                        else -> false
+                    }
                     
-                    // 충전 완료 알림 설정 확인 (Flutter SharedPreferences에서 읽기)
-                    // Flutter SharedPreferences는 키를 그대로 저장하므로 접두사 없이 읽기
-                    val chargingCompleteEnabled = flutterPrefs.getBoolean("chargingCompleteNotificationEnabled", false)
-                    val notifyOnFastCharging = flutterPrefs.getBoolean("chargingCompleteNotifyOnFastCharging", true)
-                    val notifyOnNormalCharging = flutterPrefs.getBoolean("chargingCompleteNotifyOnNormalCharging", true)
+                    Log.d("BatteryPal", "BatteryStateReceiver: 알림 필요 여부: $shouldNotify")
                     
-                    Log.d("BatteryPal", "BatteryStateReceiver: 알림 설정 확인 - enabled: $chargingCompleteEnabled, fast: $notifyOnFastCharging, normal: $notifyOnNormalCharging")
-                    
-                    if (chargingCompleteEnabled) {
-                        // 충전 타입 필터 확인
-                        val shouldNotify = when {
-                            notifyOnFastCharging && notifyOnNormalCharging -> true
-                            notifyOnFastCharging && chargingType == "AC" -> true
-                            notifyOnNormalCharging && (chargingType == "USB" || chargingType == "Wireless") -> true
-                            else -> false
-                        }
+                    if (shouldNotify) {
+                        // 알림 표시
+                        showChargingCompleteNotification(context)
                         
-                        Log.d("BatteryPal", "BatteryStateReceiver: 알림 필요 여부: $shouldNotify")
-                        
-                        if (shouldNotify) {
-                            // 알림 표시
-                            showChargingCompleteNotification(context)
-                            
-                            // 알림 플래그 설정
-                            batteryStatePrefs.edit().putBoolean("has_notified_charging_complete", true).apply()
-                            Log.d("BatteryPal", "BatteryStateReceiver: 충전 완료 알림 표시됨")
-                        }
+                        // 알림 플래그 설정
+                        batteryStatePrefs.edit().putBoolean("has_notified_charging_complete", true).apply()
+                        Log.d("BatteryPal", "BatteryStateReceiver: 충전 완료 알림 표시됨")
                     }
                 }
-                
-                // 배터리 레벨이 100% 미만으로 떨어지면 알림 플래그 리셋
-                if (batteryPercent < 100.0) {
-                    batteryStatePrefs.edit().putBoolean("has_notified_charging_complete", false).apply()
-                }
-                
-                // 현재 상태 저장
-                batteryStatePrefs.edit()
-                    .putFloat("last_battery_level", batteryPercent.toFloat())
-                    .putBoolean("last_is_charging", isCharging)
-                    .apply()
-                
-            } catch (e: Exception) {
-                Log.e("BatteryPal", "BatteryStateReceiver: 오류 발생", e)
             }
+            
+            // 배터리 레벨이 100% 미만으로 떨어지면 알림 플래그 리셋
+            if (batteryPercent < 100.0) {
+                batteryStatePrefs.edit().putBoolean("has_notified_charging_complete", false).apply()
+            }
+            
+            // 현재 상태 저장
+            batteryStatePrefs.edit()
+                .putFloat("last_battery_level", batteryPercent.toFloat())
+                .putBoolean("last_is_charging", isCharging)
+                .apply()
+            
+        } catch (e: Exception) {
+            Log.e("BatteryPal", "BatteryStateReceiver: 오류 발생", e)
         }
     }
     
