@@ -2,7 +2,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../services/battery_service.dart';
 import '../../services/last_charging_info_service.dart';
+import '../../services/settings_service.dart';
 import '../../models/models.dart';
+import '../../screens/analysis/widgets/charging_patterns/services/charging_session_service.dart';
 
 /// 실시간 충전 모니터 위젯
 /// 충전 중일 때 심전도 그래프처럼 충전 속도를 실시간으로 표시
@@ -21,22 +23,156 @@ class RealtimeChargingMonitor extends StatefulWidget {
 class _RealtimeChargingMonitorState extends State<RealtimeChargingMonitor> {
   final List<double> _dataPoints = [];
   final int _maxDataPoints = 50; // 50개 포인트 유지
-  Timer? _updateTimer;
+  Timer? _updateTimer; // 충전 속도 업데이트 타이머 (200ms)
+  Timer? _durationUpdateTimer; // 지속 시간 업데이트 타이머 (1초)
   final BatteryService _batteryService = BatteryService();
   final LastChargingInfoService _lastChargingInfoService = LastChargingInfoService();
+  final ChargingSessionService _sessionService = ChargingSessionService();
+  final SettingsService _settingsService = SettingsService();
   
   // 마지막 충전 정보
   LastChargingInfo? _lastChargingInfo;
+  
+  // 현재 충전 세션 시작 시간
+  DateTime? _sessionStartTime;
 
   @override
   void initState() {
     super.initState();
     // 충전 중일 때만 모니터링 시작
     if (widget.batteryInfo?.isCharging == true) {
+      _updateSessionStartTime();
       _startRealTimeUpdate();
+      
+      // 앱 재시작 후 충전 중인 경우를 대비해 세션 시작 시간 재확인
+      // (세션이 나중에 시작될 수 있으므로)
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted && widget.batteryInfo?.isCharging == true) {
+          final currentSessionStartTime = _sessionService.sessionStartTime;
+          if (currentSessionStartTime != _sessionStartTime) {
+            _updateSessionStartTime();
+          }
+        }
+      });
     }
     // 마지막 충전 정보 로드
     _loadLastChargingInfo();
+  }
+  
+  /// 세션 시작 시간 업데이트
+  void _updateSessionStartTime() {
+    final sessionStartTime = _sessionService.sessionStartTime;
+    if (mounted) {
+      setState(() {
+        _sessionStartTime = sessionStartTime;
+      });
+      
+      // 지속 시간 표시 모드이고 충전 중이면 타이머 재시작
+      final displayMode = _settingsService.appSettings.chargingMonitorDisplayMode;
+      final isCharging = widget.batteryInfo?.isCharging ?? false;
+      if (displayMode == ChargingMonitorDisplayMode.currentWithDuration && 
+          isCharging && 
+          sessionStartTime != null) {
+        _startDurationUpdateTimer();
+      }
+    }
+  }
+  
+  /// 지속 시간 업데이트 타이머 시작
+  void _startDurationUpdateTimer() {
+    // 기존 타이머가 있으면 취소
+    _durationUpdateTimer?.cancel();
+    
+    // 설정 모드 확인
+    final displayMode = _settingsService.appSettings.chargingMonitorDisplayMode;
+    if (displayMode != ChargingMonitorDisplayMode.currentWithDuration) {
+      // 지속 시간 표시 모드가 아니면 타이머 시작하지 않음
+      return;
+    }
+    
+    // 세션 시작 시간이 없으면 타이머 시작하지 않음
+    if (_sessionStartTime == null) {
+      return;
+    }
+    
+    _durationUpdateTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        _durationUpdateTimer = null;
+        return;
+      }
+
+      // 충전 중이고 세션 시작 시간이 있으면 UI 업데이트
+      final batteryInfo = _batteryService.currentBatteryInfo;
+      final currentDisplayMode = _settingsService.appSettings.chargingMonitorDisplayMode;
+      
+      // 세션 시작 시간이 변경되었을 수 있으므로 재확인
+      final currentSessionStartTime = _sessionService.sessionStartTime;
+      if (currentSessionStartTime != _sessionStartTime) {
+        setState(() {
+          _sessionStartTime = currentSessionStartTime;
+        });
+      }
+      
+      if (batteryInfo != null && 
+          batteryInfo.isCharging && 
+          _sessionStartTime != null &&
+          currentDisplayMode == ChargingMonitorDisplayMode.currentWithDuration) {
+        setState(() {
+          // 지속 시간 업데이트를 위해 setState 호출
+        });
+      } else {
+        // 충전 중이 아니거나 설정이 변경되었으면 타이머 중지
+        timer.cancel();
+        _durationUpdateTimer = null;
+      }
+    });
+  }
+  
+  /// 지속 시간 업데이트 타이머 중지
+  void _stopDurationUpdateTimer() {
+    _durationUpdateTimer?.cancel();
+    _durationUpdateTimer = null;
+  }
+
+  /// 경과 시간 계산
+  /// 세션 시작 시간으로부터 현재까지의 경과 시간을 반환
+  Duration? _calculateElapsedDuration() {
+    if (_sessionStartTime == null) {
+      return null;
+    }
+    
+    final duration = DateTime.now().difference(_sessionStartTime!);
+    
+    // 음수 duration 방지 (시스템 시간 변경 등 엣지 케이스)
+    if (duration.isNegative) {
+      return null;
+    }
+    
+    return duration;
+  }
+
+  /// 지속 시간 포맷팅
+  /// Duration을 "X시간 Y분" 또는 "Y분" 형식으로 변환
+  String _formatDuration(Duration duration) {
+    // 음수 duration 방지
+    if (duration.isNegative) {
+      return '0분';
+    }
+    
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes.remainder(60);
+    
+    // 0분일 때 처리
+    if (hours == 0 && minutes == 0) {
+      return '0분';
+    }
+    
+    if (hours > 0) {
+      return '$hours시간 $minutes분';
+    } else {
+      return '$minutes분';
+    }
   }
 
   /// 마지막 충전 정보 로드
@@ -116,16 +252,42 @@ class _RealtimeChargingMonitorState extends State<RealtimeChargingMonitor> {
 
     if (!wasCharging && isCharging) {
       // 충전 시작
+      _updateSessionStartTime();
       _startRealTimeUpdate();
     } else if (wasCharging && !isCharging) {
       // 충전 종료
       _stopRealTimeUpdate();
+      // 세션 시작 시간 초기화
+      setState(() {
+        _sessionStartTime = null;
+      });
       // 충전 종료 시 마지막 충전 정보 다시 로드
       _loadLastChargingInfo();
+    } else if (isCharging) {
+      // 충전 중일 때 세션 시작 시간이 변경될 수 있으므로 주기적으로 확인
+      // (세션이 나중에 시작될 수 있음)
+      final currentSessionStartTime = _sessionService.sessionStartTime;
+      if (currentSessionStartTime != _sessionStartTime) {
+        _updateSessionStartTime();
+      }
+      
+      // 설정 모드가 변경되었을 수 있으므로 타이머 재시작 확인
+      final displayMode = _settingsService.appSettings.chargingMonitorDisplayMode;
+      if (displayMode == ChargingMonitorDisplayMode.currentWithDuration && 
+          _sessionStartTime != null) {
+        // 지속 시간 표시 모드이고 세션이 있으면 타이머 시작
+        if (_durationUpdateTimer == null) {
+          _startDurationUpdateTimer();
+        }
+      } else {
+        // 지속 시간 표시 모드가 아니면 타이머 중지
+        _stopDurationUpdateTimer();
+      }
     }
   }
 
   void _startRealTimeUpdate() {
+    // 충전 속도 업데이트 타이머 (200ms)
     _updateTimer?.cancel();
     _updateTimer = Timer.periodic(const Duration(milliseconds: 200), (timer) {
       if (!mounted) {
@@ -150,11 +312,15 @@ class _RealtimeChargingMonitorState extends State<RealtimeChargingMonitor> {
         _updateTimer = null;
       }
     });
+
+    // 지속 시간 업데이트 타이머 시작 (설정 모드에 따라 조건부)
+    _startDurationUpdateTimer();
   }
 
   void _stopRealTimeUpdate() {
     _updateTimer?.cancel();
     _updateTimer = null;
+    _stopDurationUpdateTimer();
     setState(() {
       _dataPoints.clear();
     });
@@ -162,9 +328,39 @@ class _RealtimeChargingMonitorState extends State<RealtimeChargingMonitor> {
 
   @override
   Widget build(BuildContext context) {
+    // 설정 변경 감지
+    return ListenableBuilder(
+      listenable: _settingsService,
+      builder: (context, child) {
+        // 설정 변경 시 지속 시간 타이머 재시작 확인
+        final displayMode = _settingsService.appSettings.chargingMonitorDisplayMode;
+        final isCharging = widget.batteryInfo?.isCharging ?? false;
+        
+        if (isCharging && _sessionStartTime != null) {
+          if (displayMode == ChargingMonitorDisplayMode.currentWithDuration) {
+            // 지속 시간 표시 모드이고 세션이 있으면 타이머 시작
+            if (_durationUpdateTimer == null) {
+              _startDurationUpdateTimer();
+            }
+          } else {
+            // 지속 시간 표시 모드가 아니면 타이머 중지
+            _stopDurationUpdateTimer();
+          }
+        }
+        
+        return _buildChargingMonitor(context);
+      },
+    );
+  }
+
+  /// 충전 모니터 UI 빌드
+  Widget _buildChargingMonitor(BuildContext context) {
     final isCharging = widget.batteryInfo?.isCharging ?? false;
     final current = widget.batteryInfo?.chargingCurrent ?? 0;
     final currentAbs = current.abs();
+    
+    // 현재 표시 모드 가져오기
+    final displayMode = _settingsService.appSettings.chargingMonitorDisplayMode;
 
     // 충전 중이 아닐 때 표시할 UI
     if (!isCharging) {
@@ -315,8 +511,46 @@ class _RealtimeChargingMonitorState extends State<RealtimeChargingMonitor> {
             ],
           ),
 
+          // 지속 시간 표시 (설정에 따라 조건부 렌더링)
+          if (displayMode == ChargingMonitorDisplayMode.currentWithDuration) ...[
+            const SizedBox(height: 16),
+            _buildDurationDisplay(context),
+          ],
+
         ],
       ),
+    );
+  }
+
+  /// 지속 시간 표시 위젯
+  Widget _buildDurationDisplay(BuildContext context) {
+    final elapsedDuration = _calculateElapsedDuration();
+    
+    if (elapsedDuration == null) {
+      // 세션 시작 시간이 없으면 표시하지 않음
+      return const SizedBox.shrink();
+    }
+
+    final durationText = _formatDuration(elapsedDuration);
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(
+          Icons.access_time,
+          color: Colors.green.withValues(alpha: 0.7),
+          size: 18,
+        ),
+        const SizedBox(width: 6),
+        Text(
+          '충전 중: $durationText',
+          style: TextStyle(
+            color: Colors.green.withValues(alpha: 0.8),
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
     );
   }
 
@@ -399,6 +633,7 @@ class _RealtimeChargingMonitorState extends State<RealtimeChargingMonitor> {
   @override
   void dispose() {
     _updateTimer?.cancel();
+    _durationUpdateTimer?.cancel();
     super.dispose();
   }
 }
