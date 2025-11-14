@@ -42,20 +42,18 @@ class _RealtimeChargingMonitorState extends State<RealtimeChargingMonitor> {
     _controller.addListener(_onControllerChanged);
     
     // 네이티브에서 저장한 충전 세션 정보 복구 (앱 재시작 후 지속 시간 복구)
+    // await로 완료될 때까지 기다려야 합니다
     _controller.restoreSessionFromNative().then((_) {
-      // 충전 중일 때만 모니터링 시작
+      // 현재 충전 중이면 실시간 업데이트 시작
       if (mounted && widget.batteryInfo?.isCharging == true) {
-        _controller.handleChargingStart();
-        
-        // 앱 재시작 후 충전 중인 경우를 대비해 세션 시작 시간 재확인
-        // (세션이 나중에 시작될 수 있으므로)
-        Future.delayed(const Duration(seconds: 2), () {
-          if (mounted && widget.batteryInfo?.isCharging == true) {
-            _controller.checkAndUpdateSessionStartTime();
-            // 네이티브 세션 정보도 다시 확인 (동기화)
-            _controller.restoreSessionFromNative();
-          }
-        });
+        // 세션 시작 시간이 아직 설정되지 않았으면 설정
+        if (_controller.sessionStartTime == null) {
+          // 네이티브에서 복구하지 못했으면 현재 시간 사용
+          _controller.handleChargingStart();
+        } else {
+          // 네이티브에서 복구했으면 실시간 업데이트만 시작
+          _controller.startRealTimeUpdate();
+        }
       }
     });
     
@@ -79,22 +77,17 @@ class _RealtimeChargingMonitorState extends State<RealtimeChargingMonitor> {
   }
   
   /// 충전 상태 변화 처리
+  /// 주의: 스트림 리스너가 자동으로 충전 시작/종료를 감지하므로,
+  /// 여기서는 UI 업데이트만 처리합니다.
   void _handleChargingStateChange(RealtimeChargingMonitor oldWidget) {
-    final wasCharging = oldWidget.batteryInfo?.isCharging ?? false;
     final isCharging = widget.batteryInfo?.isCharging ?? false;
 
-    if (!wasCharging && isCharging) {
-      // 충전 시작 시 네이티브 세션 정보 복구 후 처리
-      _controller.restoreSessionFromNative().then((_) {
-        if (mounted) {
-          _controller.handleChargingStart();
-        }
-      });
-    } else if (wasCharging && !isCharging) {
-      _controller.handleChargingEnd();
-    } else if (isCharging) {
+    // 스트림 리스너가 자동으로 처리하므로, 여기서는 추가 처리만 수행
+    if (isCharging) {
+      // 충전 중일 때는 업데이트만 처리
       _controller.handleChargingUpdate();
     }
+    // 충전 시작/종료는 스트림 리스너에서 자동 처리됨
   }
 
   @override

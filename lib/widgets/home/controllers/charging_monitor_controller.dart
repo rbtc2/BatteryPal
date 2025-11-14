@@ -44,6 +44,12 @@ class ChargingMonitorController extends ChangeNotifier {
   /// 지속 시간 업데이트 타이머
   Timer? _durationUpdateTimer;
   
+  /// 배터리 정보 스트림 구독
+  StreamSubscription<BatteryInfo>? _batteryInfoSubscription;
+  
+  /// 이전 충전 상태 (충전 시작/종료 감지용)
+  bool _wasCharging = false;
+  
   /// 마지막 충전 정보
   LastChargingInfo? _lastChargingInfo;
   LastChargingInfo? get lastChargingInfo => _lastChargingInfo;
@@ -63,6 +69,9 @@ class ChargingMonitorController extends ChangeNotifier {
     // 설정 변경 리스너 등록
     _settingsService.addListener(_onSettingsChanged);
     _lastDisplayMode = _settingsService.appSettings.chargingMonitorDisplayMode;
+    
+    // 배터리 스트림 리스너 설정 (충전 상태 변화 자동 감지)
+    _setupBatteryStreamListener();
   }
   
   /// 설정 변경 핸들러
@@ -74,6 +83,88 @@ class ChargingMonitorController extends ChangeNotifier {
       _lastDisplayMode = currentDisplayMode;
       _updateDurationTimerBasedOnSettings();
     }
+  }
+
+  /// 배터리 스트림 리스너 설정
+  /// 충전 상태 변화를 자동으로 감지하여 세션 시작 시간을 관리합니다
+  void _setupBatteryStreamListener() {
+    _batteryInfoSubscription?.cancel();
+    
+    _batteryInfoSubscription = _batteryService.batteryInfoStream.listen((batteryInfo) {
+      final isCharging = batteryInfo.isCharging;
+      
+      // 충전 상태 변화 감지
+      if (!_wasCharging && isCharging) {
+        // 충전 시작: 세션 시작 시간 설정
+        _handleChargingStartFromStream(batteryInfo);
+      } else if (_wasCharging && !isCharging) {
+        // 충전 종료: 세션 시작 시간 리셋
+        _handleChargingEndFromStream();
+      }
+      
+      _wasCharging = isCharging;
+    });
+    
+    // 초기 충전 상태 설정
+    final currentInfo = _batteryService.currentBatteryInfo;
+    if (currentInfo != null) {
+      _wasCharging = currentInfo.isCharging;
+    }
+    
+    debugPrint('ChargingMonitorController: 배터리 스트림 리스너 설정 완료');
+  }
+
+  /// 스트림에서 충전 시작 감지 시 처리
+  /// 네이티브에서 저장한 세션 정보를 우선적으로 사용합니다
+  Future<void> _handleChargingStartFromStream(BatteryInfo batteryInfo) async {
+    try {
+      debugPrint('ChargingMonitorController: 스트림에서 충전 시작 감지');
+      
+      // 1. 네이티브에서 저장한 세션 정보 확인 (우선순위)
+      final sessionInfo = await NativeBatteryService.getChargingSessionInfo();
+      
+      if (sessionInfo != null && 
+          sessionInfo.isChargingActive && 
+          sessionInfo.startTime != null) {
+        // 네이티브에서 저장한 시작 시간 사용 (앱이 꺼진 상태에서 충전 시작)
+        _sessionStartTime = sessionInfo.startTime;
+        debugPrint('ChargingMonitorController: 네이티브 세션 시작 시간 사용 - $_sessionStartTime');
+      } else {
+        // 네이티브 정보가 없으면 현재 시간 사용
+        _sessionStartTime = DateTime.now();
+        debugPrint('ChargingMonitorController: 새 세션 시작 - $_sessionStartTime');
+      }
+      
+      notifyListeners();
+      _updateDurationTimerBasedOnSettings();
+      
+      // 실시간 업데이트 시작
+      startRealTimeUpdate();
+    } catch (e) {
+      debugPrint('ChargingMonitorController: 충전 시작 처리 실패 - $e');
+      // 에러가 발생해도 현재 시간으로 세션 시작
+      _sessionStartTime = DateTime.now();
+      notifyListeners();
+      startRealTimeUpdate();
+    }
+  }
+
+  /// 스트림에서 충전 종료 감지 시 처리
+  /// 세션 시작 시간을 리셋하고 실시간 업데이트를 중지합니다
+  void _handleChargingEndFromStream() {
+    debugPrint('ChargingMonitorController: 스트림에서 충전 종료 감지');
+    
+    // 충전 종료: 세션 시작 시간 리셋
+    _sessionStartTime = null;
+    debugPrint('ChargingMonitorController: 충전 종료 - 세션 시작 시간 리셋');
+    
+    // 실시간 업데이트 중지
+    stopRealTimeUpdate();
+    
+    // 마지막 충전 정보 로드
+    loadLastChargingInfo();
+    
+    notifyListeners();
   }
   
   /// 세션 시작 시간 확인 및 업데이트
@@ -135,6 +226,20 @@ class ChargingMonitorController extends ChangeNotifier {
           debugPrint('ChargingMonitorController: 충전 종료 상태로 세션 시작 시간 초기화');
           notifyListeners();
         }
+      }
+      
+      // 현재 충전 중인데 세션 시작 시간이 없으면 네이티브 정보 사용
+      // (앱 재시작 시 이미 충전 중인 경우를 처리)
+      final currentInfo = _batteryService.currentBatteryInfo;
+      if (currentInfo != null && 
+          currentInfo.isCharging && 
+          _sessionStartTime == null &&
+          sessionInfo.isChargingActive && 
+          sessionInfo.startTime != null) {
+        _sessionStartTime = sessionInfo.startTime;
+        debugPrint('ChargingMonitorController: 현재 충전 중 - 네이티브 세션 시작 시간 복구 - $_sessionStartTime');
+        notifyListeners();
+        _updateDurationTimerBasedOnSettings();
       }
     } catch (e) {
       debugPrint('ChargingMonitorController: 네이티브 세션 정보 복구 실패 - $e');
@@ -271,17 +376,36 @@ class ChargingMonitorController extends ChangeNotifier {
   }
 
   /// 충전 시작 처리
+  /// 주의: 세션 시작 시간은 스트림 리스너에서 자동으로 설정됩니다.
+  /// 이 메서드는 외부에서 명시적으로 호출될 때 사용됩니다.
   void handleChargingStart() {
-    updateSessionStartTime();
+    // 세션 시작 시간이 없으면 현재 시간으로 설정
+    if (_sessionStartTime == null) {
+      _sessionStartTime = DateTime.now();
+      debugPrint('ChargingMonitorController: handleChargingStart - 세션 시작 시간 설정 - $_sessionStartTime');
+      notifyListeners();
+      _updateDurationTimerBasedOnSettings();
+    }
+    
+    // 실시간 업데이트 시작
     startRealTimeUpdate();
   }
   
   /// 충전 종료 처리
+  /// 주의: 세션 시작 시간은 스트림 리스너에서 자동으로 리셋됩니다.
+  /// 이 메서드는 외부에서 명시적으로 호출될 때 사용됩니다.
   void handleChargingEnd() {
-    stopRealTimeUpdate();
+    // 세션 시작 시간 리셋
     _sessionStartTime = null;
-    notifyListeners();
+    debugPrint('ChargingMonitorController: handleChargingEnd - 세션 시작 시간 리셋');
+    
+    // 실시간 업데이트 중지
+    stopRealTimeUpdate();
+    
+    // 마지막 충전 정보 로드
     loadLastChargingInfo();
+    
+    notifyListeners();
   }
   
   /// 충전 중 업데이트 처리
@@ -357,6 +481,10 @@ class ChargingMonitorController extends ChangeNotifier {
   void dispose() {
     // 설정 리스너 제거
     _settingsService.removeListener(_onSettingsChanged);
+    
+    // 배터리 스트림 구독 정리
+    _batteryInfoSubscription?.cancel();
+    _batteryInfoSubscription = null;
     
     // 타이머 정리
     _updateTimer?.cancel();
