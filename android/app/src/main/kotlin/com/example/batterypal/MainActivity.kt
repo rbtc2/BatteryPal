@@ -685,30 +685,74 @@ class MainActivity : FlutterActivity() {
             while (usageEvents.hasNextEvent()) {
                 usageEvents.getNextEvent(event)
                 
+                // 날짜 범위를 벗어나는 이벤트는 무시 (안전성 검증)
+                if (event.timeStamp < startTime || event.timeStamp > endTime) {
+                    android.util.Log.w("BatteryPal", "날짜 범위를 벗어나는 이벤트 무시: ${java.util.Date(event.timeStamp)}")
+                    continue
+                }
+                
                 when (event.eventType) {
                     UsageEvents.Event.SCREEN_INTERACTIVE -> {
-                        // 화면이 켜짐
+                        // 이미 화면이 켜져있던 경우, 이전 시간을 먼저 처리
+                        if (lastScreenOnTime != null) {
+                            // 이전 켜짐 시간이 현재 켜짐 시간보다 이전인 경우만 처리
+                            // (중복 이벤트 방지)
+                            if (lastScreenOnTime < event.timeStamp) {
+                                // 이전 켜짐부터 현재 켜짐까지는 이미 화면이 켜져있었으므로
+                                // 이전 시간을 현재 시간으로 업데이트만 함 (중복 계산 방지)
+                                android.util.Log.d("BatteryPal", "중복 SCREEN_INTERACTIVE 이벤트: ${java.util.Date(lastScreenOnTime)} -> ${java.util.Date(event.timeStamp)}")
+                            }
+                        }
                         lastScreenOnTime = event.timeStamp
                         android.util.Log.d("BatteryPal", "화면 켜짐: ${java.util.Date(event.timeStamp)}")
                     }
                     UsageEvents.Event.SCREEN_NON_INTERACTIVE -> {
                         // 화면이 꺼짐
                         if (lastScreenOnTime != null) {
-                            val duration = event.timeStamp - lastScreenOnTime
-                            screenOnTime += duration
-                            android.util.Log.d("BatteryPal", "화면 꺼짐: ${java.util.Date(event.timeStamp)}, 지속 시간: ${duration / 1000 / 60}분")
-                            lastScreenOnTime = null
+                            // 날짜 범위 내에서만 계산 (안전성 검증)
+                            val onStart = kotlin.math.max(lastScreenOnTime, startTime)
+                            val onEnd = kotlin.math.min(event.timeStamp, endTime)
+                            
+                            if (onEnd > onStart) {
+                                val duration = onEnd - onStart
+                                // 음수나 비정상적인 값 방지
+                                if (duration > 0 && duration <= (endTime - startTime)) {
+                                    screenOnTime += duration
+                                    android.util.Log.d("BatteryPal", "화면 꺼짐: ${java.util.Date(event.timeStamp)}, 지속 시간: ${duration / 1000 / 60}분")
+                                } else {
+                                    android.util.Log.w("BatteryPal", "비정상적인 지속 시간 무시: ${duration}ms")
+                                }
+                            }
                         }
+                        lastScreenOnTime = null
                     }
                 }
             }
             
             // 아직 화면이 켜져있는 경우 (마지막 이벤트가 SCREEN_INTERACTIVE인 경우)
+            // 하지만 날짜 범위를 벗어나면 안 됨 (안전성 검증)
             if (lastScreenOnTime != null) {
                 val currentTime = System.currentTimeMillis()
-                val duration = currentTime - lastScreenOnTime
-                screenOnTime += duration
-                android.util.Log.d("BatteryPal", "화면이 아직 켜져있음, 추가 시간: ${duration / 1000 / 60}분")
+                val onStart = kotlin.math.max(lastScreenOnTime, startTime)
+                val onEnd = kotlin.math.min(currentTime, endTime) // 날짜 범위를 넘지 않도록
+                
+                if (onEnd > onStart) {
+                    val duration = onEnd - onStart
+                    // 음수나 비정상적인 값 방지
+                    if (duration > 0 && duration <= (endTime - startTime)) {
+                        screenOnTime += duration
+                        android.util.Log.d("BatteryPal", "화면이 아직 켜져있음, 추가 시간: ${duration / 1000 / 60}분")
+                    } else {
+                        android.util.Log.w("BatteryPal", "비정상적인 추가 시간 무시: ${duration}ms")
+                    }
+                }
+            }
+            
+            // 최대값 제한: 하루는 24시간을 넘을 수 없음 (안전성 검증)
+            val maxTimeForDay = 24 * 60 * 60 * 1000L // 24시간을 밀리초로
+            if (screenOnTime > maxTimeForDay) {
+                android.util.Log.w("BatteryPal", "화면 켜짐 시간이 24시간을 초과: ${screenOnTime}ms (${screenOnTime / 1000.0 / 60.0 / 60.0}시간) -> ${maxTimeForDay}ms (24시간)로 제한")
+                screenOnTime = maxTimeForDay
             }
             
             val hours = screenOnTime / 1000.0 / 60.0 / 60.0
