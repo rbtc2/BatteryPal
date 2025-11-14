@@ -12,6 +12,7 @@ class StatCard extends StatelessWidget {
   final String trend;
   final Color trendColor;
   final IconData icon;
+  final bool highlightNumbers; // 숫자만 크게 표시할지 여부
 
   const StatCard({
     super.key,
@@ -22,6 +23,7 @@ class StatCard extends StatelessWidget {
     required this.trend,
     required this.trendColor,
     required this.icon,
+    this.highlightNumbers = false,
   });
 
   @override
@@ -87,35 +89,37 @@ class StatCard extends StatelessWidget {
           const SizedBox(height: 8),
           
           // 메인 값 + 단위 (가로로 배치, 줄바꿈 방지)
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Flexible(
-                child: Text(
-                  mainValue,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+          highlightNumbers
+              ? _buildHighlightedNumbers(context, mainValue, unit)
+              : Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        mainValue,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (unit.isNotEmpty) ...[
+                      const SizedBox(width: 4),
+                      Text(
+                        unit,
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                        ),
+                        maxLines: 1,
+                      ),
+                    ],
+                  ],
                 ),
-              ),
-              if (unit.isNotEmpty) ...[
-                const SizedBox(width: 4),
-                Text(
-                  unit,
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                  ),
-                  maxLines: 1,
-                ),
-              ],
-            ],
-          ),
           
           const SizedBox(height: 4),
           
@@ -171,6 +175,74 @@ class StatCard extends StatelessWidget {
     if (trend.startsWith('+')) return Icons.trending_up;
     if (trend.startsWith('-')) return Icons.trending_down;
     return Icons.trending_flat;
+  }
+
+  /// 숫자만 크게 표시하는 위젯 빌드
+  /// 예: "1시간 7분" -> "1"(큰) "시간"(작은, unit과 같은 스타일) "7"(큰) "분"(작은, unit과 같은 스타일)
+  Widget _buildHighlightedNumbers(BuildContext context, String mainValue, String unit) {
+    // mainValue에 전체 문자열이 들어옴 (예: "1시간 7분")
+    final fullText = mainValue;
+    
+    // 숫자가 없으면 일반 텍스트로 표시
+    final RegExp numberRegex = RegExp(r'\d+');
+    if (!numberRegex.hasMatch(fullText)) {
+      return Text(
+        fullText,
+        style: TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+          color: Theme.of(context).colorScheme.onSurface,
+        ),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      );
+    }
+    
+    // 숫자와 비숫자를 분리하여 TextSpan 리스트 생성
+    // 숫자는 16px bold, 비숫자(시간/분)는 10px (다른 카드의 unit과 동일한 스타일)
+    final textSpans = <TextSpan>[];
+    final unitStyle = TextStyle(
+      fontSize: 10,
+      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+    );
+    final numberStyle = TextStyle(
+      fontSize: 16,
+      fontWeight: FontWeight.bold,
+      color: Theme.of(context).colorScheme.onSurface,
+    );
+    
+    int lastIndex = 0;
+    for (final match in numberRegex.allMatches(fullText)) {
+      // 숫자 앞의 텍스트 (작은 폰트, unit과 같은 스타일)
+      if (match.start > lastIndex) {
+        textSpans.add(TextSpan(
+          text: fullText.substring(lastIndex, match.start),
+          style: unitStyle,
+        ));
+      }
+      
+      // 숫자 (큰 폰트)
+      textSpans.add(TextSpan(
+        text: match.group(0),
+        style: numberStyle,
+      ));
+      
+      lastIndex = match.end;
+    }
+    
+    // 마지막 숫자 뒤의 텍스트 (작은 폰트, unit과 같은 스타일)
+    if (lastIndex < fullText.length) {
+      textSpans.add(TextSpan(
+        text: fullText.substring(lastIndex),
+        style: unitStyle,
+      ));
+    }
+    
+    return RichText(
+      text: TextSpan(children: textSpans),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
   }
 }
 
