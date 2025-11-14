@@ -1,6 +1,37 @@
 import 'package:flutter/material.dart';
 import '../models/optimization_models.dart';
-import '../../../../../widgets/common/common_widgets.dart';
+// 백업 파일: 더 이상 사용되지 않음
+// import '../../../../../widgets/common/common_widgets.dart';
+
+/// 백업 파일용 간단한 CustomCard 구현
+class CustomCard extends StatelessWidget {
+  final Widget child;
+  final double? elevation;
+  final EdgeInsetsGeometry? padding;
+  final BorderRadius? borderRadius;
+  
+  const CustomCard({
+    super.key,
+    required this.child,
+    this.elevation,
+    this.padding,
+    this.borderRadius,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: elevation ?? 2,
+      shape: borderRadius != null 
+          ? RoundedRectangleBorder(borderRadius: borderRadius!)
+          : null,
+      child: Padding(
+        padding: padding ?? const EdgeInsets.all(16),
+        child: child,
+      ),
+    );
+  }
+}
 
 /// 섹션 2: 자동 최적화 설정
 /// 원클릭 최적화 버튼을 눌렀을 때 실행될 항목을 선택하는 토글만 제공

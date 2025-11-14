@@ -1,4 +1,32 @@
-import '../utils/app_utils.dart';
+// 백업 파일: 더 이상 사용되지 않음
+// import '../../lib/utils/app_utils.dart';
+
+/// 백업 파일용 간단한 TimeUtils 구현
+class TimeUtils {
+  static String formatDuration(Duration duration) {
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes.remainder(60);
+    if (hours > 0) {
+      return '$hours시간 $minutes분';
+    } else {
+      return '$minutes분';
+    }
+  }
+  
+  static String formatRelativeTime(DateTime dateTime) {
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
+    if (difference.inSeconds < 60) {
+      return '${difference.inSeconds}초 전';
+    } else if (difference.inMinutes < 60) {
+      return '${difference.inMinutes}분 전';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours}시간 전';
+    } else {
+      return '${dateTime.month}/${dateTime.day} ${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')}';
+    }
+  }
+}
 
 /// 배터리 최적화 결과 모델
 class OptimizationResult {

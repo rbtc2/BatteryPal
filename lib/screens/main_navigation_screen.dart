@@ -19,7 +19,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   // ignore: prefer_final_fields
   bool _isProUser = false;
   
-  // 분석 탭의 초기 탭 인덱스 (최적화 탭으로 이동할 때 사용)
+  // 분석 탭의 초기 탭 인덱스
   int _analysisTabInitialIndex = 0;
 
   // 3개 탭 페이지들 (Pro 상태 전달)
@@ -36,13 +36,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     SettingsTab(isProUser: _isProUser, onProToggle: _handleProUpgrade),
   ];
   
-  /// 분석 탭의 최적화 탭으로 이동
-  void navigateToAnalysisOptimization() {
-    setState(() {
-      _analysisTabInitialIndex = 2; // 최적화 탭 인덱스
-      _currentIndex = 1; // 분석 탭으로 이동
-    });
-  }
 
   @override
   Widget build(BuildContext context) {

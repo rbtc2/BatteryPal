@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'widgets/battery_drain_tab.dart';
 import 'widgets/charging_patterns_tab.dart';
-import 'widgets/optimization_tab.dart';
 import '../../utils/dialog_utils.dart';
 
-/// 분석 탭 화면 - 3개의 하위 탭으로 구성된 탭 인터페이스
+/// 분석 탭 화면 - 2개의 하위 탭으로 구성된 탭 인터페이스
 class AnalysisTab extends StatefulWidget {
   final bool isProUser;
   final VoidCallback onProToggle;
@@ -28,7 +27,7 @@ class _AnalysisTabState extends State<AnalysisTab> with TickerProviderStateMixin
   void initState() {
     super.initState();
     _tabController = TabController(
-      length: 3,
+      length: 2,
       vsync: this,
       initialIndex: widget.initialTabIndex,
     );
@@ -91,10 +90,6 @@ class _AnalysisTabState extends State<AnalysisTab> with TickerProviderStateMixin
               icon: Icon(Icons.charging_station),
               text: '충전',
             ),
-            Tab(
-              icon: Icon(Icons.tune),
-              text: '최적화',
-            ),
           ],
         ),
       ),
@@ -108,10 +103,6 @@ class _AnalysisTabState extends State<AnalysisTab> with TickerProviderStateMixin
             tabIndex: 0, // 소모 탭 인덱스
           ),
           ChargingPatternsTab(
-            isProUser: widget.isProUser,
-            onProUpgrade: widget.onProToggle,
-          ),
-          OptimizationTab(
             isProUser: widget.isProUser,
             onProUpgrade: widget.onProToggle,
           ),

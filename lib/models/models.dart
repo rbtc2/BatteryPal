@@ -7,7 +7,6 @@ export 'app_usage_data.dart';
 export 'battery_display_cycle_speed.dart';
 export 'charging_monitor_display_mode.dart';
 export 'app_settings.dart';
-export 'optimization_result.dart';
 
 // 기존 모델들
 export 'battery_history_models.dart';

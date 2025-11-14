@@ -1,7 +1,31 @@
 import 'package:flutter/material.dart';
-import '../../../../../services/optimization_snapshot_service.dart';
-import '../../../../../services/system_settings_service.dart';
+// 백업 파일: 더 이상 사용되지 않음
+// import '../../../../../services/optimization_snapshot_service.dart';
+// import '../../../../../services/system_settings_service.dart';
 import '../models/optimization_models.dart';
+
+/// 백업 파일용 간단한 서비스 구현
+class OptimizationSnapshotService {
+  Future<String?> getManualSettingPreviousValue(String itemId) async {
+    return null;
+  }
+  
+  Future<bool> saveManualSettingPreviousValue(String itemId, String value) async {
+    return false;
+  }
+  
+  Future<bool> clearManualSettingPreviousValue(String itemId) async {
+    return false;
+  }
+}
+
+class SystemSettingsService {
+  Future<bool?> isBatterySaverEnabled() async => null;
+  Future<String?> getNetworkConnectionType() async => null;
+  Future<String?> getLocationServiceStatus() async => null;
+  Future<String?> getSyncStatus() async => null;
+  Future<int?> getScreenTimeout() async => null;
+}
 
 /// 섹션 3: 수동 설정 항목
 class ManualOptimizationCard extends StatefulWidget {
