@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../charging_patterns/widgets/stat_card.dart';
 import '../../../../../services/discharge_current_calculator.dart';
 import '../../../../../services/screen_time_service.dart';
@@ -38,6 +40,13 @@ class _DrainStatsCardState extends State<DrainStatsCard> with WidgetsBindingObse
   bool _isLoadingScreenTime = false;
   bool _hasUsageStatsPermission = false;
   
+  // 날짜 변경 감지를 위한 상태
+  DateTime? _lastLoadedDate; // 마지막으로 로드한 날짜
+  Timer? _midnightTimer; // 자정 타이머
+  
+  // Android 날짜 변경 확인을 위한 MethodChannel
+  static const MethodChannel _dateChangeChannel = MethodChannel('com.example.batterypal/system_settings');
+  
   final DischargeCurrentCalculator _calculator = DischargeCurrentCalculator();
   final ScreenTimeService _screenTimeService = ScreenTimeService();
 
@@ -46,18 +55,26 @@ class _DrainStatsCardState extends State<DrainStatsCard> with WidgetsBindingObse
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     // 탭 진입 시 계산
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // Android에서 날짜 변경 플래그 확인 (앱 종료 상태에서도 감지)
+      await _checkDateChangeFromAndroid();
+      
       // 초기 날짜 콜백 호출
       final targetDate = _getTargetDate();
+      _lastLoadedDate = targetDate;
       widget.onDateChanged?.call(targetDate);
       
       _calculateDischargeCurrent();
       _checkUsageStatsPermission(); // 권한 확인
+      
+      // 자정 타이머 시작
+      _startMidnightTimer();
     });
   }
 
   @override
   void dispose() {
+    _midnightTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -65,14 +82,19 @@ class _DrainStatsCardState extends State<DrainStatsCard> with WidgetsBindingObse
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
-    // 앱이 포그라운드로 돌아올 때 권한 상태 다시 확인
+    // 앱이 포그라운드로 돌아올 때 권한 상태 다시 확인 및 날짜 변경 확인
     if (state == AppLifecycleState.resumed) {
       _checkUsageStatsPermission();
+      // Android에서 날짜 변경 플래그 확인 (앱 종료 상태에서도 감지)
+      _checkDateChangeFromAndroid();
     }
   }
 
   /// Pull-to-Refresh를 위한 public 메서드
   Future<void> refresh() async {
+    // Android에서 날짜 변경 플래그 확인
+    await _checkDateChangeFromAndroid();
+    
     await _calculateDischargeCurrent(forceRefresh: true);
     if (_hasUsageStatsPermission) {
       await _loadScreenOnTime(forceRefresh: true);
@@ -93,11 +115,72 @@ class _DrainStatsCardState extends State<DrainStatsCard> with WidgetsBindingObse
     
     // 날짜 변경 콜백 호출
     final targetDate = _getTargetDate();
+    _lastLoadedDate = targetDate;
     widget.onDateChanged?.call(targetDate);
     
     _calculateDischargeCurrent(forceRefresh: true);
     if (_hasUsageStatsPermission) {
       _loadScreenOnTime(forceRefresh: true);
+    }
+  }
+  
+  /// Android에서 날짜 변경 플래그 확인
+  /// 앱이 종료된 상태에서도 날짜 변경을 감지한 경우 플래그를 확인하고 자동 새로고침
+  Future<void> _checkDateChangeFromAndroid() async {
+    try {
+      if (_selectedDateTab != 0) {
+        // 오늘 탭이 아니면 날짜 변경 확인 불필요
+        return;
+      }
+      
+      final bool? dateChanged = await _dateChangeChannel.invokeMethod('checkDateChange') as bool?;
+      
+      if (dateChanged == true && mounted) {
+        debugPrint('DrainStatsCard: Android에서 날짜 변경 감지됨 - 자동 새로고침');
+        // 날짜 변경이 감지되었으면 자동으로 재계산
+        _onDateChanged();
+      }
+    } catch (e) {
+      debugPrint('DrainStatsCard: 날짜 변경 확인 실패 - $e');
+    }
+  }
+  
+  /// 두 날짜가 같은 날인지 확인
+  bool _isSameDate(DateTime date1, DateTime date2) {
+    return date1.year == date2.year &&
+           date1.month == date2.month &&
+           date1.day == date2.day;
+  }
+  
+  /// 자정 타이머 시작
+  /// 자정이 되면 자동으로 새로고침
+  void _startMidnightTimer() {
+    _midnightTimer?.cancel();
+    
+    try {
+      final now = DateTime.now();
+      // 다음 자정 시간 계산 (00:00:00)
+      final tomorrow = DateTime(now.year, now.month, now.day + 1, 0, 0, 0);
+      final durationUntilMidnight = tomorrow.difference(now);
+      
+      debugPrint('DrainStatsCard: 자정 타이머 스케줄링 - ${durationUntilMidnight.inHours}시간 ${durationUntilMidnight.inMinutes % 60}분 후 실행');
+      
+      // 다음 자정까지 대기 후 실행
+      _midnightTimer = Timer(durationUntilMidnight, () {
+        if (!mounted) return;
+        
+        debugPrint('DrainStatsCard: 자정 도달 - 자동 새로고침 시작');
+        
+        // 오늘 탭일 때만 자동 새로고침
+        if (_selectedDateTab == 0) {
+          _onDateChanged();
+        }
+        
+        // 다음 자정까지 다시 스케줄링 (재귀적)
+        _startMidnightTimer();
+      });
+    } catch (e) {
+      debugPrint('DrainStatsCard: 자정 타이머 스케줄링 실패 - $e');
     }
   }
   
@@ -233,7 +316,9 @@ class _DrainStatsCardState extends State<DrainStatsCard> with WidgetsBindingObse
         setState(() {
           _screenOnTime = screenOnTime;
           _isLoadingScreenTime = false;
+          _lastLoadedDate = targetDate; // 로드한 날짜 업데이트
         });
+        debugPrint('DrainStatsCard: 화면 켜짐 시간 로드 완료 - ${targetDate.toString().split(' ')[0]}: ${screenOnTime?.toStringAsFixed(2)}시간');
       }
     } catch (e) {
       debugPrint('화면 켜짐 시간 로드 실패: $e');

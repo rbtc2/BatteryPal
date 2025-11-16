@@ -132,6 +132,14 @@ class MainActivity : FlutterActivity() {
                         result.error("INVALID_ARGUMENT", "dateMillis is required", null)
                     }
                 }
+                "checkDateChange" -> {
+                    val dateChanged = DateChangeReceiver.checkAndClearDateChangeFlag(applicationContext)
+                    result.success(dateChanged)
+                }
+                "getCurrentDateKey" -> {
+                    val dateKey = DateChangeReceiver.getCurrentDateKey()
+                    result.success(dateKey)
+                }
                 "isIgnoringBatteryOptimizations" -> {
                     val isIgnoring = isIgnoringBatteryOptimizations()
                     result.success(isIgnoring)
