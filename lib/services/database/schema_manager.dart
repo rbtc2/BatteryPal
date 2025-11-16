@@ -92,6 +92,16 @@ class SchemaManager {
     await db.execute('''
       CREATE INDEX idx_data_quality ON ${BatteryHistoryDatabaseConfig.tableName} (data_quality)
     ''');
+    
+    // Phase 5: 백그라운드 데이터 조회 최적화를 위한 인덱스
+    await db.execute('''
+      CREATE INDEX idx_collection_method ON ${BatteryHistoryDatabaseConfig.tableName} (collection_method)
+    ''');
+    
+    // Phase 5: 백그라운드 데이터 복구 쿼리 최적화 (collection_method + timestamp)
+    await db.execute('''
+      CREATE INDEX idx_collection_method_timestamp ON ${BatteryHistoryDatabaseConfig.tableName} (collection_method, timestamp)
+    ''');
   }
 
   /// 충전 세션 테이블 생성
@@ -160,10 +170,42 @@ class SchemaManager {
       await _createChargingSessionsTable(db);
     }
     
+    // Phase 5: 버전 3 - 성능 최적화 인덱스 추가
+    if (oldVersion < 3) {
+      debugPrint('데이터베이스 업그레이드: 버전 3 - 성능 최적화 인덱스 추가');
+      await _addPerformanceIndexes(db);
+    }
+    
     // 향후 버전 업그레이드 로직 추가
-    if (oldVersion < newVersion && oldVersion >= 2) {
+    if (oldVersion < newVersion && oldVersion >= 3) {
       // 추가 마이그레이션 로직
       debugPrint('추가 마이그레이션 로직 실행 (버전 $oldVersion -> $newVersion)');
+    }
+  }
+  
+  /// Phase 5: 성능 최적화 인덱스 추가
+  /// 
+  /// 기존 데이터베이스에 성능 최적화 인덱스를 추가합니다.
+  /// 
+  /// [db]: 데이터베이스 인스턴스
+  Future<void> _addPerformanceIndexes(Database db) async {
+    try {
+      // collection_method 인덱스 추가
+      await db.execute('''
+        CREATE INDEX IF NOT EXISTS idx_collection_method 
+        ON ${BatteryHistoryDatabaseConfig.tableName} (collection_method)
+      ''');
+      
+      // collection_method + timestamp 복합 인덱스 추가
+      await db.execute('''
+        CREATE INDEX IF NOT EXISTS idx_collection_method_timestamp 
+        ON ${BatteryHistoryDatabaseConfig.tableName} (collection_method, timestamp)
+      ''');
+      
+      debugPrint('성능 최적화 인덱스 추가 완료');
+    } catch (e) {
+      debugPrint('성능 최적화 인덱스 추가 실패: $e');
+      // 인덱스 추가 실패해도 계속 진행 (이미 존재할 수 있음)
     }
   }
 

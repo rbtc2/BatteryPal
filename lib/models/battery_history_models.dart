@@ -428,7 +428,7 @@ class BatteryHistoryDatabaseConfig {
   
   /// 데이터베이스 버전
   /// 버전 2: charging_sessions 테이블 추가
-  static const int databaseVersion = 2;
+  static const int databaseVersion = 3; // Phase 5: 성능 최적화 인덱스 추가
   
   /// 테이블 이름
   static const String tableName = 'battery_history';

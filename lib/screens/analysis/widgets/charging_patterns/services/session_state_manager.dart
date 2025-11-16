@@ -212,6 +212,16 @@ class SessionStateManager {
     _wasCharging = wasCharging;
   }
   
+  /// 세션 시작 시간 업데이트 (백그라운드 세션 복구용)
+  /// 
+  /// [startTime] 새로운 시작 시간
+  void updateStartTime(DateTime startTime) {
+    if (_state == SessionState.active && _startTime != null) {
+      _startTime = startTime;
+      debugPrint('SessionStateManager: 세션 시작 시간 업데이트 - $startTime');
+    }
+  }
+  
   /// 현재 세션 기록 설정
   void setCurrentSession(ChargingSessionRecord? session) {
     _currentSession = session;

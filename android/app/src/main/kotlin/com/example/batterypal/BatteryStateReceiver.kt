@@ -7,11 +7,25 @@ import android.content.IntentFilter
 import android.content.SharedPreferences
 import android.os.BatteryManager
 import android.util.Log
+import androidx.work.Constraints
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
+import androidx.work.WorkRequest
+import java.util.concurrent.TimeUnit
 
 /// 배터리 상태 변화를 감지하는 독립적인 BroadcastReceiver
 /// 앱이 백그라운드에 있거나 화면이 꺼진 상태에서도 작동
 /// AndroidManifest에 정적으로 등록되어 앱이 완전히 종료되어도 작동
 class BatteryStateReceiver : BroadcastReceiver() {
+    
+    companion object {
+        private const val WORK_NAME = "charging_data_collection"
+        private const val WORK_INTERVAL_MINUTES = 15L // PeriodicWorkRequest의 최소 간격 (15분)
+        private const val ONE_TIME_WORK_DELAY_SECONDS = 10L // OneTimeWorkRequest 지연 시간 (10초)
+    }
     override fun onReceive(context: Context, intent: Intent) {
         when (intent.action) {
             Intent.ACTION_POWER_CONNECTED -> {
@@ -66,6 +80,9 @@ class BatteryStateReceiver : BroadcastReceiver() {
                 Log.d("BatteryPal", "BatteryStateReceiver: 충전 시작 정보 저장 - 레벨: $batteryPercent%, 타입: $chargingType")
             }
             
+            // WorkManager 주기적 작업 예약 (충전 데이터 수집)
+            scheduleChargingDataCollection(context)
+            
         } catch (e: Exception) {
             Log.e("BatteryPal", "BatteryStateReceiver: 충전기 연결 처리 오류", e)
         }
@@ -114,6 +131,9 @@ class BatteryStateReceiver : BroadcastReceiver() {
                 
                 Log.d("BatteryPal", "BatteryStateReceiver: 충전기 분리 감지 (시작 시간 없음) - 종료 시간: $now")
             }
+            
+            // WorkManager 주기적 작업 취소 (충전 종료)
+            cancelChargingDataCollection(context)
             
         } catch (e: Exception) {
             Log.e("BatteryPal", "BatteryStateReceiver: 충전기 분리 처리 오류", e)
@@ -254,6 +274,62 @@ class BatteryStateReceiver : BroadcastReceiver() {
             }
         } catch (e: Exception) {
             Log.e("BatteryPal", "BatteryStateReceiver: 알림 표시 실패", e)
+        }
+    }
+    
+    /// WorkManager 주기적 작업 예약 (충전 데이터 수집)
+    private fun scheduleChargingDataCollection(context: Context) {
+        try {
+            val workManager = WorkManager.getInstance(context)
+            
+            // Phase 3: 제약 조건 최적화 (배터리 효율성과 데이터 수집의 균형)
+            val constraints = Constraints.Builder()
+                .setRequiredNetworkType(NetworkType.NOT_REQUIRED) // 네트워크 불필요
+                .setRequiresBatteryNotLow(false) // 배터리 부족해도 실행 (충전 중이므로)
+                .setRequiresCharging(false) // 충전 중이 아니어도 실행 (충전 중일 때만 실행되므로)
+                .setRequiresDeviceIdle(false) // 기기가 유휴 상태일 필요 없음
+                .setRequiresStorageNotLow(false) // 저장 공간 부족해도 실행
+                .build()
+            
+            // 즉시 실행할 OneTimeWorkRequest 생성 (첫 데이터 수집)
+            val immediateWorkRequest = OneTimeWorkRequestBuilder<ChargingDataWorker>()
+                .setConstraints(constraints)
+                .addTag(WORK_NAME)
+                .build()
+            
+            // 주기적 작업 요청 생성 (15분마다 실행)
+            // 주의: PeriodicWorkRequest의 최소 간격은 15분
+            val periodicWorkRequest = PeriodicWorkRequestBuilder<ChargingDataWorker>(
+                WORK_INTERVAL_MINUTES, TimeUnit.MINUTES
+            )
+                .setConstraints(constraints)
+                .addTag(WORK_NAME)
+                .build()
+            
+            // 즉시 실행 작업 추가
+            workManager.enqueue(immediateWorkRequest)
+            
+            // 주기적 작업 예약 (기존 작업이 있으면 교체)
+            workManager.enqueueUniquePeriodicWork(
+                WORK_NAME,
+                ExistingPeriodicWorkPolicy.REPLACE,
+                periodicWorkRequest
+            )
+            
+            Log.d("BatteryPal", "BatteryStateReceiver: WorkManager 작업 예약 완료 (즉시 실행 + ${WORK_INTERVAL_MINUTES}분 간격)")
+        } catch (e: Exception) {
+            Log.e("BatteryPal", "BatteryStateReceiver: WorkManager 작업 예약 실패", e)
+        }
+    }
+    
+    /// WorkManager 주기적 작업 취소
+    private fun cancelChargingDataCollection(context: Context) {
+        try {
+            val workManager = WorkManager.getInstance(context)
+            workManager.cancelUniqueWork(WORK_NAME)
+            Log.d("BatteryPal", "BatteryStateReceiver: WorkManager 주기적 작업 취소 완료")
+        } catch (e: Exception) {
+            Log.e("BatteryPal", "BatteryStateReceiver: WorkManager 작업 취소 실패", e)
         }
     }
 }

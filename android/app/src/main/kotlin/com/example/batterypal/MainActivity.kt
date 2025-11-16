@@ -132,6 +132,14 @@ class MainActivity : FlutterActivity() {
                         result.error("INVALID_ARGUMENT", "dateMillis is required", null)
                     }
                 }
+                "isIgnoringBatteryOptimizations" -> {
+                    val isIgnoring = isIgnoringBatteryOptimizations()
+                    result.success(isIgnoring)
+                }
+                "openBatteryOptimizationSettings" -> {
+                    openBatteryOptimizationSettings()
+                    result.success(true)
+                }
                 else -> {
                     result.notImplemented()
                 }
@@ -802,6 +810,47 @@ class MainActivity : FlutterActivity() {
         } catch (e: Exception) {
             android.util.Log.e("BatteryPal", "화면 켜짐 시간 가져오기 실패", e)
             -1
+        }
+    }
+
+    // ========== 배터리 최적화 예외 처리 (Phase 3) ==========
+
+    /// 배터리 최적화 예외 여부 확인
+    /// 
+    /// Returns: 배터리 최적화에서 제외되었으면 true, 그렇지 않으면 false
+    private fun isIgnoringBatteryOptimizations(): Boolean {
+        return try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                val powerManager = getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+                val isIgnoring = powerManager.isIgnoringBatteryOptimizations(packageName)
+                android.util.Log.d("BatteryPal", "배터리 최적화 예외 여부: $isIgnoring")
+                isIgnoring
+            } else {
+                // API 23 미만에서는 항상 true (배터리 최적화 기능 없음)
+                true
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("BatteryPal", "배터리 최적화 예외 확인 실패", e)
+            false
+        }
+    }
+
+    /// 배터리 최적화 설정 화면으로 이동
+    /// 
+    /// 사용자가 앱을 배터리 최적화에서 제외할 수 있도록 설정 화면을 엽니다.
+    private fun openBatteryOptimizationSettings() {
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                startActivity(intent)
+                android.util.Log.d("BatteryPal", "배터리 최적화 설정 화면 열기")
+            } else {
+                // API 23 미만에서는 배터리 최적화 기능이 없음
+                android.util.Log.d("BatteryPal", "API 23 미만에서는 배터리 최적화 기능이 없습니다")
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("BatteryPal", "배터리 최적화 설정 화면 열기 실패", e)
         }
     }
 }

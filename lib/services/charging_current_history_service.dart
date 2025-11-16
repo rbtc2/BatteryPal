@@ -96,6 +96,9 @@ class ChargingCurrentHistoryService {
       // Phase 2: 기존 DB 데이터 로드 (오늘 데이터)
       await _loadTodayDataFromDatabase();
       
+      // Phase 2: 백그라운드에서 수집된 데이터 확인 및 동기화
+      await _checkAndSyncBackgroundData();
+      
       // 날짜 변경 감지 및 과거 날짜 데이터 저장 (앱 시작 시)
       final todayKey = _getDateKey(DateTime.now());
       // 초기화 시에는 마지막 저장 날짜를 오늘로 설정하고, 
@@ -614,6 +617,77 @@ class ChargingCurrentHistoryService {
       }
     } catch (e, stackTrace) {
       debugPrint('ChargingCurrentHistoryService: DB 저장 실패 - $e');
+      debugPrint('스택 트레이스: $stackTrace');
+    }
+  }
+  
+  /// Phase 2: 백그라운드에서 수집된 데이터 확인 및 동기화
+  Future<void> _checkAndSyncBackgroundData() async {
+    if (_isDisposed || !_isInitialized) return;
+    
+    try {
+      debugPrint('ChargingCurrentHistoryService: 백그라운드 데이터 확인 시작...');
+      
+      final db = _databaseService.database;
+      if (db == null) {
+        debugPrint('ChargingCurrentHistoryService: 데이터베이스가 초기화되지 않음');
+        return;
+      }
+      
+      // 최근 24시간 내의 백그라운드 데이터 확인
+      final cutoffTime = DateTime.now().subtract(const Duration(hours: 24));
+      final cutoffTimestamp = cutoffTime.millisecondsSinceEpoch;
+      
+      // Phase 5: 백그라운드에서 수집된 데이터 확인 (쿼리 최적화)
+      // 인덱스 idx_collection_method_timestamp를 활용하여 빠른 조회
+      final results = await db.query(
+        'battery_history',
+        columns: ['timestamp', 'charging_current'],
+        where: 'timestamp >= ? AND collection_method = ?',
+        whereArgs: [cutoffTimestamp, 'background_workmanager'],
+        orderBy: 'timestamp ASC',
+        // Phase 5: 배치 처리 최적화 - 한 번에 너무 많은 데이터를 로드하지 않음
+        // (메모리 사용량 최적화)
+      );
+      
+      if (results.isNotEmpty) {
+        debugPrint('ChargingCurrentHistoryService: 백그라운드 데이터 ${results.length}개 발견');
+        
+        // 백그라운드 데이터를 메모리에 로드 (날짜별로 그룹화)
+        for (final row in results) {
+          final timestamp = DateTime.fromMillisecondsSinceEpoch(row['timestamp'] as int);
+          final currentMa = row['charging_current'] as int;
+          final dateKey = _getDateKey(timestamp);
+          
+          if (!_dailyData.containsKey(dateKey)) {
+            _dailyData[dateKey] = [];
+          }
+          
+          // 중복 체크 (같은 타임스탬프가 이미 있으면 스킵)
+          // 타임스탬프가 정확히 일치하는 경우만 중복으로 간주
+          final isDuplicate = _dailyData[dateKey]!.any(
+            (point) => point.timestamp.millisecondsSinceEpoch == timestamp.millisecondsSinceEpoch,
+          );
+          
+          if (!isDuplicate) {
+            _dailyData[dateKey]!.add(ChargingCurrentPoint(
+              timestamp: timestamp,
+              currentMa: currentMa,
+            ));
+          }
+        }
+        
+        // 날짜별로 정렬
+        for (final dateKey in _dailyData.keys) {
+          _dailyData[dateKey]!.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+        }
+        
+        debugPrint('ChargingCurrentHistoryService: 백그라운드 데이터 동기화 완료');
+      } else {
+        debugPrint('ChargingCurrentHistoryService: 백그라운드 데이터 없음');
+      }
+    } catch (e, stackTrace) {
+      debugPrint('ChargingCurrentHistoryService: 백그라운드 데이터 확인 실패 - $e');
       debugPrint('스택 트레이스: $stackTrace');
     }
   }

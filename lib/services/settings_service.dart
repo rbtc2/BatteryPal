@@ -85,6 +85,7 @@ class SettingsService extends ChangeNotifier {
       await prefs.setBool('backgroundAppRestriction', settingsJson['backgroundAppRestriction'] as bool);
       await prefs.setBool('autoBrightnessEnabled', settingsJson['autoBrightnessEnabled'] as bool);
       await prefs.setBool('chargingCompleteNotificationEnabled', settingsJson['chargingCompleteNotificationEnabled'] as bool);
+      await prefs.setBool('backgroundDataCollectionEnabled', settingsJson['backgroundDataCollectionEnabled'] as bool); // Phase 4
       
       // 충전 완료 알림 설정
       await prefs.setBool('chargingCompleteNotifyOnFastCharging', settingsJson['chargingCompleteNotifyOnFastCharging'] as bool);
@@ -133,6 +134,7 @@ class SettingsService extends ChangeNotifier {
         backgroundAppRestriction: prefs.getBool('backgroundAppRestriction') ?? false,
         autoBrightnessEnabled: prefs.getBool('autoBrightnessEnabled') ?? false,
         chargingCompleteNotificationEnabled: prefs.getBool('chargingCompleteNotificationEnabled') ?? false,
+        backgroundDataCollectionEnabled: prefs.getBool('backgroundDataCollectionEnabled') ?? true, // Phase 4
         
         // 충전 완료 알림 설정
         chargingCompleteNotifyOnFastCharging: prefs.getBool('chargingCompleteNotifyOnFastCharging') ?? true,
@@ -276,6 +278,16 @@ class SettingsService extends ChangeNotifier {
   void updateChargingCompleteNotifyOnNormalCharging(bool enabled) {
     _appSettings = _appSettings.copyWith(
       chargingCompleteNotifyOnNormalCharging: enabled,
+      lastUpdated: DateTime.now(),
+    );
+    notifyListeners();
+    _autoSave();
+  }
+
+  /// Phase 4: 백그라운드 데이터 수집 설정 변경
+  void updateBackgroundDataCollection(bool enabled) {
+    _appSettings = _appSettings.copyWith(
+      backgroundDataCollectionEnabled: enabled,
       lastUpdated: DateTime.now(),
     );
     notifyListeners();

@@ -15,6 +15,7 @@ class AppSettings {
   final bool backgroundAppRestriction;
   final bool autoBrightnessEnabled; // 화면 밝기 자동 조절 활성화
   final bool chargingCompleteNotificationEnabled; // 충전 완료 알림 활성화
+  final bool backgroundDataCollectionEnabled; // Phase 4: 백그라운드 데이터 수집 활성화
   
   // 충전 완료 알림 설정
   final bool chargingCompleteNotifyOnFastCharging; // 고속 충전(AC) 시에만 알림
@@ -52,6 +53,7 @@ class AppSettings {
     this.backgroundAppRestriction = false,
     this.autoBrightnessEnabled = false, // 기본값: false
     this.chargingCompleteNotificationEnabled = false, // 기본값: false (Pro 기능)
+    this.backgroundDataCollectionEnabled = true, // Phase 4: 기본값: true (백그라운드 수집 활성화)
     
     // 충전 완료 알림 설정 기본값
     this.chargingCompleteNotifyOnFastCharging = true,
@@ -95,6 +97,7 @@ class AppSettings {
       'backgroundAppRestriction': backgroundAppRestriction,
       'autoBrightnessEnabled': autoBrightnessEnabled,
       'chargingCompleteNotificationEnabled': chargingCompleteNotificationEnabled,
+      'backgroundDataCollectionEnabled': backgroundDataCollectionEnabled, // Phase 4
       
       // 충전 완료 알림 설정
       'chargingCompleteNotifyOnFastCharging': chargingCompleteNotifyOnFastCharging,
@@ -136,6 +139,7 @@ class AppSettings {
       backgroundAppRestriction: json['backgroundAppRestriction'] ?? false,
       autoBrightnessEnabled: json['autoBrightnessEnabled'] ?? false,
       chargingCompleteNotificationEnabled: json['chargingCompleteNotificationEnabled'] ?? false,
+      backgroundDataCollectionEnabled: json['backgroundDataCollectionEnabled'] ?? true, // Phase 4
       
       // 충전 완료 알림 설정
       chargingCompleteNotifyOnFastCharging: json['chargingCompleteNotifyOnFastCharging'] ?? true,
@@ -184,6 +188,7 @@ class AppSettings {
     bool? backgroundAppRestriction,
     bool? autoBrightnessEnabled,
     bool? chargingCompleteNotificationEnabled,
+    bool? backgroundDataCollectionEnabled, // Phase 4
     
     // 충전 완료 알림 설정
     bool? chargingCompleteNotifyOnFastCharging,
@@ -221,6 +226,7 @@ class AppSettings {
       backgroundAppRestriction: backgroundAppRestriction ?? this.backgroundAppRestriction,
       autoBrightnessEnabled: autoBrightnessEnabled ?? this.autoBrightnessEnabled,
       chargingCompleteNotificationEnabled: chargingCompleteNotificationEnabled ?? this.chargingCompleteNotificationEnabled,
+      backgroundDataCollectionEnabled: backgroundDataCollectionEnabled ?? this.backgroundDataCollectionEnabled, // Phase 4
       
       // 충전 완료 알림 설정
       chargingCompleteNotifyOnFastCharging: chargingCompleteNotifyOnFastCharging ?? this.chargingCompleteNotifyOnFastCharging,

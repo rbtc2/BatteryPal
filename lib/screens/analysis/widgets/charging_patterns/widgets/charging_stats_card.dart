@@ -11,6 +11,7 @@ import 'date_selector_tabs.dart';
 import 'charging_session_list_item.dart';
 import 'charging_session_detail_dialog.dart';
 import '../../../../../services/battery_service.dart';
+import '../../../../../services/background_data_recovery_service.dart';
 
 /// 충전 통계 및 세션 기록 카드
 /// 
@@ -91,9 +92,31 @@ class _ChargingStatsCardState extends State<ChargingStatsCard> {
   Future<void> _initializeService() async {
     try {
       await _statsController.initialize();
+      
+      // Phase 4: 백그라운드 데이터 복구 후 자동 새로고침
+      _checkBackgroundDataAndRefresh();
     } catch (e, stackTrace) {
       debugPrint('ChargingStatsCard 초기화 실패: $e');
       debugPrint('스택 트레이스: $stackTrace');
+    }
+  }
+  
+  /// Phase 4: 백그라운드 데이터 복구 확인 및 자동 새로고침
+  Future<void> _checkBackgroundDataAndRefresh() async {
+    try {
+      final recoveryService = BackgroundDataRecoveryService();
+      final result = recoveryService.lastRecoveryResult;
+      
+      if (result != null && result.hasRecoveredData) {
+        // 복구된 데이터가 있으면 자동 새로고침
+        debugPrint('ChargingStatsCard: 백그라운드 데이터 복구 감지, 자동 새로고침');
+        await Future.delayed(const Duration(milliseconds: 500));
+        if (mounted) {
+          await refresh();
+        }
+      }
+    } catch (e) {
+      debugPrint('ChargingStatsCard: 백그라운드 데이터 확인 실패 - $e');
     }
   }
   

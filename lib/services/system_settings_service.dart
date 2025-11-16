@@ -143,5 +143,33 @@ class SystemSettingsService {
       debugPrint('권한 설정 화면 열기 실패: $e');
     }
   }
+
+  /// Phase 3: 배터리 최적화 예외 여부 확인
+  /// 
+  /// Returns: 배터리 최적화에서 제외되었으면 true, 그렇지 않으면 false
+  Future<bool?> isIgnoringBatteryOptimizations() async {
+    try {
+      debugPrint('시스템 설정: 배터리 최적화 예외 여부 확인 요청');
+      final bool isIgnoring = await _channel.invokeMethod('isIgnoringBatteryOptimizations');
+      debugPrint('시스템 설정: 배터리 최적화 예외 여부 = $isIgnoring');
+      return isIgnoring;
+    } catch (e) {
+      debugPrint('배터리 최적화 예외 여부 확인 실패: $e');
+      return null;
+    }
+  }
+
+  /// Phase 3: 배터리 최적화 설정 화면으로 이동
+  /// 
+  /// 사용자가 앱을 배터리 최적화에서 제외할 수 있도록 설정 화면을 엽니다.
+  Future<void> openBatteryOptimizationSettings() async {
+    try {
+      debugPrint('시스템 설정: 배터리 최적화 설정 화면 열기 요청');
+      await _channel.invokeMethod('openBatteryOptimizationSettings');
+      debugPrint('시스템 설정: 배터리 최적화 설정 화면 열기 완료');
+    } catch (e) {
+      debugPrint('배터리 최적화 설정 화면 열기 실패: $e');
+    }
+  }
 }
 

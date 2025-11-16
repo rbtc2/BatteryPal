@@ -9,6 +9,7 @@ import 'database/repositories/charging_session_repository.dart';
 import 'database/maintenance/data_cleanup_service.dart';
 import 'database/maintenance/data_compression_service.dart';
 import 'database/maintenance/backup_service.dart';
+import 'database/maintenance/performance_optimizer.dart';
 
 /// 배터리 히스토리 데이터베이스 서비스
 /// 
@@ -48,6 +49,7 @@ class BatteryHistoryDatabaseService {
   final DataCleanupService _dataCleanupService = DataCleanupService();
   final DataCompressionService _dataCompressionService = DataCompressionService();
   final BackupService _backupService = BackupService();
+  final PerformanceOptimizer _performanceOptimizer = PerformanceOptimizer();
 
   // ==================== 공개 속성 ====================
   
@@ -533,6 +535,41 @@ class BatteryHistoryDatabaseService {
       debugPrint('모든 충전 세션 데이터 삭제 실패: $e');
       debugPrint('스택 트레이스: $stackTrace');
       rethrow;
+    }
+  }
+
+  // ==================== Phase 5: 성능 최적화 ====================
+
+  /// 데이터베이스 성능 최적화 실행
+  /// 
+  /// 인덱스 재구성, 통계 정보 업데이트, VACUUM 등을 실행합니다.
+  /// 
+  /// [force]: 강제 실행 여부 (기본값: false)
+  /// 
+  /// Returns: 최적화 성공 여부
+  Future<bool> optimizePerformance({bool force = false}) async {
+    final db = await _ensureInitialized();
+    
+    try {
+      return await _performanceOptimizer.optimizeDatabase(db, force: force);
+    } catch (e, stackTrace) {
+      debugPrint('성능 최적화 실패: $e');
+      debugPrint('스택 트레이스: $stackTrace');
+      return false;
+    }
+  }
+
+  /// 빠른 성능 최적화 (통계 정보만 업데이트)
+  /// 
+  /// VACUUM 없이 통계 정보만 업데이트하여 빠르게 실행합니다.
+  Future<void> quickOptimize() async {
+    final db = await _ensureInitialized();
+    
+    try {
+      await _performanceOptimizer.quickOptimize(db);
+    } catch (e, stackTrace) {
+      debugPrint('빠른 최적화 실패: $e');
+      debugPrint('스택 트레이스: $stackTrace');
     }
   }
 

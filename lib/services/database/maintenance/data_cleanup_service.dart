@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import '../../../models/battery_history_models.dart';
+import 'performance_optimizer.dart';
 
 /// 데이터 정리 서비스
 /// 오래된 데이터를 정리하고 자동 정리 스케줄을 관리합니다.
@@ -106,6 +107,10 @@ class DataCleanupService {
       (timer) async {
         try {
           await cleanupOldDataCallback();
+          
+          // Phase 5: 데이터 정리 후 성능 최적화 실행
+          final optimizer = PerformanceOptimizer();
+          await optimizer.optimizeDatabase(db, force: false);
         } catch (e) {
           debugPrint('자동 정리 실패: $e');
         }
