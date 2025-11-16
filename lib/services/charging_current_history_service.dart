@@ -229,83 +229,105 @@ class ChargingCurrentHistoryService {
     // 마지막 0mA 기록 추가 (충전 종료 표시)
     _recordChargingCurrent(0, force: true);
     
-    // Phase 2: 충전 종료 시 즉시 DB에 저장
-    _saveToDatabase();
+      // Phase 2: 충전 종료 시 즉시 DB에 저장 (Phase 3: 에러 처리 추가)
+      _saveToDatabase().catchError((e) {
+        debugPrint('ChargingCurrentHistoryService: 충전 종료 시 저장 실패 - $e');
+        // 에러 발생해도 계속 진행
+      });
   }
   
-  /// 충전 전류값 기록
+  /// 충전 전류값 기록 (Phase 3: 에러 처리 강화)
   /// 중복 방지 및 최소 간격 체크 포함
   /// 개선: 충전 중에는 시간 기반으로도 기록하여 그래프 가로선 표시
   void _recordChargingCurrent(int currentMa, {bool force = false}) {
     if (!_isCollecting && !force) return;
     if (_isDisposed) return;
     
-    final now = DateTime.now();
-    final isCharging = currentMa > 0;
-    final timeSinceLastRecord = _lastRecordedTime != null 
-        ? now.difference(_lastRecordedTime!) 
-        : Duration.zero;
-    
-    // 기록 조건 판단
-    bool shouldRecord = force;
-    
-    if (!shouldRecord) {
-      // 1. 전류값이 변경된 경우 → 항상 기록
-      if (_lastRecordedCurrent != currentMa) {
-        shouldRecord = true;
-      }
-      // 2. 충전 중이고 시간 간격이 지난 경우 → 시간 축 표시를 위해 기록
-      else if (isCharging && timeSinceLastRecord >= _chargingTimeInterval) {
-        shouldRecord = true;
-        debugPrint('ChargingCurrentHistoryService: 시간 기반 기록 - ${currentMa}mA (${timeSinceLastRecord.inSeconds}초 경과)');
-      }
-      // 3. 방전 중이고 최소 간격이 지난 경우 (전류값 변경 시에만)
-      else if (!isCharging && 
-               _lastRecordedTime != null &&
-               timeSinceLastRecord >= _minRecordingInterval &&
-               _lastRecordedCurrent != currentMa) {
-        shouldRecord = true;
-      }
-    }
-    
-    // 기록하지 않으면 리턴
-    if (!shouldRecord) {
-      return;
-    }
-    
-    // 포인트 생성 및 저장
-    final point = ChargingCurrentPoint(
-      timestamp: now,
-      currentMa: currentMa,
-    );
-    
-    // 날짜별로 저장
-    final dateKey = _getDateKey(now);
-    
-    // 날짜 변경 감지 및 과거 날짜 데이터 저장
-    if (_lastSavedDateKey != null && _lastSavedDateKey != dateKey) {
-      debugPrint('ChargingCurrentHistoryService: 날짜 변경 감지 - $_lastSavedDateKey -> $dateKey');
-      _checkDateChangeAndSave();
-    }
-    
-    if (!_dailyData.containsKey(dateKey)) {
-      _dailyData[dateKey] = [];
+    try {
+      final now = DateTime.now();
+      final isCharging = currentMa > 0;
+      final timeSinceLastRecord = _lastRecordedTime != null 
+          ? now.difference(_lastRecordedTime!) 
+          : Duration.zero;
       
-      // Phase 4: 메모리 최적화 - 오래된 날짜 데이터 정리
-      _cleanupOldMemoryData();
-    }
-    _dailyData[dateKey]!.add(point);
-    
-    // 마지막 기록 정보 업데이트
-    _lastRecordedCurrent = currentMa;
-    _lastRecordedTime = now;
-    
-    debugPrint('ChargingCurrentHistoryService: 전류 기록 - ${currentMa}mA ($dateKey)');
-    
-    // 배치 저장 임계값 체크 (50개 이상이면 즉시 저장)
-    final todayData = _dailyData[dateKey] ?? [];
-    if (todayData.length >= _batchSaveThreshold) {
-      _saveToDatabase();
+      // 기록 조건 판단
+      bool shouldRecord = force;
+      
+      if (!shouldRecord) {
+        // 1. 전류값이 변경된 경우 → 항상 기록
+        if (_lastRecordedCurrent != currentMa) {
+          shouldRecord = true;
+        }
+        // 2. 충전 중이고 시간 간격이 지난 경우 → 시간 축 표시를 위해 기록
+        else if (isCharging && timeSinceLastRecord >= _chargingTimeInterval) {
+          shouldRecord = true;
+          debugPrint('ChargingCurrentHistoryService: 시간 기반 기록 - ${currentMa}mA (${timeSinceLastRecord.inSeconds}초 경과)');
+        }
+        // 3. 방전 중이고 최소 간격이 지난 경우 (전류값 변경 시에만)
+        else if (!isCharging && 
+                 _lastRecordedTime != null &&
+                 timeSinceLastRecord >= _minRecordingInterval &&
+                 _lastRecordedCurrent != currentMa) {
+          shouldRecord = true;
+        }
+      }
+      
+      // 기록하지 않으면 리턴
+      if (!shouldRecord) {
+        return;
+      }
+      
+      // 포인트 생성 및 저장
+      final point = ChargingCurrentPoint(
+        timestamp: now,
+        currentMa: currentMa,
+      );
+      
+      // 날짜별로 저장
+      final dateKey = _getDateKey(now);
+      
+      // 날짜 변경 감지 및 과거 날짜 데이터 저장 (Phase 3: 에러 처리 추가)
+      if (_lastSavedDateKey != null && _lastSavedDateKey != dateKey) {
+        try {
+          debugPrint('ChargingCurrentHistoryService: 날짜 변경 감지 - $_lastSavedDateKey -> $dateKey');
+          _checkDateChangeAndSave();
+        } catch (e) {
+          debugPrint('ChargingCurrentHistoryService: 날짜 변경 처리 실패 - $e');
+          // 에러 발생해도 계속 진행
+        }
+      }
+      
+      if (!_dailyData.containsKey(dateKey)) {
+        _dailyData[dateKey] = [];
+        
+        // Phase 4: 메모리 최적화 - 오래된 날짜 데이터 정리 (Phase 3: 에러 처리 추가)
+        try {
+          _cleanupOldMemoryData();
+        } catch (e) {
+          debugPrint('ChargingCurrentHistoryService: 메모리 정리 실패 - $e');
+          // 에러 발생해도 계속 진행
+        }
+      }
+      _dailyData[dateKey]!.add(point);
+      
+      // 마지막 기록 정보 업데이트
+      _lastRecordedCurrent = currentMa;
+      _lastRecordedTime = now;
+      
+      debugPrint('ChargingCurrentHistoryService: 전류 기록 - ${currentMa}mA ($dateKey)');
+      
+      // 배치 저장 임계값 체크 (50개 이상이면 즉시 저장) (Phase 3: 에러 처리 추가)
+      final todayData = _dailyData[dateKey] ?? [];
+      if (todayData.length >= _batchSaveThreshold) {
+        _saveToDatabase().catchError((e) {
+          debugPrint('ChargingCurrentHistoryService: 배치 저장 실패 - $e');
+          // 에러 발생해도 계속 진행
+        });
+      }
+    } catch (e, stackTrace) {
+      // Phase 3: 에러 처리 강화 - 에러 발생 시에도 서비스는 계속 작동
+      debugPrint('ChargingCurrentHistoryService: 전류 기록 실패 - $e');
+      debugPrint('스택 트레이스: $stackTrace');
     }
   }
   
@@ -571,7 +593,7 @@ class ChargingCurrentHistoryService {
   
   // 배치 저장 타이머 제거됨 (더 이상 사용하지 않음)
   
-  /// Phase 2: 메모리 데이터를 DB에 저장
+  /// Phase 2: 메모리 데이터를 DB에 저장 (Phase 3: 에러 처리 강화)
   Future<void> _saveToDatabase() async {
     if (_isDisposed || !_isInitialized) return;
     
@@ -584,12 +606,20 @@ class ChargingCurrentHistoryService {
         return; // 저장할 데이터 없음
       }
       
+      // Phase 3: 저장 전 데이터 검증
+      if (todayData.length > 10000) {
+        debugPrint('ChargingCurrentHistoryService: 저장할 데이터가 너무 많음 (${todayData.length}개), 일부만 저장');
+        // 너무 많은 데이터는 최근 것만 저장
+        final recentData = todayData.sublist(todayData.length - 1000);
+        _dailyData[todayKey] = recentData;
+      }
+      
       // DB에 저장되지 않은 데이터만 필터링 (간단한 체크: 이미 저장된 데이터는 제외)
       // 실제 구현에서는 저장된 마지막 타임스탬프를 추적하거나, 전체를 저장하고 중복 제거
       // Phase 2에서는 단순히 모든 데이터를 저장하되, DB에서 이미 존재하는지 확인하지 않음
       // (DB의 conflictAlgorithm.replace로 자동 처리)
       
-      final pointsToSave = todayData.map((point) => {
+      final pointsToSave = _dailyData[todayKey]!.map((point) => {
         'timestamp': point.timestamp,
         'currentMa': point.currentMa,
       }).toList();
@@ -603,10 +633,15 @@ class ChargingCurrentHistoryService {
         // Phase 2에서는 유지하여 빠른 조회 지원
       }
     } catch (e, stackTrace) {
+      // Phase 3: 에러 처리 강화 - 에러 발생 시에도 서비스는 계속 작동
       debugPrint('ChargingCurrentHistoryService: DB 저장 실패 - $e');
       debugPrint('스택 트레이스: $stackTrace');
+      // 에러 발생해도 메모리 데이터는 유지하여 다음 저장 시도 시 다시 저장 가능
     }
   }
+  
+  /// Phase 3: 공개 메서드로 변경 (외부에서 호출 가능)
+  Future<void> saveToDatabase() => _saveToDatabase();
   
   /// Phase 2: 백그라운드에서 수집된 데이터 확인 및 동기화
   Future<void> _checkAndSyncBackgroundData() async {

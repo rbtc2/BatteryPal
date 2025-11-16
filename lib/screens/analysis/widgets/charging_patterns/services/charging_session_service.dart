@@ -281,10 +281,12 @@ class ChargingSessionService {
     }
   }
   
-  /// 에러 처리
+  /// 에러 처리 (Phase 3: 에러 처리 강화)
   void _onError(dynamic error) {
     debugPrint('ChargingSessionService: 스트림 에러 - $error');
-    // 에러 발생 시에도 서비스는 계속 실행
+    // Phase 3: 에러 발생 시에도 서비스는 계속 실행
+    // 스트림 구독은 유지되며, 다음 이벤트에서 정상 작동할 수 있도록 함
+    // 필요시 재연결 로직을 추가할 수 있음
   }
   
   // ==================== 세션 시작 처리 ====================

@@ -90,49 +90,64 @@ class HomeLifecycleManager {
     // 기존 구독 정리
     _batteryInfoSubscription?.cancel();
     
-    // 새로운 스트림 구독 생성
+    // 새로운 스트림 구독 생성 (Phase 3: 중복 업데이트 방지 강화)
     _batteryInfoSubscription = _batteryService.batteryInfoStream.listen((batteryInfo) {
-      debugPrint('HomeLifecycleManager: 배터리 정보 수신 - ${batteryInfo.toString()}');
-      
-      // 이전 충전 상태 확인
-      final wasCharging = _cachedBatteryInfo?.isCharging ?? false;
-      final isCharging = batteryInfo.isCharging;
-      
-      // 스마트 캐시 업데이트
-      _updateCache(batteryInfo);
-      
-      // 충전 상태 변화 감지 (충전 시작/종료)
-      if (wasCharging != isCharging) {
-        debugPrint('HomeLifecycleManager: 충전 상태 변화 감지 - ${wasCharging ? "충전 중" : "방전 중"} → ${isCharging ? "충전 중" : "방전 중"}');
-        // 주기적 새로고침 제거됨 - batteryInfoStream 이벤트 기반으로 자동 업데이트됨
-      }
-      
-      // 충전 전류 변화 감지
-      if (batteryInfo.isCharging) {
-        final currentChargingCurrent = batteryInfo.chargingCurrent;
-        if (_previousChargingCurrent != currentChargingCurrent && currentChargingCurrent >= 0) {
-          debugPrint('HomeLifecycleManager: 충전 전류 변화 감지 - ${_previousChargingCurrent}mA → ${currentChargingCurrent}mA');
-          _previousChargingCurrent = currentChargingCurrent;
-          
-          // 전역 콜백 호출 (하위 호환성)
-          onChargingCurrentChanged?.call();
-          
-          // 탭별 콜백 호출
-          for (final callback in _chargingCallbacks.values) {
-            callback?.call();
+      try {
+        // Phase 3: 중복 업데이트 방지 - 캐시된 정보와 비교하여 의미있는 변화만 처리
+        if (!_shouldProcessBatteryInfo(batteryInfo)) {
+          return; // 의미있는 변화가 없으면 처리하지 않음
+        }
+        
+        debugPrint('HomeLifecycleManager: 배터리 정보 수신 - ${batteryInfo.toString()}');
+        
+        // 이전 충전 상태 확인
+        final wasCharging = _cachedBatteryInfo?.isCharging ?? false;
+        final isCharging = batteryInfo.isCharging;
+        
+        // 스마트 캐시 업데이트
+        _updateCache(batteryInfo);
+        
+        // 충전 상태 변화 감지 (충전 시작/종료)
+        if (wasCharging != isCharging) {
+          debugPrint('HomeLifecycleManager: 충전 상태 변화 감지 - ${wasCharging ? "충전 중" : "방전 중"} → ${isCharging ? "충전 중" : "방전 중"}');
+          // 주기적 새로고침 제거됨 - batteryInfoStream 이벤트 기반으로 자동 업데이트됨
+        }
+        
+        // 충전 전류 변화 감지
+        if (batteryInfo.isCharging) {
+          final currentChargingCurrent = batteryInfo.chargingCurrent;
+          if (_previousChargingCurrent != currentChargingCurrent && currentChargingCurrent >= 0) {
+            debugPrint('HomeLifecycleManager: 충전 전류 변화 감지 - ${_previousChargingCurrent}mA → ${currentChargingCurrent}mA');
+            _previousChargingCurrent = currentChargingCurrent;
+            
+            // 전역 콜백 호출 (하위 호환성)
+            onChargingCurrentChanged?.call();
+            
+            // 탭별 콜백 호출
+            for (final callback in _chargingCallbacks.values) {
+              callback?.call();
+            }
           }
         }
+        
+        // 전역 콜백 호출 (하위 호환성)
+        onBatteryInfoUpdated?.call(batteryInfo);
+        
+        // 탭별 콜백 호출
+        for (final callback in _tabCallbacks.values) {
+          callback?.call(batteryInfo);
+        }
+        
+        debugPrint('HomeLifecycleManager: 배터리 정보 업데이트 콜백 호출 - 배터리 레벨: ${batteryInfo.formattedLevel}');
+      } catch (e, stackTrace) {
+        // Phase 3: 에러 처리 강화 - 에러 발생 시에도 서비스는 계속 작동
+        debugPrint('HomeLifecycleManager: 배터리 정보 처리 중 오류 발생 - $e');
+        debugPrint('스택 트레이스: $stackTrace');
       }
-      
-      // 전역 콜백 호출 (하위 호환성)
-      onBatteryInfoUpdated?.call(batteryInfo);
-      
-      // 탭별 콜백 호출
-      for (final callback in _tabCallbacks.values) {
-        callback?.call(batteryInfo);
-      }
-      
-      debugPrint('HomeLifecycleManager: 배터리 정보 업데이트 콜백 호출 - 배터리 레벨: ${batteryInfo.formattedLevel}');
+    }, onError: (error) {
+      // Phase 3: 에러 처리 강화
+      debugPrint('HomeLifecycleManager: 배터리 정보 스트림 오류 - $error');
+      // 에러 발생 시에도 서비스는 계속 작동
     });
     
     debugPrint('HomeLifecycleManager: 배터리 정보 스트림 구독 설정 완료');
@@ -296,6 +311,45 @@ class HomeLifecycleManager {
     _cachedBatteryInfo = batteryInfo;
     _lastCacheTime = DateTime.now();
     debugPrint('HomeLifecycleManager: 배터리 정보 캐시 업데이트 - ${batteryInfo.formattedLevel}');
+  }
+  
+  /// Phase 3: 배터리 정보를 처리해야 하는지 확인
+  /// 중복 업데이트를 방지하기 위해 의미있는 변화가 있을 때만 true를 반환합니다.
+  bool _shouldProcessBatteryInfo(BatteryInfo newInfo) {
+    final cachedInfo = _cachedBatteryInfo;
+    
+    // 캐시가 없으면 항상 처리
+    if (cachedInfo == null) {
+      return true;
+    }
+    
+    // 캐시가 만료되었으면 처리
+    if (_lastCacheTime == null || 
+        DateTime.now().difference(_lastCacheTime!) >= _cacheValidityDuration) {
+      return true;
+    }
+    
+    // 충전 상태 변화는 항상 처리
+    if (cachedInfo.isCharging != newInfo.isCharging) {
+      return true;
+    }
+    
+    // 배터리 레벨 변화 (0.5% 이상)는 처리
+    final levelDiff = (newInfo.level - cachedInfo.level).abs();
+    if (levelDiff >= 0.5) {
+      return true;
+    }
+    
+    // 충전 중일 때 충전 전류 변화 (50mA 이상)는 처리
+    if (newInfo.isCharging && cachedInfo.isCharging) {
+      final currentDiff = (newInfo.chargingCurrent - cachedInfo.chargingCurrent).abs();
+      if (currentDiff >= 50) {
+        return true;
+      }
+    }
+    
+    // 의미있는 변화가 없으면 처리하지 않음
+    return false;
   }
   
   /// 탭별 콜백 등록

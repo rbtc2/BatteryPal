@@ -107,7 +107,7 @@ class BatteryHistoryService {
     }
   }
 
-  /// 배터리 상태 변화 감지 시 실행
+  /// 배터리 상태 변화 감지 시 실행 (Phase 3: 에러 처리 강화)
   Future<void> _onBatteryStateChanged(BatteryInfo batteryInfo) async {
     if (!_isCollecting) return;
     
@@ -116,14 +116,18 @@ class BatteryHistoryService {
       if (_shouldCollectData(batteryInfo)) {
         await _collectBatteryDataPoint(batteryInfo, 'system_event');
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      // Phase 3: 에러 처리 강화 - 에러 발생 시에도 서비스는 계속 작동
       debugPrint('배터리 상태 변화 처리 실패: $e');
+      debugPrint('스택 트레이스: $stackTrace');
     }
   }
 
-  /// 배터리 에러 처리
+  /// 배터리 에러 처리 (Phase 3: 에러 처리 강화)
   void _onBatteryError(dynamic error) {
     debugPrint('배터리 서비스 에러: $error');
+    // Phase 3: 에러 발생 시에도 서비스는 계속 작동
+    // 스트림 구독은 유지되며, 다음 이벤트에서 정상 작동할 수 있도록 함
   }
 
   // 주기적 데이터 수집 제거됨 - batteryInfoStream 이벤트 기반으로 자동 수집됨

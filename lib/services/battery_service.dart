@@ -117,18 +117,73 @@ class BatteryService {
     }
   }
   
-  /// 안전하게 스트림에 이벤트 추가
+  /// 안전하게 스트림에 이벤트 추가 (Phase 3: 이벤트 필터링 추가)
+  /// 의미있는 변화가 있을 때만 이벤트를 전달하여 불필요한 업데이트를 방지합니다.
   void _safeAddEvent(BatteryInfo batteryInfo) {
     if (!_isDisposed && _batteryInfoController != null && !_batteryInfoController!.isClosed) {
       try {
-        _batteryInfoController!.add(batteryInfo);
-        debugPrint('배터리 정보 스트림에 추가됨: ${batteryInfo.formattedLevel}');
+        // Phase 3: 이벤트 필터링 - 의미있는 변화가 있을 때만 전달
+        if (_shouldEmitEvent(batteryInfo)) {
+          _batteryInfoController!.add(batteryInfo);
+          _debugLog('배터리 정보 스트림에 추가됨: ${batteryInfo.formattedLevel}');
+        } else {
+          _debugLog('배터리 정보 변화가 없어 이벤트 건너뜀: ${batteryInfo.formattedLevel}');
+        }
       } catch (e) {
         debugPrint('스트림에 이벤트 추가 실패: $e');
       }
     } else {
-      debugPrint('스트림이 닫혔거나 서비스가 dispose됨, 이벤트 추가 건너뜀');
+      _debugLog('스트림이 닫혔거나 서비스가 dispose됨, 이벤트 추가 건너뜀');
     }
+  }
+  
+  /// Phase 3: 이벤트를 전달해야 하는지 확인
+  /// 의미있는 변화가 있을 때만 true를 반환합니다.
+  bool _shouldEmitEvent(BatteryInfo newInfo) {
+    final previousInfo = _currentBatteryInfo;
+    
+    // 첫 업데이트는 항상 전달
+    if (previousInfo == null) {
+      return true;
+    }
+    
+    // 충전 상태 변화는 항상 전달
+    if (previousInfo.isCharging != newInfo.isCharging) {
+      return true;
+    }
+    
+    // 배터리 레벨 변화 (0.5% 이상)는 전달
+    final levelDiff = (newInfo.level - previousInfo.level).abs();
+    if (levelDiff >= 0.5) {
+      return true;
+    }
+    
+    // 충전 중일 때 충전 전류 변화 (50mA 이상)는 전달
+    if (newInfo.isCharging && previousInfo.isCharging) {
+      final currentDiff = (newInfo.chargingCurrent - previousInfo.chargingCurrent).abs();
+      if (currentDiff >= 50) {
+        return true;
+      }
+    }
+    
+    // 온도 변화 (2°C 이상)는 전달
+    if (newInfo.temperature != -1.0 && previousInfo.temperature != -1.0) {
+      final tempDiff = (newInfo.temperature - previousInfo.temperature).abs();
+      if (tempDiff >= 2.0) {
+        return true;
+      }
+    }
+    
+    // 전압 변화 (50mV 이상)는 전달
+    if (newInfo.voltage != -1 && previousInfo.voltage != -1) {
+      final voltageDiff = (newInfo.voltage - previousInfo.voltage).abs();
+      if (voltageDiff >= 50) {
+        return true;
+      }
+    }
+    
+    // 의미있는 변화가 없으면 전달하지 않음
+    return false;
   }
 
   // ==================== 모니터링 관리 ====================
