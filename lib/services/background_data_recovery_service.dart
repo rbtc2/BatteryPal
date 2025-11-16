@@ -189,33 +189,35 @@ class BackgroundDataRecoveryService {
     }
   }
 
-  /// 충전 전류 히스토리 서비스에 데이터 동기화
+  /// 충전 전류 히스토리 서비스에 데이터 동기화 (Phase 2 개선)
   Future<void> _syncChargingCurrentHistory(BackgroundDataInfo dataInfo) async {
     try {
       if (!dataInfo.hasBackgroundData) return;
 
       debugPrint('BackgroundDataRecoveryService: 충전 전류 히스토리 동기화 시작...');
       
-      // ChargingCurrentHistoryService는 이미 데이터베이스에서 데이터를 읽으므로
-      // 별도의 동기화 작업이 필요 없음
-      // 다만, 서비스가 초기화되지 않았다면 초기화
+      // 서비스가 초기화되지 않았다면 초기화
       if (!_chargingCurrentHistoryService.isInitialized) {
         await _chargingCurrentHistoryService.initialize();
       }
-
-      debugPrint('BackgroundDataRecoveryService: 충전 전류 히스토리 동기화 완료');
+      
+      // Phase 2: ChargingCurrentHistoryService의 _checkAndSyncBackgroundData()가 
+      // 이미 initialize()에서 호출되므로, 여기서는 추가 동기화가 필요 없음
+      // 다만, 명시적으로 동기화를 강제하려면 서비스에 동기화 메서드를 추가할 수 있음
+      
+      debugPrint('BackgroundDataRecoveryService: 충전 전류 히스토리 동기화 완료 (${dataInfo.dataCount}개 데이터)');
     } catch (e) {
       debugPrint('BackgroundDataRecoveryService: 충전 전류 히스토리 동기화 실패 - $e');
     }
   }
 
-  /// 충전 세션 복구
+  /// 충전 세션 복구 (Phase 2 개선)
   Future<void> _recoverChargingSession(
     ChargingSessionInfo sessionInfo,
     BackgroundDataInfo dataInfo,
   ) async {
     try {
-      if (!dataInfo.hasBackgroundData || sessionInfo.startTime == null) {
+      if (!dataInfo.hasBackgroundData) {
         return;
       }
 
@@ -226,6 +228,10 @@ class BackgroundDataRecoveryService {
         await _chargingSessionService.initialize();
       }
 
+      // Phase 2: ChargingSessionService의 _recoverBackgroundSession()이 
+      // 이미 initialize()에서 호출되므로, 여기서는 추가 복구가 필요 없음
+      // 다만, 명시적으로 복구를 강제하려면 서비스에 복구 메서드를 추가할 수 있음
+      
       // 세션이 아직 진행 중인 경우, ChargingSessionService가 자동으로 감지할 수 있도록
       // BatteryService의 현재 상태를 확인
       // (ChargingSessionService는 BatteryService 스트림을 구독하므로 자동으로 처리됨)

@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import '../../../../../models/models.dart';
 import '../../../../../services/battery_service.dart';
 import '../../../../../services/last_charging_info_service.dart';
+import '../../../../../services/battery_history_database_service.dart';
 import '../models/charging_session_models.dart';
 import 'charging_session_storage.dart';
 import 'session_timer_manager.dart';
@@ -13,6 +14,7 @@ import 'session_data_collector.dart';
 import 'session_record_builder.dart';
 import 'date_change_manager.dart';
 import 'session_state_manager.dart';
+import '../utils/time_slot_utils.dart';
 
 /// 충전 세션 감지 및 추적 서비스 (싱글톤)
 /// 
@@ -536,16 +538,19 @@ class ChargingSessionService {
   
   // ==================== 백그라운드 세션 복구 ====================
   
-  /// Phase 2: 백그라운드 세션 복구
-  /// 네이티브에서 저장한 세션 정보를 확인하고 복구합니다.
+  /// Phase 2: 백그라운드 세션 복구 (개선됨)
+  /// 네이티브에서 저장한 세션 정보와 데이터베이스의 백그라운드 데이터를 확인하여 복구합니다.
   Future<void> _recoverBackgroundSession() async {
     if (_isDisposed) return;
     
     try {
       debugPrint('ChargingSessionService: 백그라운드 세션 복구 확인 시작...');
       
-      // 네이티브에서 충전 세션 정보 가져오기
+      // 1. 네이티브에서 충전 세션 정보 가져오기
       final sessionInfo = await NativeBatteryService.getChargingSessionInfo();
+      
+      // 2. 데이터베이스에서 백그라운드 데이터로부터 완료된 세션 분석
+      await _analyzeBackgroundSessionsFromDatabase();
       
       if (sessionInfo == null) {
         debugPrint('ChargingSessionService: 네이티브 세션 정보 없음');
@@ -554,7 +559,7 @@ class ChargingSessionService {
       
       debugPrint('ChargingSessionService: 네이티브 세션 정보 발견 - $sessionInfo');
       
-      // 세션이 아직 진행 중인 경우
+      // 3. 세션이 아직 진행 중인 경우 복구
       if (sessionInfo.isChargingActive && sessionInfo.startTime != null) {
         final currentInfo = _batteryService.currentBatteryInfo;
         
@@ -563,15 +568,11 @@ class ChargingSessionService {
           debugPrint('ChargingSessionService: 진행 중인 백그라운드 세션 복구 - 시작 시간: ${sessionInfo.startTime}');
           
           // 세션 시작 시간을 네이티브에서 가져온 시간으로 설정
-          // (BatteryInfo를 기반으로 세션 시작)
           if (sessionInfo.startBatteryLevel != null) {
-            // 시작 배터리 레벨이 있으면 이를 사용하여 세션 시작
-            // 실제로는 _startSession을 호출하되, 시작 시간만 네이티브 시간으로 설정
             _stateManager.setWasCharging(true);
             
             // 세션 시작 (시작 시간은 네이티브 시간 사용)
             if (!_stateManager.isActive) {
-              // 세션이 아직 시작되지 않았으면 시작
               _startSession(currentInfo);
               
               // 시작 시간을 네이티브 시간으로 업데이트
@@ -600,6 +601,174 @@ class ChargingSessionService {
       debugPrint('ChargingSessionService: 백그라운드 세션 복구 완료');
     } catch (e, stackTrace) {
       debugPrint('ChargingSessionService: 백그라운드 세션 복구 실패 - $e');
+      debugPrint('스택 트레이스: $stackTrace');
+    }
+  }
+  
+  /// Phase 2: 데이터베이스의 백그라운드 데이터로부터 완료된 세션 분석 및 복구
+  /// WorkManager에서 수집한 백그라운드 데이터를 분석하여 완료된 세션을 복구합니다.
+  Future<void> _analyzeBackgroundSessionsFromDatabase() async {
+    if (_isDisposed) return;
+    
+    try {
+      debugPrint('ChargingSessionService: 백그라운드 데이터로부터 세션 분석 시작...');
+      
+      // 데이터베이스 서비스를 통해 데이터베이스 접근
+      final databaseService = BatteryHistoryDatabaseService();
+      final db = databaseService.database;
+      if (db == null) {
+        debugPrint('ChargingSessionService: 데이터베이스가 초기화되지 않음');
+        return;
+      }
+      
+      // 최근 24시간 내의 백그라운드 데이터 확인
+      final cutoffTime = DateTime.now().subtract(const Duration(hours: 24));
+      final cutoffTimestamp = cutoffTime.millisecondsSinceEpoch;
+      
+      // 백그라운드 데이터 조회 (collection_method = 'background_workmanager')
+      final results = await db.query(
+        'battery_history',
+        columns: ['timestamp', 'is_charging', 'battery_level', 'charging_current'],
+        where: 'timestamp >= ? AND collection_method = ?',
+        whereArgs: [cutoffTimestamp, 'background_workmanager'],
+        orderBy: 'timestamp ASC',
+      );
+      
+      if (results.isEmpty) {
+        debugPrint('ChargingSessionService: 백그라운드 데이터 없음');
+        return;
+      }
+      
+      debugPrint('ChargingSessionService: 백그라운드 데이터 ${results.length}개 발견, 세션 분석 시작...');
+      
+      // 충전 시작/종료 패턴 분석하여 세션 추출
+      final sessions = <Map<String, dynamic>>[];
+      DateTime? sessionStart;
+      int? startBatteryLevel;
+      int? startChargingCurrent;
+      
+      for (final row in results) {
+        final timestamp = DateTime.fromMillisecondsSinceEpoch(row['timestamp'] as int);
+        final isCharging = (row['is_charging'] as int) == 1;
+        final batteryLevel = row['battery_level'] as double? ?? 0.0;
+        final chargingCurrent = row['charging_current'] as int? ?? 0;
+        
+        if (isCharging && sessionStart == null) {
+          // 충전 시작
+          sessionStart = timestamp;
+          startBatteryLevel = batteryLevel.toInt();
+          startChargingCurrent = chargingCurrent;
+        } else if (!isCharging && sessionStart != null) {
+          // 충전 종료 - 세션 완료
+          final duration = timestamp.difference(sessionStart!);
+          
+          // 최소 3분 이상 지속된 세션만 저장
+          if (duration.inMinutes >= 3) {
+            sessions.add({
+              'startTime': sessionStart,
+              'endTime': timestamp,
+              'duration': duration,
+              'startBatteryLevel': startBatteryLevel,
+              'endBatteryLevel': batteryLevel.toInt(),
+              'startChargingCurrent': startChargingCurrent,
+            });
+            debugPrint('ChargingSessionService: 백그라운드 세션 발견 - ${sessionStart} ~ ${timestamp} (${duration.inMinutes}분)');
+          }
+          
+          sessionStart = null;
+          startBatteryLevel = null;
+          startChargingCurrent = null;
+        }
+      }
+      
+      // 마지막 세션이 아직 종료되지 않은 경우 (현재 충전 중)
+      if (sessionStart != null) {
+        final currentInfo = _batteryService.currentBatteryInfo;
+        if (currentInfo != null && currentInfo.isCharging) {
+          // 현재 충전 중이면 세션 복구 (위에서 처리됨)
+          debugPrint('ChargingSessionService: 진행 중인 백그라운드 세션 발견 - ${sessionStart}');
+        }
+      }
+      
+      // 완료된 세션들을 저장소에 저장 (중복 체크 포함)
+      int recoveredCount = 0;
+      for (final session in sessions) {
+        try {
+          // 이미 저장된 세션인지 확인 (시작 시간 기준)
+          final existingSessions = await storageService.getTodaySessions();
+          final isDuplicate = existingSessions.any((s) => 
+            s.startTime.difference(session['startTime'] as DateTime).abs().inMinutes < 1
+          );
+          
+          if (!isDuplicate) {
+            // 백그라운드 세션을 위한 간단한 세션 기록 생성
+            // SessionRecordBuilder를 사용하지 않고 직접 생성 (백그라운드 데이터는 상세 정보 없음)
+            final startTime = session['startTime'] as DateTime;
+            final endTime = session['endTime'] as DateTime;
+            final duration = session['duration'] as Duration;
+            final startBatteryLevel = session['startBatteryLevel'] as int;
+            final endBatteryLevel = session['endBatteryLevel'] as int;
+            final batteryChange = endBatteryLevel - startBatteryLevel;
+            final avgCurrent = session['startChargingCurrent'] as int? ?? 0;
+            
+            // 세션 ID 생성
+            final sessionId = 'session_${startTime.millisecondsSinceEpoch}';
+            
+            // 시간대 계산 (TimeSlotUtils 사용)
+            final timeSlot = TimeSlotUtils.getTimeSlot(startTime);
+            
+            // 세션 제목 생성 (기존 제목과 중복되지 않도록)
+            final existingTitles = existingSessions
+                .map((s) => s.sessionTitle)
+                .toList();
+            final sessionTitle = TimeSlotUtils.generateSessionTitle(timeSlot, existingTitles);
+            
+            // 세션 기록 생성 (최소한의 정보만 포함)
+            final sessionRecord = ChargingSessionRecord(
+              id: sessionId,
+              startTime: startTime,
+              endTime: endTime,
+              startBatteryLevel: startBatteryLevel.toDouble(),
+              endBatteryLevel: endBatteryLevel.toDouble(),
+              batteryChange: batteryChange.toDouble(),
+              duration: duration,
+              avgCurrent: avgCurrent.toDouble(),
+              avgTemperature: 0.0, // 백그라운드 데이터에는 온도 정보 없음
+              maxCurrent: avgCurrent,
+              minCurrent: avgCurrent,
+              efficiency: 0.0, // 백그라운드 데이터에는 효율 계산 불가
+              timeSlot: timeSlot,
+              sessionTitle: sessionTitle,
+              speedChanges: [], // 백그라운드 데이터에는 상세 변화 이력 없음
+              icon: TimeSlotUtils.getTimeSlotIcon(timeSlot),
+              color: TimeSlotUtils.getTimeSlotColor(timeSlot),
+              batteryCapacity: null,
+              batteryVoltage: null,
+              isValid: true,
+            );
+            
+            if (sessionRecord.validate()) {
+              await storageService.saveSession(sessionRecord, saveToDatabase: true);
+              recoveredCount++;
+              debugPrint('ChargingSessionService: 백그라운드 세션 복구 완료 - ${session['startTime']}');
+            } else {
+              debugPrint('ChargingSessionService: 백그라운드 세션이 유효하지 않음 - ${session['startTime']}');
+            }
+          }
+        } catch (e) {
+          debugPrint('ChargingSessionService: 백그라운드 세션 저장 실패 - $e');
+        }
+      }
+      
+      if (recoveredCount > 0) {
+        debugPrint('ChargingSessionService: 백그라운드 세션 ${recoveredCount}개 복구 완료');
+        _notifySessionsChanged();
+      } else {
+        debugPrint('ChargingSessionService: 복구할 백그라운드 세션 없음');
+      }
+      
+    } catch (e, stackTrace) {
+      debugPrint('ChargingSessionService: 백그라운드 세션 분석 실패 - $e');
       debugPrint('스택 트레이스: $stackTrace');
     }
   }
