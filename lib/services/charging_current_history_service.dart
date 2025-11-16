@@ -26,9 +26,8 @@ class ChargingCurrentHistoryService {
   // 스트림 구독 관리
   StreamSubscription<BatteryInfo>? _batteryInfoSubscription;
   
-  // Phase 2: 배치 저장을 위한 타이머
-  Timer? _batchSaveTimer;
-  static const Duration _batchSaveInterval = Duration(minutes: 1); // 1분마다 배치 저장
+  // 배치 저장 타이머 제거됨 - 이벤트 기반으로 전환
+  // Timer? _batchSaveTimer; // 더 이상 사용하지 않음
   static const int _batchSaveThreshold = 50; // 50개 이상이면 즉시 저장
   
   // 충전 중 주기적 데이터 수집 타이머 (그래프 가로선 표시용)
@@ -90,8 +89,7 @@ class ChargingCurrentHistoryService {
         cancelOnError: false,
       );
       
-      // Phase 2: 배치 저장 타이머 시작
-      _startBatchSaveTimer();
+      // 배치 저장 타이머 제거됨 - 이벤트 기반으로 전환
       
       // Phase 2: 기존 DB 데이터 로드 (오늘 데이터)
       await _loadTodayDataFromDatabase();
@@ -283,6 +281,13 @@ class ChargingCurrentHistoryService {
     
     // 날짜별로 저장
     final dateKey = _getDateKey(now);
+    
+    // 날짜 변경 감지 및 과거 날짜 데이터 저장
+    if (_lastSavedDateKey != null && _lastSavedDateKey != dateKey) {
+      debugPrint('ChargingCurrentHistoryService: 날짜 변경 감지 - $_lastSavedDateKey -> $dateKey');
+      _checkDateChangeAndSave();
+    }
+    
     if (!_dailyData.containsKey(dateKey)) {
       _dailyData[dateKey] = [];
       
@@ -297,7 +302,7 @@ class ChargingCurrentHistoryService {
     
     debugPrint('ChargingCurrentHistoryService: 전류 기록 - ${currentMa}mA ($dateKey)');
     
-    // Phase 2: 배치 저장 임계값 체크
+    // 배치 저장 임계값 체크 (50개 이상이면 즉시 저장)
     final todayData = _dailyData[dateKey] ?? [];
     if (todayData.length >= _batchSaveThreshold) {
       _saveToDatabase();
@@ -424,21 +429,8 @@ class ChargingCurrentHistoryService {
     // 에러 발생 시에도 서비스는 계속 실행
   }
   
-  /// Phase 2: 배치 저장 타이머 시작
-  void _startBatchSaveTimer() {
-    _batchSaveTimer?.cancel();
-    _batchSaveTimer = Timer.periodic(_batchSaveInterval, (timer) {
-      if (!_isDisposed && _isInitialized) {
-        // 날짜 변경 감지 및 과거 날짜 데이터 저장 (비동기)
-        _checkDateChangeAndSave();
-        // 오늘 데이터 저장
-        _saveToDatabase();
-        // 7일 이상 된 데이터 정리 (하루에 한 번만 실행)
-        _checkAndCleanupOldData();
-      }
-    });
-    debugPrint('ChargingCurrentHistoryService: 배치 저장 타이머 시작');
-  }
+  // 배치 저장 타이머 제거됨 - 이벤트 기반으로 전환
+  // 데이터가 일정량 쌓이거나 충전 종료 시에만 저장
   
   /// 7일 이상 된 데이터 정리 체크 (하루에 한 번만 실행)
   void _checkAndCleanupOldData() {
@@ -577,12 +569,7 @@ class ChargingCurrentHistoryService {
     });
   }
   
-  /// Phase 2: 배치 저장 타이머 중지
-  void _stopBatchSaveTimer() {
-    _batchSaveTimer?.cancel();
-    _batchSaveTimer = null;
-    debugPrint('ChargingCurrentHistoryService: 배치 저장 타이머 중지');
-  }
+  // 배치 저장 타이머 제거됨 (더 이상 사용하지 않음)
   
   /// Phase 2: 메모리 데이터를 DB에 저장
   Future<void> _saveToDatabase() async {
@@ -731,13 +718,12 @@ class ChargingCurrentHistoryService {
     _isDisposed = true;
     _isCollecting = false;
     
-    // Phase 2: 날짜 변경 체크 및 어제 데이터 저장
+    // 날짜 변경 체크 및 어제 데이터 저장
     _checkDateChangeAndSave();
-    // Phase 2: 마지막 저장 (오늘 데이터)
+    // 마지막 저장 (오늘 데이터)
     _saveToDatabase();
     
-    // Phase 2: 배치 저장 타이머 중지
-    _stopBatchSaveTimer();
+    // 배치 저장 타이머 제거됨 (더 이상 사용하지 않음)
     
     // 충전 모니터링 타이머 중지
     _stopChargingMonitoringTimer();

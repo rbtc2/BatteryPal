@@ -31,13 +31,8 @@ class HomeLifecycleManager {
     _batteryService.setSettingsService(settingsService);
   }
   
-  // 주기적 새로고침 타이머
-  Timer? _periodicRefreshTimer;
-  
-  // 적응형 새로고침 간격 (초)
-  static const int _refreshIntervalSeconds = 30;
-  static const int _backgroundRefreshIntervalSeconds = 60; // 백그라운드에서는 더 긴 간격
-  static const int _chargingRefreshIntervalSeconds = 10; // 충전 중에는 더 짧은 간격
+  // 주기적 새로고침 타이머 제거됨 - 이벤트 기반으로 전환
+  // Timer? _periodicRefreshTimer; // 더 이상 사용하지 않음
   
   // 충전 전류 변화 감지를 위한 이전 값
   int _previousChargingCurrent = -1;
@@ -77,15 +72,7 @@ class HomeLifecycleManager {
       // 배터리 정보 스트림 구독 설정
       _setupBatteryInfoStream();
       
-      // 충전 상태 확인 후 주기적 새로고침 시작/중지
-      final currentInfo = _batteryService.currentBatteryInfo;
-      if (currentInfo != null && currentInfo.isCharging) {
-        debugPrint('HomeLifecycleManager: 초기화 시 충전 중이므로 주기적 새로고침 시작');
-        _startPeriodicRefresh();
-      } else {
-        debugPrint('HomeLifecycleManager: 초기화 시 충전 중이 아니므로 주기적 새로고침 중지');
-        _stopPeriodicRefresh();
-      }
+      // 주기적 새로고침 제거됨 - batteryInfoStream 이벤트 기반으로 자동 업데이트됨
       
       // 앱 생명주기 리스너 설정
       _setupAppLifecycleListener();
@@ -117,16 +104,7 @@ class HomeLifecycleManager {
       // 충전 상태 변화 감지 (충전 시작/종료)
       if (wasCharging != isCharging) {
         debugPrint('HomeLifecycleManager: 충전 상태 변화 감지 - ${wasCharging ? "충전 중" : "방전 중"} → ${isCharging ? "충전 중" : "방전 중"}');
-        
-        if (isCharging) {
-          // 충전 시작: 주기적 새로고침 시작
-          debugPrint('HomeLifecycleManager: 충전 시작 - 주기적 새로고침 시작');
-          _startPeriodicRefresh();
-        } else {
-          // 충전 종료: 주기적 새로고침 중지
-          debugPrint('HomeLifecycleManager: 충전 종료 - 주기적 새로고침 중지');
-          _stopPeriodicRefresh();
-        }
+        // 주기적 새로고침 제거됨 - batteryInfoStream 이벤트 기반으로 자동 업데이트됨
       }
       
       // 충전 전류 변화 감지
@@ -160,80 +138,8 @@ class HomeLifecycleManager {
     debugPrint('HomeLifecycleManager: 배터리 정보 스트림 구독 설정 완료');
   }
   
-  /// 적응형 주기적 새로고침 시작
-  /// 충전 중일 때만 주기적 새로고침을 수행합니다
-  void _startPeriodicRefresh() {
-    final currentInfo = _cachedBatteryInfo ?? _batteryService.currentBatteryInfo;
-    
-    // 충전 중이 아닐 때는 주기적 새로고침 중지
-    if (currentInfo == null || !currentInfo.isCharging) {
-      debugPrint('HomeLifecycleManager: 충전 중이 아니므로 주기적 새로고침 중지');
-      _stopPeriodicRefresh();
-      return;
-    }
-    
-    final interval = _getOptimalRefreshInterval();
-    debugPrint('HomeLifecycleManager: 적응형 주기적 새로고침 시작 ($interval초 간격)');
-    
-    _periodicRefreshTimer?.cancel();
-    _periodicRefreshTimer = Timer.periodic(
-      Duration(seconds: interval),
-      (timer) {
-        final currentInfo = _cachedBatteryInfo ?? _batteryService.currentBatteryInfo;
-        
-        // 충전 중이 아니면 타이머 중지
-        if (currentInfo == null || !currentInfo.isCharging) {
-          debugPrint('HomeLifecycleManager: 충전 중이 아니므로 주기적 새로고침 중지');
-          timer.cancel();
-          _periodicRefreshTimer = null;
-          return;
-        }
-        
-        debugPrint('HomeLifecycleManager: 적응형 주기적 새로고침 실행');
-        _batteryService.refreshBatteryInfo();
-        
-        // 간격 재조정 (충전 상태 변화 시)
-        final newInterval = _getOptimalRefreshInterval();
-        if (newInterval != interval) {
-          debugPrint('HomeLifecycleManager: 새로고침 간격 재조정 - $interval초 → $newInterval초');
-          _startPeriodicRefresh(); // 재시작
-        }
-      },
-    );
-  }
-  
-  /// 최적의 새로고침 간격 계산
-  int _getOptimalRefreshInterval() {
-    final currentInfo = _cachedBatteryInfo ?? _batteryService.currentBatteryInfo;
-    
-    if (currentInfo == null) {
-      return _refreshIntervalSeconds; // 기본값
-    }
-    
-    // 충전 중이면 더 자주 새로고침
-    if (currentInfo.isCharging) {
-      return _chargingRefreshIntervalSeconds;
-    }
-    
-    // 배터리가 낮으면 더 자주 새로고침
-    if (currentInfo.level < 20) {
-      return 15; // 15초
-    }
-    
-    // 배터리가 높으면 덜 자주 새로고침
-    if (currentInfo.level > 80) {
-      return 45; // 45초
-    }
-    
-    return _refreshIntervalSeconds; // 기본값
-  }
-  
-  /// 주기적 새로고침 중지
-  void _stopPeriodicRefresh() {
-    debugPrint('HomeLifecycleManager: 주기적 새로고침 중지');
-    _periodicRefreshTimer?.cancel();
-    _periodicRefreshTimer = null;
-  }
+  // 주기적 새로고침 메서드 제거됨 - batteryInfoStream 이벤트 기반으로 자동 업데이트됨
+  // 더 이상 Timer.periodic을 사용하지 않으며, batteryInfoStream의 이벤트만으로 충분합니다.
   
   /// 앱 생명주기 리스너 설정
   void _setupAppLifecycleListener() {
@@ -278,35 +184,9 @@ class HomeLifecycleManager {
   void _optimizeForBackground() {
     debugPrint('HomeLifecycleManager: 백그라운드 최적화 시작');
     
-    final currentInfo = _cachedBatteryInfo ?? _batteryService.currentBatteryInfo;
-    
-    // 충전 중일 때만 백그라운드에서도 주기적 새로고침 유지
-    if (currentInfo != null && currentInfo.isCharging) {
-      // 주기적 새로고침 간격을 더 길게 조정
-      _periodicRefreshTimer?.cancel();
-      _periodicRefreshTimer = Timer.periodic(
-        const Duration(seconds: _backgroundRefreshIntervalSeconds),
-        (timer) {
-          final currentInfo = _cachedBatteryInfo ?? _batteryService.currentBatteryInfo;
-          
-          // 충전 중이 아니면 타이머 중지
-          if (currentInfo == null || !currentInfo.isCharging) {
-            debugPrint('HomeLifecycleManager: 충전 중이 아니므로 백그라운드 새로고침 중지');
-            timer.cancel();
-            _periodicRefreshTimer = null;
-            return;
-          }
-          
-          debugPrint('HomeLifecycleManager: 백그라운드 주기적 새로고침 실행');
-          _batteryService.refreshBatteryInfo();
-        },
-      );
-      debugPrint('HomeLifecycleManager: 백그라운드 최적화 완료 ($_backgroundRefreshIntervalSeconds초 간격)');
-    } else {
-      // 충전 중이 아니면 주기적 새로고침 중지
-      debugPrint('HomeLifecycleManager: 충전 중이 아니므로 백그라운드 새로고침 중지');
-      _stopPeriodicRefresh();
-    }
+    // 주기적 새로고침 제거됨 - batteryInfoStream 이벤트 기반으로 자동 업데이트됨
+    // 백그라운드에서도 스트림 구독은 유지되며, 시스템 이벤트가 발생할 때만 업데이트됨
+    debugPrint('HomeLifecycleManager: 백그라운드 최적화 완료 (이벤트 기반 모드)');
   }
   
   /// 포그라운드 최적화 (정상 모드)
@@ -319,19 +199,10 @@ class HomeLifecycleManager {
       _setupBatteryInfoStream();
     }
     
-    // 포그라운드 복귀 시 항상 배터리 정보 새로고침 (충전 상태 확인용)
-    debugPrint('HomeLifecycleManager: 포그라운드 복귀 - 배터리 정보 강제 새로고침');
-    _batteryService.refreshBatteryInfo().then((_) {
-      // 새로고침 후 충전 상태에 따라 주기적 새로고침 시작/중지
-      final currentInfo = _batteryService.currentBatteryInfo;
-      if (currentInfo != null && currentInfo.isCharging) {
-        debugPrint('HomeLifecycleManager: 포그라운드 복귀 - 충전 중이므로 주기적 새로고침 시작');
-        _startPeriodicRefresh();
-      } else {
-        debugPrint('HomeLifecycleManager: 포그라운드 복귀 - 충전 중이 아니므로 주기적 새로고침 중지');
-        _stopPeriodicRefresh();
-      }
-    });
+    // 포그라운드 복귀 시 한 번만 배터리 정보 새로고침 (최신 상태 확인용)
+    debugPrint('HomeLifecycleManager: 포그라운드 복귀 - 배터리 정보 한 번 새로고침');
+    _batteryService.refreshBatteryInfo();
+    // 주기적 새로고침 제거됨 - 이후 batteryInfoStream 이벤트 기반으로 자동 업데이트됨
     
     debugPrint('HomeLifecycleManager: 포그라운드 최적화 완료');
   }
@@ -375,17 +246,8 @@ class HomeLifecycleManager {
     }
     
     // 3. 백그라운드에서 최신 정보 새로고침 (비동기)
-    _refreshBatteryInfoInBackground().then((_) {
-      // 새로고침 후 충전 상태에 따라 주기적 새로고침 시작/중지
-      final currentInfo = _batteryService.currentBatteryInfo;
-      if (currentInfo != null && currentInfo.isCharging) {
-        debugPrint('HomeLifecycleManager: 탭 복귀 후 충전 중이므로 주기적 새로고침 시작');
-        _startPeriodicRefresh();
-      } else {
-        debugPrint('HomeLifecycleManager: 탭 복귀 후 충전 중이 아니므로 주기적 새로고침 중지');
-        _stopPeriodicRefresh();
-      }
-    });
+    _refreshBatteryInfoInBackground();
+    // 주기적 새로고침 제거됨 - 이후 batteryInfoStream 이벤트 기반으로 자동 업데이트됨
     
     debugPrint('HomeLifecycleManager: 탭 복귀 처리 완료');
   }
@@ -486,9 +348,8 @@ class HomeLifecycleManager {
     _appPausedCallbacks.clear();
     _appResumedCallbacks.clear();
     
-    // 스트림 구독과 타이머는 유지 (다른 탭에서 사용할 수 있음)
+    // 스트림 구독은 유지 (다른 탭에서 사용할 수 있음)
     // _batteryInfoSubscription?.cancel(); // 주석 처리
-    // _stopPeriodicRefresh(); // 주석 처리
     
     debugPrint('HomeLifecycleManager: dispose 완료 (싱글톤 - 핵심 서비스 유지)');
   }
@@ -501,8 +362,7 @@ class HomeLifecycleManager {
     _batteryInfoSubscription?.cancel();
     _batteryInfoSubscription = null;
     
-    // 주기적 새로고침 중지
-    _stopPeriodicRefresh();
+    // 주기적 새로고침 제거됨 (더 이상 사용하지 않음)
     
     // 모든 콜백 정리
     _tabCallbacks.clear();

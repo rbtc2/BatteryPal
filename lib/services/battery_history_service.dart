@@ -16,13 +16,13 @@ class BatteryHistoryService {
   final BatteryHistoryDatabaseService _databaseService = BatteryHistoryDatabaseService();
   
   StreamSubscription<BatteryInfo>? _batterySubscription;
-  Timer? _periodicCollectionTimer;
+  // 주기적 수집 타이머 제거됨 - 이벤트 기반으로 전환
+  // Timer? _periodicCollectionTimer; // 더 이상 사용하지 않음
   
   bool _isCollecting = false;
   bool _isInitialized = false;
   
   // 데이터 수집 설정
-  static const Duration _collectionInterval = Duration(minutes: 5);
   static const Duration _significantChangeThreshold = Duration(minutes: 2);
   
   // 마지막 수집된 데이터 포인트
@@ -63,14 +63,13 @@ class BatteryHistoryService {
       
       _isCollecting = true;
       
-      // 배터리 상태 변화 감지
+      // 배터리 상태 변화 감지 (이벤트 기반)
       _batterySubscription = _batteryService.batteryInfoStream.listen(
         _onBatteryStateChanged,
         onError: _onBatteryError,
       );
       
-      // 주기적 데이터 수집 시작
-      _startPeriodicCollection();
+      // 주기적 데이터 수집 제거됨 - 이벤트 기반으로 전환
       
       // 초기 데이터 포인트 수집
       await _collectCurrentBatteryData();
@@ -98,9 +97,7 @@ class BatteryHistoryService {
       await _batterySubscription?.cancel();
       _batterySubscription = null;
       
-      // 주기적 수집 중지
-      _periodicCollectionTimer?.cancel();
-      _periodicCollectionTimer = null;
+      // 주기적 수집 타이머 제거됨 (더 이상 사용하지 않음)
       
       debugPrint('배터리 데이터 수집 중지 완료');
       
@@ -129,14 +126,7 @@ class BatteryHistoryService {
     debugPrint('배터리 서비스 에러: $error');
   }
 
-  /// 주기적 데이터 수집 시작
-  void _startPeriodicCollection() {
-    _periodicCollectionTimer = Timer.periodic(_collectionInterval, (timer) async {
-      if (_isCollecting) {
-        await _collectCurrentBatteryData();
-      }
-    });
-  }
+  // 주기적 데이터 수집 제거됨 - batteryInfoStream 이벤트 기반으로 자동 수집됨
 
   /// 현재 배터리 데이터 수집
   Future<void> _collectCurrentBatteryData() async {

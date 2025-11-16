@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'battery_drain/widgets/drain_stats_card.dart';
 import 'battery_drain/widgets/drain_hourly_chart.dart';
@@ -49,9 +48,9 @@ class _BatteryDrainTabState extends State<BatteryDrainTab>
   final GlobalKey _chartKey = GlobalKey();
   final GlobalKey _listKey = GlobalKey();
   
-  // 실시간 업데이트 관련
-  Timer? _updateTimer; // 실시간 업데이트 타이머
-  bool _isTabVisible = false; // 탭 가시성 상태
+  // 탭 가시성 상태
+  bool _isTabVisible = false;
+  // 1분 타이머 제거됨 - 탭 전환 시에만 새로고침하도록 변경
   
   // 날짜 상태 관리 (DrainHourlyChart에 전달용)
   DateTime? _currentTargetDate;
@@ -100,39 +99,15 @@ class _BatteryDrainTabState extends State<BatteryDrainTab>
       });
       
       if (isVisible) {
-        // 탭이 보일 때: 실시간 업데이트 시작
-        _startRealtimeUpdate();
-      } else {
-        // 탭이 안 보일 때: 실시간 업데이트 중지
-        _stopRealtimeUpdate();
+        // 탭이 보일 때: 한 번만 새로고침 (이벤트 기반으로 전환)
+        _refreshStatsCard();
       }
+      // 탭이 안 보일 때는 아무 작업도 하지 않음 (메모리 절약)
     }
   }
   
-  /// 실시간 업데이트 시작 (탭이 보일 때만)
-  void _startRealtimeUpdate() {
-    _stopRealtimeUpdate(); // 기존 타이머 정리
-    
-    debugPrint('소모 탭 실시간 업데이트 시작');
-    
-    // 1분마다 업데이트
-    _updateTimer = Timer.periodic(const Duration(minutes: 1), (timer) {
-      if (!mounted || !_isTabVisible) {
-        timer.cancel();
-        return;
-      }
-      
-      // DrainStatsCard의 refresh 호출
-      _refreshStatsCard();
-    });
-  }
-  
-  /// 실시간 업데이트 중지 (탭이 안 보일 때)
-  void _stopRealtimeUpdate() {
-    _updateTimer?.cancel();
-    _updateTimer = null;
-    debugPrint('소모 탭 실시간 업데이트 중지');
-  }
+  // 1분 타이머 기반 실시간 업데이트 제거됨
+  // 탭이 보일 때 한 번만 새로고침하며, 사용자가 Pull-to-Refresh로 수동 새로고침 가능
   
   /// DrainStatsCard 새로고침
   void _refreshStatsCard() {
@@ -187,8 +162,7 @@ class _BatteryDrainTabState extends State<BatteryDrainTab>
       widget.tabController!.removeListener(_onTabControllerChanged);
     }
     
-    // 타이머 정리
-    _stopRealtimeUpdate();
+    // 타이머 제거됨 (더 이상 사용하지 않음)
     
     _animationController.dispose();
     super.dispose();
