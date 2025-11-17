@@ -6,7 +6,6 @@ import '../../../services/settings_service.dart';
 import '../../../services/native_battery_service.dart';
 import '../../../models/models.dart';
 import '../../../screens/analysis/widgets/charging_patterns/services/charging_session_service.dart';
-import '../../../models/charging_monitor_display_mode.dart';
 
 /// 충전 모니터 컨트롤러
 /// 타이머 및 상태 관리 로직을 담당하는 컨트롤러

@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
-import '../../../models/battery_history_models.dart';
 
 /// Phase 5: 데이터베이스 성능 최적화 서비스
 /// 

@@ -60,9 +60,6 @@ class ChargingCurrentHistoryService {
   // 날짜 변경 감지를 위한 마지막 저장 날짜 추적
   String? _lastSavedDateKey;
   
-  // 마지막 데이터 정리 실행 시간 (하루에 한 번만 실행)
-  DateTime? _lastCleanupTime;
-  
   /// 서비스 초기화
   /// 앱 시작 시 호출하여 BatteryService 스트림 구독 시작
   Future<void> initialize() async {
@@ -453,19 +450,6 @@ class ChargingCurrentHistoryService {
   
   // 배치 저장 타이머 제거됨 - 이벤트 기반으로 전환
   // 데이터가 일정량 쌓이거나 충전 종료 시에만 저장
-  
-  /// 7일 이상 된 데이터 정리 체크 (하루에 한 번만 실행)
-  void _checkAndCleanupOldData() {
-    if (_isDisposed || !_isInitialized) return;
-    
-    final now = DateTime.now();
-    // 마지막 정리 시간이 없거나, 하루가 지났으면 정리 실행
-    if (_lastCleanupTime == null || 
-        now.difference(_lastCleanupTime!) >= const Duration(days: 1)) {
-      _lastCleanupTime = now;
-      _cleanupOldDatabaseData();
-    }
-  }
   
   /// 날짜 변경 감지 및 과거 날짜 데이터 저장 (7일 전까지)
   void _checkDateChangeAndSave() {

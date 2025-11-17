@@ -114,6 +114,7 @@ class BatteryOptimizationHelper {
     
     if (!isIgnoring && autoShowDialog) {
       // 배터리 최적화 예외가 설정되지 않았고, 자동 다이얼로그 표시가 활성화되어 있으면
+      if (!context.mounted) return isIgnoring;
       await requestBatteryOptimizationException(context);
     }
     

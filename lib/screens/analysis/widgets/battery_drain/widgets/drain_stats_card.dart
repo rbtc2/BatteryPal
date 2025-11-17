@@ -41,7 +41,6 @@ class _DrainStatsCardState extends State<DrainStatsCard> with WidgetsBindingObse
   bool _hasUsageStatsPermission = false;
   
   // 날짜 변경 감지를 위한 상태
-  DateTime? _lastLoadedDate; // 마지막으로 로드한 날짜
   Timer? _midnightTimer; // 자정 타이머
   
   // Android 날짜 변경 확인을 위한 MethodChannel
@@ -61,7 +60,6 @@ class _DrainStatsCardState extends State<DrainStatsCard> with WidgetsBindingObse
       
       // 초기 날짜 콜백 호출
       final targetDate = _getTargetDate();
-      _lastLoadedDate = targetDate;
       widget.onDateChanged?.call(targetDate);
       
       _calculateDischargeCurrent();
@@ -115,7 +113,6 @@ class _DrainStatsCardState extends State<DrainStatsCard> with WidgetsBindingObse
     
     // 날짜 변경 콜백 호출
     final targetDate = _getTargetDate();
-    _lastLoadedDate = targetDate;
     widget.onDateChanged?.call(targetDate);
     
     _calculateDischargeCurrent(forceRefresh: true);
@@ -143,13 +140,6 @@ class _DrainStatsCardState extends State<DrainStatsCard> with WidgetsBindingObse
     } catch (e) {
       debugPrint('DrainStatsCard: 날짜 변경 확인 실패 - $e');
     }
-  }
-  
-  /// 두 날짜가 같은 날인지 확인
-  bool _isSameDate(DateTime date1, DateTime date2) {
-    return date1.year == date2.year &&
-           date1.month == date2.month &&
-           date1.day == date2.day;
   }
   
   /// 자정 타이머 시작
@@ -316,7 +306,6 @@ class _DrainStatsCardState extends State<DrainStatsCard> with WidgetsBindingObse
         setState(() {
           _screenOnTime = screenOnTime;
           _isLoadingScreenTime = false;
-          _lastLoadedDate = targetDate; // 로드한 날짜 업데이트
         });
         debugPrint('DrainStatsCard: 화면 켜짐 시간 로드 완료 - ${targetDate.toString().split(' ')[0]}: ${screenOnTime?.toStringAsFixed(2)}시간');
       }

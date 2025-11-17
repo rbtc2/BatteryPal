@@ -7,6 +7,7 @@ import '../../../../../models/models.dart';
 import '../../../../../services/battery_service.dart';
 import '../../../../../services/last_charging_info_service.dart';
 import '../../../../../services/battery_history_database_service.dart';
+import '../../../../../services/native_battery_service.dart';
 import '../models/charging_session_models.dart';
 import 'charging_session_storage.dart';
 import 'session_timer_manager.dart';
@@ -662,7 +663,7 @@ class ChargingSessionService {
           startChargingCurrent = chargingCurrent;
         } else if (!isCharging && sessionStart != null) {
           // 충전 종료 - 세션 완료
-          final duration = timestamp.difference(sessionStart!);
+          final duration = timestamp.difference(sessionStart);
           
           // 최소 3분 이상 지속된 세션만 저장
           if (duration.inMinutes >= 3) {
@@ -674,7 +675,7 @@ class ChargingSessionService {
               'endBatteryLevel': batteryLevel.toInt(),
               'startChargingCurrent': startChargingCurrent,
             });
-            debugPrint('ChargingSessionService: 백그라운드 세션 발견 - ${sessionStart} ~ ${timestamp} (${duration.inMinutes}분)');
+            debugPrint('ChargingSessionService: 백그라운드 세션 발견 - $sessionStart ~ $timestamp (${duration.inMinutes}분)');
           }
           
           sessionStart = null;
@@ -688,7 +689,7 @@ class ChargingSessionService {
         final currentInfo = _batteryService.currentBatteryInfo;
         if (currentInfo != null && currentInfo.isCharging) {
           // 현재 충전 중이면 세션 복구 (위에서 처리됨)
-          debugPrint('ChargingSessionService: 진행 중인 백그라운드 세션 발견 - ${sessionStart}');
+          debugPrint('ChargingSessionService: 진행 중인 백그라운드 세션 발견 - $sessionStart');
         }
       }
       
@@ -697,7 +698,7 @@ class ChargingSessionService {
       for (final session in sessions) {
         try {
           // 이미 저장된 세션인지 확인 (시작 시간 기준)
-          final existingSessions = await storageService.getTodaySessions();
+          final existingSessions = await _storageService.getTodaySessions();
           final isDuplicate = existingSessions.any((s) => 
             s.startTime.difference(session['startTime'] as DateTime).abs().inMinutes < 1
           );
@@ -750,7 +751,7 @@ class ChargingSessionService {
             );
             
             if (sessionRecord.validate()) {
-              await storageService.saveSession(sessionRecord, saveToDatabase: true);
+              await _storageService.saveSession(sessionRecord, saveToDatabase: true);
               recoveredCount++;
               debugPrint('ChargingSessionService: 백그라운드 세션 복구 완료 - ${session['startTime']}');
             } else {
@@ -763,7 +764,7 @@ class ChargingSessionService {
       }
       
       if (recoveredCount > 0) {
-        debugPrint('ChargingSessionService: 백그라운드 세션 ${recoveredCount}개 복구 완료');
+        debugPrint('ChargingSessionService: 백그라운드 세션 $recoveredCount개 복구 완료');
         _notifySessionsChanged();
       } else {
         debugPrint('ChargingSessionService: 복구할 백그라운드 세션 없음');

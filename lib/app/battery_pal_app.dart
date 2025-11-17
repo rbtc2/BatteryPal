@@ -43,7 +43,7 @@ class _BatteryPalAppState extends State<BatteryPalApp> {
       if (result != null && result.hasRecoveredData) {
         // 복구된 데이터가 있으면 알림 표시
         final context = _navigatorKey.currentContext;
-        if (context != null && mounted) {
+        if (context != null && context.mounted) {
           final message = _buildRecoveryMessage(result);
           SnackBarUtils.showInfo(context, message);
         }
