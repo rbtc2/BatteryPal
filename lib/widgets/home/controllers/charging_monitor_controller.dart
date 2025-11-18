@@ -251,13 +251,17 @@ class ChargingMonitorController extends ChangeNotifier {
   /// PHASE 4: 다른 충전기 감지 시 즉시 종료되는 경우도 처리
   /// PHASE 5: 불필요한 업데이트 방지 및 에러 처리 개선
   /// PHASE 6-2: 세션 시작 시간 리셋 보장 - 항상 null로 설정하여 완전 종료 확실히 처리
+  /// PHASE 8-2: 세션 시작 시간 리셋 보장 강화 - 더 확실한 리셋 및 검증 로직 추가
   void _handleSessionDeactivated() {
-    debugPrint('ChargingMonitorController: 세션 비활성화 감지 - 완전 종료');
+    debugPrint('ChargingMonitorController: ========== 세션 비활성화 감지 시작 - 완전 종료 ==========');
     
     try {
-      // 세션 서비스의 상태 확인 (다른 충전기 감지 시 즉시 종료인지 확인)
+      // PHASE 8-2: 세션 서비스의 상태 확인 (다른 충전기 감지 시 즉시 종료인지 확인)
       final sessionState = _sessionService.sessionState;
+      final sessionStartTime = _sessionService.sessionStartTime;
       final isImmediateEnd = sessionState == SessionState.idle;
+      
+      debugPrint('ChargingMonitorController: 세션 상태 확인 - sessionState: ${sessionState.name}, sessionStartTime: $sessionStartTime');
       
       if (isImmediateEnd) {
         debugPrint('ChargingMonitorController: 세션 즉시 종료 (다른 충전기 감지 또는 5초 대기 완료)');
@@ -265,19 +269,31 @@ class ChargingMonitorController extends ChangeNotifier {
         debugPrint('ChargingMonitorController: 세션 완전 종료 (5초 대기 완료)');
       }
       
-      // PHASE 6-2: 세션 시작 시간을 항상 null로 리셋 (완전 종료 보장)
+      // PHASE 8-2: 세션 시작 시간을 항상 null로 리셋 (완전 종료 보장)
       // 이전 세션의 시간이 남아있지 않도록 확실히 처리
       final hadSessionTime = _sessionStartTime != null;
+      final previousSessionStartTime = _sessionStartTime;
+      
+      // PHASE 8-2: 세션 서비스의 시작 시간도 null이어야 함 (일관성 검증)
+      if (sessionStartTime != null && sessionState == SessionState.idle) {
+        debugPrint('ChargingMonitorController: ⚠️ 경고 - 세션 서비스가 idle 상태인데 시작 시간이 남아있음: $sessionStartTime');
+      }
+      
+      // PHASE 8-2: 강제 리셋 - 세션 서비스가 idle 상태면 반드시 null로 설정
       _sessionStartTime = null;
       
       if (hadSessionTime) {
-        debugPrint('ChargingMonitorController: 세션 완전 종료 - 세션 시작 시간 리셋 (리프레시)');
+        debugPrint('ChargingMonitorController: ✅ 세션 완전 종료 - 세션 시작 시간 리셋 완료 (이전: $previousSessionStartTime → null)');
       } else {
         debugPrint('ChargingMonitorController: 세션 완전 종료 - 세션 시작 시간 이미 null (이중 리셋 방지)');
       }
       
+      // PHASE 8-2: 지속 시간 타이머도 확실히 중지
+      _stopDurationUpdateTimer();
+      
       // 실시간 업데이트 중지
       if (_isActive) {
+        debugPrint('ChargingMonitorController: 실시간 업데이트 중지');
         stopRealTimeUpdate();
       }
       
@@ -285,18 +301,28 @@ class ChargingMonitorController extends ChangeNotifier {
       // 다른 충전기 감지 시 즉시 종료되는 경우에도 세션이 저장되므로 로드
       loadLastChargingInfo();
       
+      // PHASE 8-2: 최종 검증 - 세션 시작 시간이 확실히 null인지 확인
+      if (_sessionStartTime != null) {
+        debugPrint('ChargingMonitorController: ⚠️ 경고 - 세션 시작 시간 리셋 실패! 강제로 null 설정');
+        _sessionStartTime = null;
+      }
+      
       // UI 업데이트
       notifyListeners();
       
-      debugPrint('ChargingMonitorController: 세션 완전 종료 처리 완료 - 모든 상태 리프레시됨');
-    } catch (e) {
-      debugPrint('ChargingMonitorController: 세션 비활성화 처리 중 오류 - $e');
+      debugPrint('ChargingMonitorController: ✅ 세션 완전 종료 처리 완료 - 모든 상태 리프레시됨 (세션 시작 시간: $_sessionStartTime)');
+      debugPrint('ChargingMonitorController: ========== 세션 비활성화 감지 완료 ==========');
+    } catch (e, stackTrace) {
+      debugPrint('ChargingMonitorController: ⚠️ 세션 비활성화 처리 중 오류 - $e');
+      debugPrint('스택 트레이스: $stackTrace');
       // 에러 발생 시에도 기본 정리 작업 수행 - 세션 시작 시간은 반드시 null로 설정
       _sessionStartTime = null;
+      _stopDurationUpdateTimer();
       if (_isActive) {
         stopRealTimeUpdate();
       }
       notifyListeners();
+      debugPrint('ChargingMonitorController: 에러 발생 후 기본 정리 작업 완료 (세션 시작 시간: $_sessionStartTime)');
     }
   }
 
@@ -314,11 +340,12 @@ class ChargingMonitorController extends ChangeNotifier {
       // 세션 시작 시간은 세션 상태 스트림의 _handleSessionActivated()에서 처리
       final sessionState = _sessionService.sessionState;
       
-      // PHASE 6-2: 안전장치 - idle 상태에서 세션 시작 시간이 남아있으면 강제 리셋
+      // PHASE 8-3: 안전장치 강화 - idle 상태에서 세션 시작 시간이 남아있으면 강제 리셋
       // 완전 종료 후 재시작 시 이전 세션 시간이 남아있지 않도록 보장
       if (sessionState == SessionState.idle && _sessionStartTime != null) {
-        debugPrint('ChargingMonitorController: 안전장치 - idle 상태에서 이전 세션 시간 발견, 강제 리셋');
+        debugPrint('ChargingMonitorController: ⚠️ 안전장치 - idle 상태에서 이전 세션 시간 발견, 강제 리셋 (이전: $_sessionStartTime)');
         _sessionStartTime = null;
+        _stopDurationUpdateTimer();
       }
       
       // 세션 상태 스트림이 이미 처리했거나 처리 중이면 여기서는 실시간 업데이트만 시작
@@ -380,11 +407,15 @@ class ChargingMonitorController extends ChangeNotifier {
   /// 스트림에서 충전 종료 감지 시 처리
   /// PHASE 2: ending 상태일 때는 세션 시작 시간을 유지합니다
   /// 세션이 완전히 종료되면 (PHASE 3에서) 세션 상태 스트림을 통해 리셋됩니다
+  /// PHASE 8-3: idle 상태에서 세션 시작 시간 리셋 보장 강화
   void _handleChargingEndFromStream() {
     debugPrint('ChargingMonitorController: 스트림에서 충전 종료 감지');
     
     // 세션 서비스의 상태 확인
     final sessionState = _sessionService.sessionState;
+    final sessionStartTime = _sessionService.sessionStartTime;
+    
+    debugPrint('ChargingMonitorController: 충전 종료 감지 - sessionState: ${sessionState.name}, sessionStartTime: $sessionStartTime');
     
     if (sessionState == SessionState.ending) {
       // ending 상태: 5초 대기 중이므로 세션 시작 시간 유지
@@ -398,17 +429,23 @@ class ChargingMonitorController extends ChangeNotifier {
       notifyListeners();
     } else if (sessionState == SessionState.idle) {
       // idle 상태: 세션이 완전히 종료됨
-      // PHASE 6-4: 안전장치 - 세션 시작 시간이 남아있으면 강제 리셋
+      // PHASE 8-3: 안전장치 강화 - 세션 시작 시간이 남아있으면 강제 리셋
       if (_sessionStartTime != null) {
-        debugPrint('ChargingMonitorController: 안전장치 - idle 상태에서 세션 시작 시간 발견, 강제 리셋');
+        debugPrint('ChargingMonitorController: ⚠️ 안전장치 - idle 상태에서 세션 시작 시간 발견, 강제 리셋 (이전: $_sessionStartTime)');
         _sessionStartTime = null;
+        _stopDurationUpdateTimer();
         notifyListeners();
+      }
+      
+      // PHASE 8-3: 세션 서비스의 시작 시간도 확인
+      if (sessionStartTime != null) {
+        debugPrint('ChargingMonitorController: ⚠️ 경고 - 세션 서비스가 idle 상태인데 시작 시간이 남아있음: $sessionStartTime');
       }
       
       // 실시간 업데이트 중지
       stopRealTimeUpdate();
       
-      debugPrint('ChargingMonitorController: 세션 idle 상태 - 완전 종료 확인됨');
+      debugPrint('ChargingMonitorController: 세션 idle 상태 - 완전 종료 확인됨 (세션 시작 시간: $_sessionStartTime)');
     } else {
       // active 상태인데 충전 종료가 감지된 경우 (비정상)
       debugPrint('ChargingMonitorController: 충전 종료 감지했지만 세션 상태가 active - 비정상 상태');
@@ -421,14 +458,16 @@ class ChargingMonitorController extends ChangeNotifier {
   /// 세션 시작 시간 확인 및 업데이트
   /// 세션이 나중에 시작될 수 있으므로 주기적으로 확인 필요
   /// PHASE 6-4: 완전 종료 후에는 업데이트하지 않도록 안전장치 추가
+  /// PHASE 8-3: 안전장치 강화 - idle 상태에서 세션 시작 시간 리셋 보장
   void checkAndUpdateSessionStartTime() {
-    // PHASE 6-4: 세션이 완전히 종료된 상태(idle)이면 업데이트하지 않음
+    // PHASE 8-3: 세션이 완전히 종료된 상태(idle)이면 업데이트하지 않음
     final sessionState = _sessionService.sessionState;
     if (sessionState == SessionState.idle) {
       // 완전 종료 상태: 세션 시작 시간은 null이어야 함
       if (_sessionStartTime != null) {
-        debugPrint('ChargingMonitorController: 안전장치 - idle 상태에서 세션 시작 시간 발견, 강제 리셋');
+        debugPrint('ChargingMonitorController: ⚠️ 안전장치 - idle 상태에서 세션 시작 시간 발견, 강제 리셋 (이전: $_sessionStartTime)');
         _sessionStartTime = null;
+        _stopDurationUpdateTimer();
         notifyListeners();
       }
       return;
@@ -442,15 +481,17 @@ class ChargingMonitorController extends ChangeNotifier {
   
   /// 세션 시작 시간 업데이트
   /// PHASE 6-4: 완전 종료 후에는 업데이트하지 않도록 안전장치 추가
+  /// PHASE 8-3: 안전장치 강화 - idle 상태에서 세션 시작 시간 리셋 보장
   void updateSessionStartTime() {
     try {
-      // PHASE 6-4: 세션이 완전히 종료된 상태(idle)이면 업데이트하지 않음
+      // PHASE 8-3: 세션이 완전히 종료된 상태(idle)이면 업데이트하지 않음
       final sessionState = _sessionService.sessionState;
       if (sessionState == SessionState.idle) {
         // 완전 종료 상태: 세션 시작 시간은 null이어야 함
         if (_sessionStartTime != null) {
-          debugPrint('ChargingMonitorController: 안전장치 - idle 상태에서 세션 시작 시간 발견, 강제 리셋');
+          debugPrint('ChargingMonitorController: ⚠️ 안전장치 - idle 상태에서 세션 시작 시간 발견, 강제 리셋 (이전: $_sessionStartTime)');
           _sessionStartTime = null;
+          _stopDurationUpdateTimer();
           notifyListeners();
         }
         return;
@@ -458,7 +499,7 @@ class ChargingMonitorController extends ChangeNotifier {
       
       final sessionStartTime = _sessionService.sessionStartTime;
       if (_sessionStartTime != sessionStartTime) {
-        // PHASE 6-4: 새 세션인지 확인 (세션 서비스의 시간이 더 최신이면 새 세션)
+        // PHASE 8-3: 새 세션인지 확인 (세션 서비스의 시간이 더 최신이면 새 세션)
         if (_sessionStartTime != null && 
             sessionStartTime != null && 
             sessionStartTime.isAfter(_sessionStartTime!)) {

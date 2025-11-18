@@ -114,9 +114,28 @@ class ChargingSessionService {
   
   /// 서비스 초기화
   /// 앱 시작 시 호출하여 BatteryService 스트림 구독 시작
+  /// PHASE 8-4: 이미 초기화되어 있어도 스트림 구독 상태 확인 및 재구독
   Future<void> initialize() async {
-    if (_isInitialized || _isDisposed) {
-      debugPrint('ChargingSessionService: 이미 초기화되었거나 dispose됨');
+    if (_isDisposed) {
+      debugPrint('ChargingSessionService: dispose됨 - 초기화 불가');
+      return;
+    }
+    
+    // PHASE 8-4: 이미 초기화되어 있어도 스트림 구독이 제대로 설정되어 있는지 확인
+    if (_isInitialized) {
+      debugPrint('ChargingSessionService: 이미 초기화됨 - 스트림 구독 상태 확인');
+      // 스트림 구독이 없으면 재구독
+      if (_batteryInfoSubscription == null) {
+        debugPrint('ChargingSessionService: 스트림 구독이 없음 - 재구독');
+        _batteryInfoSubscription = _batteryService.batteryInfoStream.listen(
+          _onBatteryInfoUpdate,
+          onError: _onError,
+          cancelOnError: false,
+        );
+        debugPrint('ChargingSessionService: 스트림 구독 재설정 완료');
+      } else {
+        debugPrint('ChargingSessionService: 스트림 구독 존재함 (정상 작동 중일 것으로 예상)');
+      }
       return;
     }
     
@@ -233,7 +252,13 @@ class ChargingSessionService {
   
   /// 배터리 정보 업데이트 처리
   void _onBatteryInfoUpdate(BatteryInfo batteryInfo) {
-    if (_isDisposed) return;
+    if (_isDisposed) {
+      debugPrint('ChargingSessionService: _onBatteryInfoUpdate - dispose됨, 무시');
+      return;
+    }
+    
+    // PHASE 8-4: 디버깅을 위한 로그 추가
+    debugPrint('ChargingSessionService: _onBatteryInfoUpdate 호출됨 - isCharging: ${batteryInfo.isCharging}, current: ${batteryInfo.chargingCurrent}mA, wasCharging: ${_stateManager.wasCharging}');
     
     // 날짜 변경 체크 (1분마다 체크하지만, 배터리 업데이트 시에도 체크)
     _dateChangeManager.checkDateChangeAndSave(
@@ -248,7 +273,7 @@ class ChargingSessionService {
       // 충전 상태 변화 감지
       if (isCurrentlyCharging && !_stateManager.wasCharging) {
         // 충전 시작
-        debugPrint('ChargingSessionService: 충전 시작 감지');
+        debugPrint('ChargingSessionService: 충전 시작 감지 - 현재 상태: ${_stateManager.state.name}');
         
         // ending 상태에서 재연결된 경우 (5초 이내 재연결)
         if (_stateManager.isEnding) {
@@ -528,12 +553,17 @@ class ChargingSessionService {
   
   /// 세션 초기화
   /// PHASE 7-1: ending 상태에서도 세션 상태 알림을 보장하도록 수정
+  /// PHASE 8-1: 세션 상태 알림 보장 강화 및 로그 개선
   void _resetSession() {
-    // PHASE 7-1: 세션 상태 변화 알림 (즉시)
+    // PHASE 8-1: 세션 상태 변화 알림 (즉시)
     // ending 상태에서도 세션 상태 알림을 보장하기 위해 wasActive와 wasEnding 모두 확인
+    // 중요: _stateManager.reset() 호출 전에 상태를 확인해야 함
     final wasActive = _stateManager.isActive;
     final wasEnding = _stateManager.isEnding;
+    final currentState = _stateManager.state;
     final hadActiveSession = wasActive || wasEnding;  // active 또는 ending 상태였으면 세션이 있었던 것
+    
+    debugPrint('ChargingSessionService: 세션 리셋 시작 - 현재 상태: ${currentState.name}, wasActive: $wasActive, wasEnding: $wasEnding');
     
     // 종료 대기 타이머 취소
     _timerManager.stopEndWaitTimer();
@@ -547,13 +577,15 @@ class ChargingSessionService {
     // 상태 리셋
     _stateManager.reset();
     
-    // PHASE 7-1: 세션이 활성화되어 있거나 ending 상태였다면 비활성화 알림
+    // PHASE 8-1: 세션이 활성화되어 있거나 ending 상태였다면 비활성화 알림
     // ending 상태에서도 세션 상태 알림을 보장하여 모니터 컨트롤러가 리셋을 감지할 수 있도록 함
+    // 중요: _stateManager.reset() 후에도 hadActiveSession은 리셋 전 상태를 기억하므로 정확함
     if (hadActiveSession) {
+      debugPrint('ChargingSessionService: 세션 상태 변화 알림 전송 시작 (false) - wasActive: $wasActive, wasEnding: $wasEnding');
       _notifySessionStateChanged(false);
-      debugPrint('ChargingSessionService: 세션 상태 변화 알림 (false) - wasActive: $wasActive, wasEnding: $wasEnding');
+      debugPrint('ChargingSessionService: 세션 상태 변화 알림 전송 완료 (false)');
     } else {
-      debugPrint('ChargingSessionService: 세션 리셋 - 세션이 없었음 (idle 상태)');
+      debugPrint('ChargingSessionService: 세션 리셋 완료 - 세션이 없었음 (idle 상태였음)');
     }
   }
   
