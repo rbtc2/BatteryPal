@@ -222,9 +222,15 @@ class SessionStateManager {
   /// 
   /// [startTime] 새로운 시작 시간
   void updateStartTime(DateTime startTime) {
-    if (_state == SessionState.active && _startTime != null) {
+    // PHASE 11: idle 상태에서도 시작 시간 저장 가능 (네이티브 세션 복구용)
+    // currentInfo가 null일 때 네이티브 정보로 시작 시간을 먼저 저장할 수 있도록 함
+    if (_state == SessionState.active) {
       _startTime = startTime;
-      debugPrint('SessionStateManager: 세션 시작 시간 업데이트 - $startTime');
+      debugPrint('SessionStateManager: 세션 시작 시간 업데이트 (active) - $startTime');
+    } else if (_state == SessionState.idle) {
+      // PHASE 11: idle 상태에서도 시작 시간 저장 (나중에 세션 시작 시 사용)
+      _startTime = startTime;
+      debugPrint('SessionStateManager: 세션 시작 시간 저장 (idle, 네이티브 복구용) - $startTime');
     }
   }
   

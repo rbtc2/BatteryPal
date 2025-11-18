@@ -558,40 +558,27 @@ class ChargingMonitorController extends ChangeNotifier {
       
       debugPrint('ChargingMonitorController: 네이티브 세션 정보 복구 - $sessionInfo');
       
-      // PHASE 9-4: 충전 중이고 세션 시작 시간이 있으면 복구
+      // PHASE 11: 네이티브 정보 우선시 - currentInfo.isCharging 확인 제거
+      // 네이티브에 isChargingActive = true와 startTime이 있으면 바로 복구
       if (sessionInfo.isChargingActive && sessionInfo.startTime != null) {
         // 네이티브에서 저장한 시작 시간이 더 이전이면 사용
         // (앱이 꺼진 상태에서 충전이 시작되었을 수 있음)
         if (_sessionStartTime == null || 
             sessionInfo.startTime!.isBefore(_sessionStartTime!)) {
           _sessionStartTime = sessionInfo.startTime;
-          debugPrint('ChargingMonitorController: 네이티브에서 세션 시작 시간 복구됨 - $_sessionStartTime');
+          debugPrint('ChargingMonitorController: 네이티브에서 세션 시작 시간 복구됨 (네이티브 정보 우선시) - $_sessionStartTime');
           notifyListeners();
           
           // 지속 시간 타이머 업데이트
           _updateDurationTimerBasedOnSettings();
         }
       } else if (!sessionInfo.isChargingActive) {
-        // PHASE 9-4: 충전이 종료된 상태면 세션 시작 시간 초기화
+        // PHASE 11: 충전이 종료된 상태면 세션 시작 시간 초기화
         if (_sessionStartTime != null) {
           _sessionStartTime = null;
           debugPrint('ChargingMonitorController: 충전 종료 상태로 세션 시작 시간 초기화');
           notifyListeners();
         }
-      }
-      
-      // 현재 충전 중인데 세션 시작 시간이 없으면 네이티브 정보 사용
-      // (앱 재시작 시 이미 충전 중인 경우를 처리)
-      final currentInfo = _batteryService.currentBatteryInfo;
-      if (currentInfo != null && 
-          currentInfo.isCharging && 
-          _sessionStartTime == null &&
-          sessionInfo.isChargingActive && 
-          sessionInfo.startTime != null) {
-        _sessionStartTime = sessionInfo.startTime;
-        debugPrint('ChargingMonitorController: 현재 충전 중 - 네이티브 세션 시작 시간 복구 - $_sessionStartTime');
-        notifyListeners();
-        _updateDurationTimerBasedOnSettings();
       }
     } catch (e) {
       debugPrint('ChargingMonitorController: 네이티브 세션 정보 복구 실패 - $e');
