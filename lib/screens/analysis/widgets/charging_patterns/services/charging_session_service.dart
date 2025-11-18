@@ -137,6 +137,10 @@ class ChargingSessionService {
         debugPrint('ChargingSessionService: 스트림 구독 존재함 (정상 작동 중일 것으로 예상)');
       }
       
+      // PHASE 9-5: 네이티브 세션 복구 확인 (이미 초기화되어 있어도)
+      // 앱 재시작 시 네이티브에서 저장한 세션 정보를 복구해야 함
+      await _recoverBackgroundSession();
+      
       // PHASE 8-5: 현재 충전 상태 확인 및 세션 시작 (이미 초기화되어 있어도)
       // 스트림 이벤트가 전달되지 않을 수 있으므로 직접 확인
       final currentInfo = _batteryService.currentBatteryInfo;
@@ -147,17 +151,18 @@ class ChargingSessionService {
         
         debugPrint('ChargingSessionService: 현재 충전 상태 확인 - isCharging: $isCurrentlyCharging, wasCharging: $wasCharging, sessionState: ${sessionState.name}');
         
-        // 충전 중인데 세션이 없으면 세션 시작
+        // PHASE 9-5: 네이티브 세션 복구 후에도 세션이 없으면 새로 시작
+        // (네이티브 세션 복구가 실패했거나 충전 상태가 변경된 경우)
         if (isCurrentlyCharging && sessionState == SessionState.idle) {
-          debugPrint('ChargingSessionService: 충전 중이지만 세션이 없음 - 세션 시작');
+          debugPrint('ChargingSessionService: 충전 중이지만 세션이 없음 - 새 세션 시작 (네이티브 복구 실패 또는 새 충전)');
           _stateManager.setWasCharging(true);
-          _startSession(currentInfo);
+          _startSession(currentInfo);  // 새 세션이므로 현재 시간 사용
         } else if (isCurrentlyCharging && !wasCharging) {
           // 충전 시작 감지 (wasCharging이 false였는데 충전 중)
           debugPrint('ChargingSessionService: 충전 시작 감지 (초기화 후 확인) - 세션 시작');
           _stateManager.setWasCharging(true);
           if (sessionState == SessionState.idle) {
-            _startSession(currentInfo);
+            _startSession(currentInfo);  // 새 세션이므로 현재 시간 사용
           }
         } else if (!isCurrentlyCharging && wasCharging) {
           // 충전 종료 감지
@@ -378,13 +383,21 @@ class ChargingSessionService {
   // ==================== 세션 시작 처리 ====================
   
   /// 세션 시작
-  void _startSession(BatteryInfo batteryInfo) {
-    if (!_stateManager.startSession(batteryInfo)) {
+  /// 
+  /// [batteryInfo] 세션 시작 시 배터리 정보
+  /// [startTime] 세션 시작 시간 (선택적, null이면 현재 시간 사용)
+  ///              네이티브 세션 복구 시 이전 시작 시간을 사용하기 위해 추가
+  void _startSession(BatteryInfo batteryInfo, {DateTime? startTime}) {
+    if (!_stateManager.startSession(batteryInfo, startTime: startTime)) {
       return;
     }
     
     try {
-      debugPrint('ChargingSessionService: 세션 시작');
+      if (startTime != null) {
+        debugPrint('ChargingSessionService: 세션 시작 (복구) - 시작 시간: $startTime (네이티브에서 복구)');
+      } else {
+        debugPrint('ChargingSessionService: 세션 시작 - 시작 시간: ${_stateManager.startTime}');
+      }
       
       // 세션 상태 변화 알림 (즉시)
       _notifySessionStateChanged(true);
@@ -722,42 +735,33 @@ class ChargingSessionService {
       debugPrint('ChargingSessionService: 네이티브 세션 정보 발견 - $sessionInfo');
       
       // 3. 세션이 아직 진행 중인 경우 복구
+      // PHASE 9-3: 네이티브 시작 시간을 사용하여 세션 복구
       if (sessionInfo.isChargingActive && sessionInfo.startTime != null) {
         final currentInfo = _batteryService.currentBatteryInfo;
         
         // 현재 배터리 정보가 있고 충전 중이면 세션 복구
         if (currentInfo != null && currentInfo.isCharging) {
-          debugPrint('ChargingSessionService: 진행 중인 백그라운드 세션 복구 - 시작 시간: ${sessionInfo.startTime}');
+          debugPrint('ChargingSessionService: 진행 중인 백그라운드 세션 복구 - 네이티브 시작 시간: ${sessionInfo.startTime}');
           
-          // 세션 시작 시간을 네이티브에서 가져온 시간으로 설정
-          if (sessionInfo.startBatteryLevel != null) {
-            _stateManager.setWasCharging(true);
-            
-            // 세션 시작 (시작 시간은 네이티브 시간 사용)
-            if (!_stateManager.isActive) {
-              _startSession(currentInfo);
-              
-              // 시작 시간을 네이티브 시간으로 업데이트
-              if (sessionInfo.startTime != null) {
-                _stateManager.updateStartTime(sessionInfo.startTime!);
-                debugPrint('ChargingSessionService: 세션 시작 시간을 네이티브 시간으로 업데이트 - ${sessionInfo.startTime}');
-              }
-            }
+          _stateManager.setWasCharging(true);
+          
+          // PHASE 9-3: 네이티브 시작 시간을 사용하여 세션 시작 (복구)
+          if (!_stateManager.isActive) {
+            // 네이티브에서 가져온 시작 시간으로 세션 시작
+            _startSession(currentInfo, startTime: sessionInfo.startTime);
+            debugPrint('ChargingSessionService: 백그라운드 세션 복구 완료 - 시작 시간: ${sessionInfo.startTime} (${DateTime.now().difference(sessionInfo.startTime!).inMinutes}분 경과)');
           } else {
-            // 시작 배터리 레벨이 없으면 일반적으로 세션 시작
-            _stateManager.setWasCharging(true);
-            if (!_stateManager.isActive) {
-              _startSession(currentInfo);
-              if (sessionInfo.startTime != null) {
-                _stateManager.updateStartTime(sessionInfo.startTime!);
-              }
+            // 이미 세션이 있으면 시작 시간만 업데이트
+            if (_stateManager.startTime != sessionInfo.startTime) {
+              _stateManager.updateStartTime(sessionInfo.startTime!);
+              debugPrint('ChargingSessionService: 기존 세션 시작 시간 업데이트 - ${sessionInfo.startTime}');
             }
           }
         } else {
           debugPrint('ChargingSessionService: 현재 충전 중이 아니므로 세션 복구 불가');
         }
       } else {
-        debugPrint('ChargingSessionService: 진행 중인 세션 없음');
+        debugPrint('ChargingSessionService: 진행 중인 세션 없음 (isChargingActive: ${sessionInfo.isChargingActive}, startTime: ${sessionInfo.startTime})');
       }
       
       debugPrint('ChargingSessionService: 백그라운드 세션 복구 완료');

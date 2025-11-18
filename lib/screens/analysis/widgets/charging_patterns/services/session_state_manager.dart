@@ -82,16 +82,18 @@ class SessionStateManager {
   /// 세션 시작
   /// 
   /// [batteryInfo] 세션 시작 시 배터리 정보
+  /// [startTime] 세션 시작 시간 (선택적, null이면 현재 시간 사용)
+  ///              네이티브 세션 복구 시 이전 시작 시간을 사용하기 위해 추가
   /// 
   /// 반환: 세션이 시작되면 true, 이미 진행 중이면 false
-  bool startSession(BatteryInfo batteryInfo) {
+  bool startSession(BatteryInfo batteryInfo, {DateTime? startTime}) {
     if (_state != SessionState.idle) {
       debugPrint('SessionStateManager: 세션이 이미 진행 중입니다');
       return false;
     }
     
     _state = SessionState.active;
-    _startTime = DateTime.now();
+    _startTime = startTime ?? DateTime.now();  // PHASE 9-1: 시작 시간 파라미터 사용
     _startBatteryInfo = batteryInfo;
     _endWaitStartTime = null;
     _currentSession = null;
@@ -99,7 +101,11 @@ class SessionStateManager {
     // 충전기 정보 저장 (5초 이내 재연결 시 비교용)
     _saveChargerInfo(batteryInfo);
     
-    debugPrint('SessionStateManager: 세션 시작 - 상태: ${_state.name}, 시작 시간: $_startTime');
+    if (startTime != null) {
+      debugPrint('SessionStateManager: 세션 시작 (복구) - 상태: ${_state.name}, 시작 시간: $_startTime (네이티브에서 복구)');
+    } else {
+      debugPrint('SessionStateManager: 세션 시작 - 상태: ${_state.name}, 시작 시간: $_startTime');
+    }
     return true;
   }
   
