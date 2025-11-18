@@ -2,27 +2,37 @@
 /// 충전 시간 및 지속 시간 포맷팅 함수들
 class ChargingFormatUtils {
   /// 지속 시간 포맷팅
-  /// Duration을 "X시간 Y분" 또는 "Y분" 형식으로 변환
-  /// 음수 duration은 "0분"으로 반환
+  /// Duration을 "X시간 Y분 Z초", "Y분 Z초", 또는 "Z초" 형식으로 변환
+  /// 음수 duration은 "0초"로 반환
   static String formatDuration(Duration duration) {
     // 음수 duration 방지
     if (duration.isNegative) {
-      return '0분';
+      return '0초';
     }
     
     final hours = duration.inHours;
     final minutes = duration.inMinutes.remainder(60);
+    final seconds = duration.inSeconds.remainder(60);
     
-    // 0분일 때 처리
-    if (hours == 0 && minutes == 0) {
-      return '0분';
+    // 모든 값이 0일 때 처리
+    if (hours == 0 && minutes == 0 && seconds == 0) {
+      return '0초';
     }
+    
+    // 시간, 분, 초를 조합하여 표시
+    final List<String> parts = [];
     
     if (hours > 0) {
-      return '$hours시간 $minutes분';
-    } else {
-      return '$minutes분';
+      parts.add('$hours시간');
     }
+    if (minutes > 0) {
+      parts.add('$minutes분');
+    }
+    if (seconds > 0 || parts.isEmpty) {
+      parts.add('$seconds초');
+    }
+    
+    return parts.join(' ');
   }
 
   /// 충전 시간 포맷팅
