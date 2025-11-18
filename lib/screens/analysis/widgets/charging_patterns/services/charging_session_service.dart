@@ -123,7 +123,7 @@ class ChargingSessionService {
     
     // PHASE 8-4: 이미 초기화되어 있어도 스트림 구독이 제대로 설정되어 있는지 확인
     if (_isInitialized) {
-      debugPrint('ChargingSessionService: 이미 초기화됨 - 스트림 구독 상태 확인');
+      debugPrint('ChargingSessionService: 이미 초기화됨 - 스트림 구독 상태 확인 및 현재 충전 상태 확인');
       // 스트림 구독이 없으면 재구독
       if (_batteryInfoSubscription == null) {
         debugPrint('ChargingSessionService: 스트림 구독이 없음 - 재구독');
@@ -136,6 +136,43 @@ class ChargingSessionService {
       } else {
         debugPrint('ChargingSessionService: 스트림 구독 존재함 (정상 작동 중일 것으로 예상)');
       }
+      
+      // PHASE 8-5: 현재 충전 상태 확인 및 세션 시작 (이미 초기화되어 있어도)
+      // 스트림 이벤트가 전달되지 않을 수 있으므로 직접 확인
+      final currentInfo = _batteryService.currentBatteryInfo;
+      if (currentInfo != null) {
+        final isCurrentlyCharging = currentInfo.isCharging && currentInfo.chargingCurrent > 0;
+        final wasCharging = _stateManager.wasCharging;
+        final sessionState = _stateManager.state;
+        
+        debugPrint('ChargingSessionService: 현재 충전 상태 확인 - isCharging: $isCurrentlyCharging, wasCharging: $wasCharging, sessionState: ${sessionState.name}');
+        
+        // 충전 중인데 세션이 없으면 세션 시작
+        if (isCurrentlyCharging && sessionState == SessionState.idle) {
+          debugPrint('ChargingSessionService: 충전 중이지만 세션이 없음 - 세션 시작');
+          _stateManager.setWasCharging(true);
+          _startSession(currentInfo);
+        } else if (isCurrentlyCharging && !wasCharging) {
+          // 충전 시작 감지 (wasCharging이 false였는데 충전 중)
+          debugPrint('ChargingSessionService: 충전 시작 감지 (초기화 후 확인) - 세션 시작');
+          _stateManager.setWasCharging(true);
+          if (sessionState == SessionState.idle) {
+            _startSession(currentInfo);
+          }
+        } else if (!isCurrentlyCharging && wasCharging) {
+          // 충전 종료 감지
+          debugPrint('ChargingSessionService: 충전 종료 감지 (초기화 후 확인)');
+          _stateManager.setWasCharging(false);
+          if (sessionState == SessionState.active || sessionState == SessionState.ending) {
+            _handleChargingEnd();
+          }
+        } else {
+          debugPrint('ChargingSessionService: 충전 상태 변화 없음');
+        }
+      } else {
+        debugPrint('ChargingSessionService: 현재 배터리 정보 없음');
+      }
+      
       return;
     }
     
