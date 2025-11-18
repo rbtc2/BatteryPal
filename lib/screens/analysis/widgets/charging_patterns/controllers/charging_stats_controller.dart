@@ -17,10 +17,11 @@ class ChargingStatsController extends ChangeNotifier {
   final ChargingSessionDataLoader _dataLoader;
   
   StreamSubscription<List<ChargingSessionRecord>>? _sessionsSubscription;
+  StreamSubscription<bool>? _sessionStateSubscription; // 세션 상태 변화 구독
   
   // 자동 새로고침 타이머
   Timer? _refreshTimer;
-  Timer? _activeSessionUpdateTimer; // 진행 중인 세션 업데이트 타이머
+  Timer? _activeSessionUpdateTimer; // 진행 중인 세션 업데이트 타이머 (백업용)
   
   // 현재 선택한 날짜의 세션 데이터
   List<ChargingSessionRecord> _currentSessions = [];
@@ -133,9 +134,32 @@ class ChargingStatsController extends ChangeNotifier {
         cancelOnError: false, // 에러 발생 시에도 스트림 유지
       );
       
+      // 세션 상태 변화 스트림 구독 (즉시 반응)
+      _sessionStateSubscription = _sessionService.sessionActiveStream.listen(
+        (isActive) {
+          if (_isMounted?.call() == false) return;
+          
+          // 오늘 탭일 때만 처리
+          if (!_dateController.isToday) return;
+          
+          // 세션 상태 변화 즉시 UI 업데이트
+          _previousIsSessionActive = isActive;
+          _notifyStateChanged();
+          debugPrint('ChargingStatsController: 세션 상태 변화 감지 - isActive: $isActive');
+        },
+        onError: (error, stackTrace) {
+          debugPrint('ChargingStatsController: 세션 상태 스트림 오류: $error');
+          debugPrint('스택 트레이스: $stackTrace');
+        },
+        cancelOnError: false, // 에러 발생 시에도 스트림 유지
+      );
+      
+      // 초기 세션 상태 저장
+      _previousIsSessionActive = _sessionService.isSessionActive;
+      
       // 자동 새로고침 시작 (오늘 탭일 때만)
       startAutoRefresh();
-      // 진행 중인 세션 업데이트 시작
+      // 진행 중인 세션 업데이트 시작 (백업용, 타이머 기반)
       startActiveSessionUpdate();
       
     } catch (e, stackTrace) {
@@ -270,6 +294,8 @@ class ChargingStatsController extends ChangeNotifier {
     // 스트림 구독 해제
     _sessionsSubscription?.cancel();
     _sessionsSubscription = null;
+    _sessionStateSubscription?.cancel();
+    _sessionStateSubscription = null;
     
     super.dispose();
   }

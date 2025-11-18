@@ -67,6 +67,16 @@ class ChargingSessionService {
   Stream<List<ChargingSessionRecord>> get sessionsStream => 
       _sessionsController.stream;
   
+  // ==================== 세션 상태 변화 관리 ====================
+  
+  /// 세션 상태 변화 스트림 (세션 활성화/비활성화 즉시 알림용)
+  final StreamController<bool> _sessionStateController = 
+      StreamController<bool>.broadcast();
+  
+  /// 세션 활성 상태 스트림
+  /// true: 세션이 활성화됨, false: 세션이 비활성화됨
+  Stream<bool> get sessionActiveStream => _sessionStateController.stream;
+  
   /// 오늘 날짜의 세션 목록 가져오기 (동기)
   /// 메모리에 있는 데이터만 반환 (빠른 접근용)
   List<ChargingSessionRecord> getTodaySessions() {
@@ -135,7 +145,14 @@ class ChargingSessionService {
         if (currentInfo.isCharging && currentInfo.chargingCurrent > 0) {
           // 이미 충전 중이면 세션 시작
           _startSession(currentInfo);
+          // _startSession 내부에서 _notifySessionStateChanged(true) 호출됨
+        } else {
+          // 충전 중이 아니면 세션 상태 알림 (idle 상태)
+          _notifySessionStateChanged(false);
         }
+      } else {
+        // 배터리 정보가 없으면 세션 상태 알림 (idle 상태)
+        _notifySessionStateChanged(false);
       }
       
       // 자정 타이머 시작 (배터리 효율적 날짜 변경 감지)
@@ -193,6 +210,10 @@ class ChargingSessionService {
       _sessionsController.close();
     }
     
+    if (!_sessionStateController.isClosed) {
+      _sessionStateController.close();
+    }
+    
     debugPrint('ChargingSessionService: dispose 완료');
   }
   
@@ -238,6 +259,8 @@ class ChargingSessionService {
             _stateManager.reactivateSession();
             _timerManager.stopEndWaitTimer(); // 종료 대기 타이머 취소
             _stateManager.setWasCharging(true);
+            // 세션 상태 변화 알림 (즉시)
+            _notifySessionStateChanged(true);
             // 충전 중 업데이트 처리 (데이터 수집 재개)
             _handleChargingUpdate(batteryInfo);
           } else {
@@ -300,6 +323,9 @@ class ChargingSessionService {
     
     try {
       debugPrint('ChargingSessionService: 세션 시작');
+      
+      // 세션 상태 변화 알림 (즉시)
+      _notifySessionStateChanged(true);
       
       // 데이터 수집 초기화
       _dataCollector.reset();
@@ -481,6 +507,9 @@ class ChargingSessionService {
   
   /// 세션 초기화
   void _resetSession() {
+    // 세션 상태 변화 알림 (즉시)
+    final wasActive = _stateManager.isActive;
+    
     // 종료 대기 타이머 취소
     _timerManager.stopEndWaitTimer();
     
@@ -492,6 +521,11 @@ class ChargingSessionService {
     
     // 상태 리셋
     _stateManager.reset();
+    
+    // 세션이 활성화되어 있었다면 비활성화 알림
+    if (wasActive) {
+      _notifySessionStateChanged(false);
+    }
   }
   
   // ==================== 충전 중 업데이트 처리 ====================
@@ -508,6 +542,8 @@ class ChargingSessionService {
     if (_stateManager.isEnding) {
       _stateManager.reactivateSession();
       _timerManager.stopEndWaitTimer(); // 종료 대기 타이머 취소
+      // 세션 상태 변화 알림 (즉시)
+      _notifySessionStateChanged(true);
     }
     
     // 전류 변화 감지 및 데이터 포인트 추가
@@ -536,6 +572,14 @@ class ChargingSessionService {
       }).catchError((e) {
         debugPrint('ChargingSessionService: 최신 세션 로드 실패 - $e');
       });
+    }
+  }
+  
+  /// 세션 상태 변화 알림
+  void _notifySessionStateChanged(bool isActive) {
+    if (!_sessionStateController.isClosed && !_isDisposed) {
+      _sessionStateController.add(isActive);
+      debugPrint('ChargingSessionService: 세션 상태 변화 알림 - isActive: $isActive');
     }
   }
   
