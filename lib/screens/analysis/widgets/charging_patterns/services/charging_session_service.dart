@@ -390,19 +390,24 @@ class ChargingSessionService {
   
   
   /// 세션 종료 (5초 대기 후)
+  /// PHASE 7-2: 모든 경로에서 세션 상태 알림이 보장되도록 로그 강화
   Future<void> _endSession() async {
+    // PHASE 7-2: 세션 종료 시작 시 상태 확인 및 로그
+    final currentState = _stateManager.state;
+    debugPrint('ChargingSessionService: 세션 종료 처리 시작 - 현재 상태: ${currentState.name}');
+    
     if (_stateManager.isIdle || _isDisposed) {
+      debugPrint('ChargingSessionService: 세션이 이미 idle이거나 dispose됨 - 종료 처리 중단');
       return;
     }
     
     try {
-      debugPrint('ChargingSessionService: 세션 종료 처리 시작');
-      
       // 데이터 수집 타이머 중지
       _timerManager.stopDataCollectionTimer();
       
       // dispose된 경우 추가 작업 중단
       if (_isDisposed) {
+        debugPrint('ChargingSessionService: dispose됨 - 세션 리셋');
         _resetSession();
         return;
       }
@@ -417,6 +422,7 @@ class ChargingSessionService {
       
       // dispose된 경우 추가 작업 중단
       if (_isDisposed) {
+        debugPrint('ChargingSessionService: dispose됨 (배터리 정보 확인 후) - 세션 리셋');
         _resetSession();
         return;
       }
@@ -431,6 +437,7 @@ class ChargingSessionService {
       
       // dispose된 경우 추가 작업 중단
       if (_isDisposed || sessionRecord == null) {
+        debugPrint('ChargingSessionService: dispose됨 또는 세션 기록 없음 - 세션 리셋');
         _resetSession();
         return;
       }
@@ -475,8 +482,11 @@ class ChargingSessionService {
         debugPrint('ChargingSessionService: 세션 검증 실패 - duration: ${sessionRecord.duration.inMinutes}분, avgCurrent: ${sessionRecord.avgCurrent}mA, batteryChange: ${sessionRecord.batteryChange}%');
       }
       
-      // 세션 초기화
+      // PHASE 7-2: 세션 초기화 (모든 경로에서 호출됨)
+      // _resetSession() 내부에서 ending 상태도 확인하여 세션 상태 알림 보장
+      debugPrint('ChargingSessionService: 세션 초기화 시작 (리셋 전 상태: ${_stateManager.state.name})');
       _resetSession();
+      debugPrint('ChargingSessionService: 세션 초기화 완료 (리셋 후 상태: ${_stateManager.state.name})');
       
       // 세션이 완전히 종료되었으므로 충전기 정보도 초기화
       _stateManager.clearChargerInfo();
@@ -484,31 +494,46 @@ class ChargingSessionService {
     } catch (e, stackTrace) {
       debugPrint('ChargingSessionService: 세션 종료 실패 - $e');
       debugPrint('스택 트레이스: $stackTrace');
+      // 에러 발생 시에도 세션 리셋 보장
+      debugPrint('ChargingSessionService: 에러 발생 - 세션 리셋 (리셋 전 상태: ${_stateManager.state.name})');
       _resetSession();
+      debugPrint('ChargingSessionService: 에러 발생 - 세션 리셋 완료 (리셋 후 상태: ${_stateManager.state.name})');
       _stateManager.clearChargerInfo();
     }
   }
   
   /// 세션 즉시 종료 (5초 대기 없이)
   /// 다른 충전기로 연결된 경우 기존 세션을 즉시 저장하기 위해 사용
+  /// PHASE 7-3: 검증 로직 및 로그 강화
   Future<void> _endSessionImmediately() async {
+    // PHASE 7-3: 세션 즉시 종료 시작 시 상태 확인 및 로그
+    final currentState = _stateManager.state;
+    debugPrint('ChargingSessionService: 세션 즉시 종료 처리 시작 (5초 대기 없이) - 현재 상태: ${currentState.name}');
+    
     if (_stateManager.isIdle || _isDisposed) {
+      debugPrint('ChargingSessionService: 세션이 이미 idle이거나 dispose됨 - 즉시 종료 처리 중단');
       return;
     }
     
-    debugPrint('ChargingSessionService: 세션 즉시 종료 처리 시작 (5초 대기 없이)');
-    
     // 종료 대기 타이머 취소
     _timerManager.stopEndWaitTimer();
+    debugPrint('ChargingSessionService: 종료 대기 타이머 취소 완료');
     
     // _endSession과 동일한 로직이지만 즉시 실행
+    // _endSession 내부에서 _resetSession()이 호출되며, 
+    // _resetSession()에서 ending 상태도 확인하여 세션 상태 알림 보장
     await _endSession();
+    debugPrint('ChargingSessionService: 세션 즉시 종료 처리 완료');
   }
   
   /// 세션 초기화
+  /// PHASE 7-1: ending 상태에서도 세션 상태 알림을 보장하도록 수정
   void _resetSession() {
-    // 세션 상태 변화 알림 (즉시)
+    // PHASE 7-1: 세션 상태 변화 알림 (즉시)
+    // ending 상태에서도 세션 상태 알림을 보장하기 위해 wasActive와 wasEnding 모두 확인
     final wasActive = _stateManager.isActive;
+    final wasEnding = _stateManager.isEnding;
+    final hadActiveSession = wasActive || wasEnding;  // active 또는 ending 상태였으면 세션이 있었던 것
     
     // 종료 대기 타이머 취소
     _timerManager.stopEndWaitTimer();
@@ -522,9 +547,13 @@ class ChargingSessionService {
     // 상태 리셋
     _stateManager.reset();
     
-    // 세션이 활성화되어 있었다면 비활성화 알림
-    if (wasActive) {
+    // PHASE 7-1: 세션이 활성화되어 있거나 ending 상태였다면 비활성화 알림
+    // ending 상태에서도 세션 상태 알림을 보장하여 모니터 컨트롤러가 리셋을 감지할 수 있도록 함
+    if (hadActiveSession) {
       _notifySessionStateChanged(false);
+      debugPrint('ChargingSessionService: 세션 상태 변화 알림 (false) - wasActive: $wasActive, wasEnding: $wasEnding');
+    } else {
+      debugPrint('ChargingSessionService: 세션 리셋 - 세션이 없었음 (idle 상태)');
     }
   }
   
@@ -576,10 +605,27 @@ class ChargingSessionService {
   }
   
   /// 세션 상태 변화 알림
+  /// PHASE 7-3: 검증 로직 및 로그 강화
   void _notifySessionStateChanged(bool isActive) {
+    // PHASE 7-3: 현재 세션 상태 확인 및 검증
+    final currentState = _stateManager.state;
+    final currentIsActive = _stateManager.isActive;
+    
+    // PHASE 7-3: 상태 일관성 검증
+    // isActive가 true인데 실제 상태가 active가 아니면 경고
+    if (isActive && !currentIsActive && currentState != SessionState.active) {
+      debugPrint('ChargingSessionService: ⚠️ 상태 불일치 경고 - 알림: isActive=$isActive, 실제 상태: ${currentState.name}');
+    }
+    // isActive가 false인데 실제 상태가 idle이 아니면 경고 (ending 상태는 허용)
+    if (!isActive && currentState != SessionState.idle && currentState != SessionState.ending) {
+      debugPrint('ChargingSessionService: ⚠️ 상태 불일치 경고 - 알림: isActive=$isActive, 실제 상태: ${currentState.name}');
+    }
+    
     if (!_sessionStateController.isClosed && !_isDisposed) {
       _sessionStateController.add(isActive);
-      debugPrint('ChargingSessionService: 세션 상태 변화 알림 - isActive: $isActive');
+      debugPrint('ChargingSessionService: 세션 상태 변화 알림 전송 - isActive: $isActive, 현재 상태: ${currentState.name}');
+    } else {
+      debugPrint('ChargingSessionService: ⚠️ 세션 상태 변화 알림 실패 - 컨트롤러 닫힘 또는 dispose됨 (isActive: $isActive)');
     }
   }
   
