@@ -56,7 +56,7 @@ class ChargingDataWorker(
                 // 충전 중이면 다음 작업도 예약 (OneTimeWorkRequest로 10초 후 실행)
                 // 이렇게 하면 PeriodicWorkRequest의 15분 제한을 우회하여 더 자주 수집 가능
                 if (isCharging) {
-                    scheduleNextCollection(context)
+                    scheduleNextCollection(applicationContext)
                 }
                 
                 Result.success()

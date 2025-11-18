@@ -16,12 +16,39 @@ class DateChangeReceiver : BroadcastReceiver() {
         private const val PREFS_NAME = "date_change_state"
         private const val KEY_LAST_LOADED_DATE = "last_loaded_date"
         private const val KEY_DATE_CHANGED_FLAG = "date_changed_flag"
+        
+        /// 날짜 변경 플래그 확인 및 초기화
+        /// 앱이 시작될 때 호출하여 날짜 변경 여부 확인
+        fun checkAndClearDateChangeFlag(context: Context): Boolean {
+            return try {
+                val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                val dateChanged = prefs.getBoolean(KEY_DATE_CHANGED_FLAG, false)
+                
+                if (dateChanged) {
+                    // 플래그 초기화
+                    prefs.edit()
+                        .putBoolean(KEY_DATE_CHANGED_FLAG, false)
+                        .apply()
+                    Log.d("BatteryPal", "DateChangeReceiver: 날짜 변경 플래그 확인 및 초기화")
+                }
+                
+                dateChanged
+            } catch (e: Exception) {
+                Log.e("BatteryPal", "DateChangeReceiver: 날짜 변경 플래그 확인 실패", e)
+                false
+            }
+        }
+        
+        /// 현재 날짜 키 가져오기
+        fun getCurrentDateKey(): String {
+            val calendar = Calendar.getInstance()
+            return "${calendar.get(Calendar.YEAR)}-${String.format("%02d", calendar.get(Calendar.MONTH) + 1)}-${String.format("%02d", calendar.get(Calendar.DAY_OF_MONTH))}"
+        }
     }
     
     override fun onReceive(context: Context, intent: Intent) {
         when (intent.action) {
             Intent.ACTION_DATE_CHANGED,
-            Intent.ACTION_TIME_SET,
             Intent.ACTION_TIMEZONE_CHANGED -> {
                 handleDateChange(context)
             }
@@ -61,36 +88,6 @@ class DateChangeReceiver : BroadcastReceiver() {
             }
         } catch (e: Exception) {
             Log.e("BatteryPal", "DateChangeReceiver: 날짜 변경 처리 오류", e)
-        }
-    }
-    
-    companion object {
-        /// 날짜 변경 플래그 확인 및 초기화
-        /// 앱이 시작될 때 호출하여 날짜 변경 여부 확인
-        fun checkAndClearDateChangeFlag(context: Context): Boolean {
-            return try {
-                val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                val dateChanged = prefs.getBoolean(KEY_DATE_CHANGED_FLAG, false)
-                
-                if (dateChanged) {
-                    // 플래그 초기화
-                    prefs.edit()
-                        .putBoolean(KEY_DATE_CHANGED_FLAG, false)
-                        .apply()
-                    Log.d("BatteryPal", "DateChangeReceiver: 날짜 변경 플래그 확인 및 초기화")
-                }
-                
-                dateChanged
-            } catch (e: Exception) {
-                Log.e("BatteryPal", "DateChangeReceiver: 날짜 변경 플래그 확인 실패", e)
-                false
-            }
-        }
-        
-        /// 현재 날짜 키 가져오기
-        fun getCurrentDateKey(): String {
-            val calendar = Calendar.getInstance()
-            return "${calendar.get(Calendar.YEAR)}-${String.format("%02d", calendar.get(Calendar.MONTH) + 1)}-${String.format("%02d", calendar.get(Calendar.DAY_OF_MONTH))}"
         }
     }
 }

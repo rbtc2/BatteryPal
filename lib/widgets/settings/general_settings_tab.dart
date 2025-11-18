@@ -91,6 +91,12 @@ class GeneralSettingsTab extends StatelessWidget {
                     subtitle: '충전 현황, 충전 분석 등',
                     onTap: () => _showDataDeletionDialog(context),
                   ),
+                  SettingsItem(
+                    title: '설정 초기화',
+                    icon: Icons.restore,
+                    subtitle: '모든 설정을 기본값으로 복원',
+                    onTap: () => _showResetSettingsDialog(context),
+                  ),
                 ],
               ),
               
@@ -136,5 +142,49 @@ class GeneralSettingsTab extends StatelessWidget {
 
   void _showDataDeletionDialog(BuildContext context) {
     DataDeletionDialog.show(context);
+  }
+
+  void _showResetSettingsDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.restore, color: Colors.orange),
+            SizedBox(width: 8),
+            Text('설정 초기화'),
+          ],
+        ),
+        content: const Text(
+          '모든 설정을 기본값으로 복원하시겠습니까?\n\n'
+          '이 작업은 되돌릴 수 없습니다.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('취소'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              settingsService.resetToDefaults();
+              Navigator.of(context).pop();
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('설정이 기본값으로 복원되었습니다.'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('초기화'),
+          ),
+        ],
+      ),
+    );
   }
 }
