@@ -531,24 +531,43 @@ class ChargingMonitorController extends ChangeNotifier {
   /// PHASE 9-4: ChargingSessionService의 세션 시작 시간과 동기화 우선
   Future<void> restoreSessionFromNative() async {
     try {
-      // PHASE 9-4: 먼저 ChargingSessionService의 세션 시작 시간 확인
+      // PHASE 12: 먼저 ChargingSessionService의 세션 시작 시간 확인
       // ChargingSessionService가 이미 네이티브 세션을 복구했을 수 있음
       final sessionServiceStartTime = _sessionService.sessionStartTime;
       final sessionState = _sessionService.sessionState;
       
-      if (sessionServiceStartTime != null && 
-          (sessionState == SessionState.active || sessionState == SessionState.ending)) {
-        // ChargingSessionService에 세션이 있으면 그것을 우선 사용
-        if (_sessionStartTime != sessionServiceStartTime) {
-          _sessionStartTime = sessionServiceStartTime;
-          debugPrint('ChargingMonitorController: 세션 서비스에서 세션 시작 시간 동기화 - $_sessionStartTime');
-          notifyListeners();
-          _updateDurationTimerBasedOnSettings();
+      // PHASE 12: idle 상태이지만 시작 시간이 있으면 그것을 사용 (currentInfo가 null이었을 때 저장된 시간)
+      if (sessionServiceStartTime != null) {
+        if (sessionState == SessionState.active || sessionState == SessionState.ending) {
+          // ChargingSessionService에 활성 세션이 있으면 그것을 우선 사용
+          if (_sessionStartTime != sessionServiceStartTime) {
+            _sessionStartTime = sessionServiceStartTime;
+            debugPrint('ChargingMonitorController: 세션 서비스에서 세션 시작 시간 동기화 (active/ending) - $_sessionStartTime');
+            notifyListeners();
+            _updateDurationTimerBasedOnSettings();
+          }
+          return;  // 세션 서비스에 활성 세션이 있으면 네이티브 확인 불필요
+        } else if (sessionState == SessionState.idle) {
+          // PHASE 12: idle 상태이지만 시작 시간이 있으면 네이티브 정보 확인 후 사용
+          // (currentInfo가 null이었을 때 저장된 시간일 수 있음)
+          final sessionInfo = await NativeBatteryService.getChargingSessionInfo();
+          if (sessionInfo != null && 
+              sessionInfo.isChargingActive && 
+              sessionInfo.startTime != null &&
+              sessionInfo.startTime == sessionServiceStartTime) {
+            // 네이티브 정보와 일치하면 사용
+            if (_sessionStartTime != sessionServiceStartTime) {
+              _sessionStartTime = sessionServiceStartTime;
+              debugPrint('ChargingMonitorController: 세션 서비스에서 세션 시작 시간 동기화 (idle, 네이티브와 일치) - $_sessionStartTime');
+              notifyListeners();
+              _updateDurationTimerBasedOnSettings();
+            }
+            return;  // 네이티브 정보와 일치하므로 사용
+          }
         }
-        return;  // 세션 서비스에 세션이 있으면 네이티브 확인 불필요
       }
       
-      // 세션 서비스에 세션이 없으면 네이티브 정보 확인
+      // 세션 서비스에 세션이 없거나 idle 상태이지만 네이티브 정보와 일치하지 않으면 네이티브 정보 확인
       final sessionInfo = await NativeBatteryService.getChargingSessionInfo();
       
       if (sessionInfo == null) {
@@ -558,7 +577,7 @@ class ChargingMonitorController extends ChangeNotifier {
       
       debugPrint('ChargingMonitorController: 네이티브 세션 정보 복구 - $sessionInfo');
       
-      // PHASE 11: 네이티브 정보 우선시 - currentInfo.isCharging 확인 제거
+      // PHASE 12: 네이티브 정보 우선시 - currentInfo.isCharging 확인 제거
       // 네이티브에 isChargingActive = true와 startTime이 있으면 바로 복구
       if (sessionInfo.isChargingActive && sessionInfo.startTime != null) {
         // 네이티브에서 저장한 시작 시간이 더 이전이면 사용
@@ -573,7 +592,7 @@ class ChargingMonitorController extends ChangeNotifier {
           _updateDurationTimerBasedOnSettings();
         }
       } else if (!sessionInfo.isChargingActive) {
-        // PHASE 11: 충전이 종료된 상태면 세션 시작 시간 초기화
+        // PHASE 12: 충전이 종료된 상태면 세션 시작 시간 초기화
         if (_sessionStartTime != null) {
           _sessionStartTime = null;
           debugPrint('ChargingMonitorController: 충전 종료 상태로 세션 시작 시간 초기화');

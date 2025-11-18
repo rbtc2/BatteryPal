@@ -3,6 +3,7 @@
 
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:battery_plus/battery_plus.dart';
 import '../../../../../models/models.dart';
 import '../../../../../services/battery_service.dart';
 import '../../../../../services/last_charging_info_service.dart';
@@ -141,28 +142,41 @@ class ChargingSessionService {
       // 앱 재시작 시 네이티브에서 저장한 세션 정보를 복구해야 함
       await _recoverBackgroundSession();
       
-      // PHASE 8-5: 현재 충전 상태 확인 및 세션 시작 (이미 초기화되어 있어도)
+      // PHASE 12: 현재 충전 상태 확인 및 세션 시작 (이미 초기화되어 있어도)
       // 스트림 이벤트가 전달되지 않을 수 있으므로 직접 확인
       final currentInfo = _batteryService.currentBatteryInfo;
       if (currentInfo != null) {
         final isCurrentlyCharging = currentInfo.isCharging && currentInfo.chargingCurrent > 0;
         final wasCharging = _stateManager.wasCharging;
         final sessionState = _stateManager.state;
+        final recoveredStartTime = _stateManager.startTime;
         
-        debugPrint('ChargingSessionService: 현재 충전 상태 확인 - isCharging: $isCurrentlyCharging, wasCharging: $wasCharging, sessionState: ${sessionState.name}');
+        debugPrint('ChargingSessionService: 현재 충전 상태 확인 - isCharging: $isCurrentlyCharging, wasCharging: $wasCharging, sessionState: ${sessionState.name}, recoveredStartTime: $recoveredStartTime');
         
-        // PHASE 10: 네이티브 세션 복구 후에도 세션이 없으면 네이티브 정보 확인 후 세션 시작
+        // PHASE 12: 네이티브 세션 복구 후에도 세션이 없으면 네이티브 정보 확인 후 세션 시작
         // (네이티브 세션 복구가 실패했거나 충전 상태가 변경된 경우)
         if (isCurrentlyCharging && sessionState == SessionState.idle) {
           debugPrint('ChargingSessionService: 충전 중이지만 세션이 없음 - 네이티브 정보 확인 후 세션 시작');
           _stateManager.setWasCharging(true);
-          await _startSessionWithNativeCheck(currentInfo);
+          // PHASE 12: 복구된 시작 시간이 있으면 그것을 사용
+          if (recoveredStartTime != null) {
+            debugPrint('ChargingSessionService: 복구된 시작 시간으로 세션 시작 - $recoveredStartTime');
+            _startSession(currentInfo, startTime: recoveredStartTime);
+          } else {
+            await _startSessionWithNativeCheck(currentInfo);
+          }
         } else if (isCurrentlyCharging && !wasCharging) {
           // 충전 시작 감지 (wasCharging이 false였는데 충전 중)
           debugPrint('ChargingSessionService: 충전 시작 감지 (초기화 후 확인) - 네이티브 정보 확인 후 세션 시작');
           _stateManager.setWasCharging(true);
           if (sessionState == SessionState.idle) {
-            await _startSessionWithNativeCheck(currentInfo);
+            // PHASE 12: 복구된 시작 시간이 있으면 그것을 사용
+            if (recoveredStartTime != null) {
+              debugPrint('ChargingSessionService: 복구된 시작 시간으로 세션 시작 - $recoveredStartTime');
+              _startSession(currentInfo, startTime: recoveredStartTime);
+            } else {
+              await _startSessionWithNativeCheck(currentInfo);
+            }
           }
         } else if (!isCurrentlyCharging && wasCharging) {
           // 충전 종료 감지
@@ -175,7 +189,13 @@ class ChargingSessionService {
           debugPrint('ChargingSessionService: 충전 상태 변화 없음');
         }
       } else {
-        debugPrint('ChargingSessionService: 현재 배터리 정보 없음');
+        // PHASE 12: currentInfo가 null이지만 복구된 시작 시간이 있으면 로그 출력
+        final recoveredStartTime = _stateManager.startTime;
+        if (recoveredStartTime != null) {
+          debugPrint('ChargingSessionService: 현재 배터리 정보 없음 - 복구된 시작 시간 대기 중: $recoveredStartTime (배터리 정보 업데이트 시 세션 시작)');
+        } else {
+          debugPrint('ChargingSessionService: 현재 배터리 정보 없음');
+        }
       }
       
       return;
@@ -199,15 +219,23 @@ class ChargingSessionService {
       // Phase 2: 백그라운드 세션 복구 확인
       await _recoverBackgroundSession();
       
-      // 현재 충전 상태 확인
+      // PHASE 12: 현재 충전 상태 확인
       final currentInfo = _batteryService.currentBatteryInfo;
+      final recoveredStartTime = _stateManager.startTime;
+      
       if (currentInfo != null) {
         _stateManager.setWasCharging(currentInfo.isCharging);
         if (currentInfo.isCharging && currentInfo.chargingCurrent > 0) {
-          // PHASE 10: 이미 충전 중이면 네이티브 세션 정보 확인 후 세션 시작
+          // PHASE 12: 이미 충전 중이면 네이티브 세션 정보 확인 후 세션 시작
           // (복구 실패 시 네이티브 정보 재확인)
           if (!_stateManager.isActive) {
-            await _startSessionWithNativeCheck(currentInfo);
+            // PHASE 12: 복구된 시작 시간이 있으면 그것을 사용
+            if (recoveredStartTime != null) {
+              debugPrint('ChargingSessionService: 복구된 시작 시간으로 세션 시작 (초기화) - $recoveredStartTime');
+              _startSession(currentInfo, startTime: recoveredStartTime);
+            } else {
+              await _startSessionWithNativeCheck(currentInfo);
+            }
           }
           // _startSession 내부에서 _notifySessionStateChanged(true) 호출됨
         } else {
@@ -215,6 +243,10 @@ class ChargingSessionService {
           _notifySessionStateChanged(false);
         }
       } else {
+        // PHASE 12: 배터리 정보가 없지만 복구된 시작 시간이 있으면 로그 출력
+        if (recoveredStartTime != null) {
+          debugPrint('ChargingSessionService: 배터리 정보 없음 - 복구된 시작 시간 대기 중: $recoveredStartTime (배터리 정보 업데이트 시 세션 시작)');
+        }
         // 배터리 정보가 없으면 세션 상태 알림 (idle 상태)
         _notifySessionStateChanged(false);
       }
@@ -774,12 +806,30 @@ class ChargingSessionService {
             }
           }
         } else {
-          // PHASE 11: currentInfo가 null이어도 네이티브 정보를 우선시하여 세션 시작 시간 저장
-          // 나중에 배터리 정보가 업데이트되면 세션이 시작됨
+          // PHASE 13: currentInfo가 null이어도 네이티브 정보로 세션 시작
+          // 네이티브에 isChargingActive = true이고 startTime이 있으면 즉시 세션 시작
           if (!_stateManager.isActive) {
-            // 세션 시작 시간만 먼저 저장 (BatteryInfo는 나중에 업데이트되면 세션 시작)
-            _stateManager.updateStartTime(sessionInfo.startTime!);
-            debugPrint('ChargingSessionService: 현재 배터리 정보가 없음 - 네이티브 시작 시간 저장: ${sessionInfo.startTime} (나중에 배터리 정보 업데이트 시 세션 시작)');
+            // 네이티브 정보로 최소한의 BatteryInfo 생성
+            final chargingType = sessionInfo.chargingType ?? 'Unknown';
+            final startBatteryLevel = sessionInfo.startBatteryLevel ?? 0.0;
+            
+            // 네이티브 정보 기반 BatteryInfo 생성 (충전 중이므로)
+            final dummyBatteryInfo = BatteryInfo(
+              level: startBatteryLevel,
+              state: BatteryState.charging, // 네이티브에 isChargingActive = true
+              timestamp: DateTime.now(),
+              temperature: -1.0, // 나중에 업데이트됨
+              voltage: -1, // 나중에 업데이트됨
+              capacity: -1, // 나중에 업데이트됨
+              health: -1, // 나중에 업데이트됨
+              chargingType: chargingType,
+              chargingCurrent: 0, // 나중에 업데이트됨
+              isCharging: true, // 네이티브에 isChargingActive = true
+            );
+            
+            // 네이티브에서 가져온 시작 시간으로 세션 시작
+            _startSession(dummyBatteryInfo, startTime: sessionInfo.startTime);
+            debugPrint('ChargingSessionService: 현재 배터리 정보가 없음 - 네이티브 정보로 세션 시작 (더미 BatteryInfo 사용) - 시작 시간: ${sessionInfo.startTime} (${DateTime.now().difference(sessionInfo.startTime!).inMinutes}분 경과)');
           } else {
             // 이미 세션이 있으면 시작 시간만 업데이트
             if (_stateManager.startTime != sessionInfo.startTime) {
