@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../../../services/battery_service.dart';
+import '../../../../../models/models.dart';
 import '../services/charging_session_service.dart';
 import '../config/charging_session_config.dart';
 
@@ -23,11 +24,38 @@ class ActiveChargingCard extends StatefulWidget {
 
 class _ActiveChargingCardState extends State<ActiveChargingCard> {
   Timer? _updateTimer;
+  StreamSubscription<BatteryInfo>? _batteryInfoSubscription;
+  bool _previousIsCharging = false;
 
   @override
   void initState() {
     super.initState();
-    // 1초마다 UI 업데이트
+    
+    // BatteryService 스트림 구독하여 충전 상태 변화 즉시 감지
+    _batteryInfoSubscription = widget.batteryService.batteryInfoStream.listen(
+      (batteryInfo) {
+        if (!mounted) return;
+        
+        final isCharging = batteryInfo.isCharging;
+        
+        // 충전 상태가 변경되면 즉시 UI 업데이트 (카드 표시/숨김)
+        if (_previousIsCharging != isCharging) {
+          _previousIsCharging = isCharging;
+          setState(() {});
+        }
+      },
+      onError: (error) {
+        debugPrint('ActiveChargingCard: 배터리 정보 스트림 오류 - $error');
+      },
+    );
+    
+    // 초기 충전 상태 저장
+    final currentInfo = widget.batteryService.currentBatteryInfo;
+    if (currentInfo != null) {
+      _previousIsCharging = currentInfo.isCharging;
+    }
+    
+    // 1초마다 UI 업데이트 (경과 시간 등 실시간 정보 업데이트용)
     _updateTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted) {
         setState(() {});
@@ -40,6 +68,7 @@ class _ActiveChargingCardState extends State<ActiveChargingCard> {
   @override
   void dispose() {
     _updateTimer?.cancel();
+    _batteryInfoSubscription?.cancel();
     super.dispose();
   }
 
@@ -47,8 +76,19 @@ class _ActiveChargingCardState extends State<ActiveChargingCard> {
   Widget build(BuildContext context) {
     final batteryInfo = widget.batteryService.currentBatteryInfo;
     final sessionStartTime = widget.sessionService.sessionStartTime;
+    final isSessionActive = widget.sessionService.isSessionActive;
     
-    if (batteryInfo == null || sessionStartTime == null) {
+    // 카드 표시 조건:
+    // 1. 배터리 정보가 있어야 함
+    // 2. 세션 시작 시간이 있어야 함
+    // 3. 세션이 활성화되어 있어야 함 (isSessionActive == true)
+    // 4. 실제로 충전 중이어야 함 (batteryInfo.isCharging == true)
+    // 
+    // 충전기가 제거되면 즉시 카드가 사라지도록 실제 충전 상태도 확인
+    if (batteryInfo == null || 
+        sessionStartTime == null || 
+        !isSessionActive || 
+        !batteryInfo.isCharging) {
       return const SizedBox.shrink();
     }
     

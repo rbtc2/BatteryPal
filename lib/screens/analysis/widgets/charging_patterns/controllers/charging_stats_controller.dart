@@ -35,6 +35,9 @@ class ChargingStatsController extends ChangeNotifier {
   // 상태 업데이트 콜백
   Function()? _onStateChanged;
   
+  // 이전 세션 활성 상태 (상태 변화 감지용)
+  bool _previousIsSessionActive = false;
+  
   ChargingStatsController({
     required ChargingSessionService sessionService,
     required ChargingSessionStorage storageService,
@@ -211,16 +214,33 @@ class ChargingStatsController extends ChangeNotifier {
   }
   
   /// 진행 중인 세션 업데이트 시작 (1초마다)
+  /// 
+  /// 세션 상태 변화를 감지하여 UI를 업데이트합니다.
+  /// - 세션이 활성화되면 UI 업데이트
+  /// - 세션이 비활성화되면 즉시 UI 업데이트 (카드 숨김)
   void startActiveSessionUpdate() {
     _activeSessionUpdateTimer?.cancel();
+    
+    // 초기 상태 저장
+    _previousIsSessionActive = _sessionService.isSessionActive;
     
     _activeSessionUpdateTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_isMounted?.call() == false) {
         timer.cancel();
         return;
       }
-      // 오늘 탭이고 진행 중인 세션이 있으면 UI 업데이트
-      if (_dateController.isToday && _sessionService.isSessionActive) {
+      
+      // 오늘 탭일 때만 처리
+      if (!_dateController.isToday) {
+        return;
+      }
+      
+      final currentIsSessionActive = _sessionService.isSessionActive;
+      
+      // 세션 상태가 변경되었거나, 세션이 활성화되어 있으면 UI 업데이트
+      // 상태가 false로 변경되었을 때도 즉시 업데이트하여 카드를 숨김
+      if (currentIsSessionActive != _previousIsSessionActive || currentIsSessionActive) {
+        _previousIsSessionActive = currentIsSessionActive;
         _notifyStateChanged();
       }
     });
