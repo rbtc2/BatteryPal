@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../../../services/settings_service.dart';
 import '../../../services/notification_service.dart';
+import '../../../services/system_settings_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// 개발자 모드 다이얼로그
 class DeveloperModeDialog extends StatelessWidget {
@@ -169,6 +172,23 @@ class _DeveloperModeDialogContentState extends State<_DeveloperModeDialogContent
                 ),
               );
             },
+          ),
+          
+          const SizedBox(height: 16),
+          
+          // 디버깅 정보 섹션
+          ExpansionTile(
+            title: const Row(
+              children: [
+                Icon(Icons.bug_report, size: 20),
+                SizedBox(width: 8),
+                Text('디버깅 정보'),
+              ],
+            ),
+            subtitle: const Text('설정 값 및 상태 확인'),
+            children: [
+              _DebugInfoWidget(settingsService: widget.settingsService),
+            ],
           ),
           
           const SizedBox(height: 24),
@@ -476,6 +496,178 @@ class _DeveloperModeDialogContentState extends State<_DeveloperModeDialogContent
         ],
       ),
     );
+  }
+}
+
+/// 디버깅 정보 위젯
+class _DebugInfoWidget extends StatefulWidget {
+  final SettingsService settingsService;
+
+  const _DebugInfoWidget({
+    required this.settingsService,
+  });
+
+  @override
+  State<_DebugInfoWidget> createState() => _DebugInfoWidgetState();
+}
+
+class _DebugInfoWidgetState extends State<_DebugInfoWidget> {
+  bool _isLoading = false;
+  Map<String, String> _debugInfo = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDebugInfo();
+  }
+
+  Future<void> _loadDebugInfo() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final info = <String, String>{};
+
+      // 1. Flutter 설정 값
+      info['Flutter 설정 값'] = widget.settingsService.appSettings.developerModeChargingTestEnabled
+          ? 'true'
+          : 'false';
+
+      // 2. SharedPreferences 직접 읽기
+      final prefs = await SharedPreferences.getInstance();
+      final prefsValue = prefs.getBool('developerModeChargingTestEnabled');
+      info['SharedPreferences (Flutter)'] = prefsValue?.toString() ?? 'null';
+
+      // 3. 네이티브에서 읽은 값
+      final systemSettings = SystemSettingsService();
+      final nativeValue = await systemSettings.getDeveloperModeChargingTestEnabled();
+      info['네이티브에서 읽은 값'] = nativeValue?.toString() ?? 'null';
+
+      // 4. 알림 권한 상태
+      final notificationPermission = await Permission.notification.status;
+      info['알림 권한'] = notificationPermission.isGranted ? '허용됨' : '거부됨';
+
+      // 5. Flutter SharedPreferences 전체 (관련 키만)
+      final allPrefs = await systemSettings.getAllFlutterSharedPreferences();
+      if (allPrefs != null) {
+        final developerKey = allPrefs['developerModeChargingTestEnabled'];
+        info['네이티브 SharedPreferences'] = developerKey?.toString() ?? '키 없음';
+        
+        // 관련 키들도 표시
+        final relatedKeys = allPrefs.entries
+            .where((e) => e.key.toString().contains('developer') || 
+                         e.key.toString().contains('charging') ||
+                         e.key.toString().contains('notification'))
+            .take(5)
+            .map((e) => '${e.key}: ${e.value}')
+            .join(', ');
+        if (relatedKeys.isNotEmpty) {
+          info['관련 키들'] = relatedKeys;
+        }
+      }
+
+      setState(() {
+        _debugInfo = info;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _debugInfo = {'오류': e.toString()};
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Padding(
+        padding: EdgeInsets.all(16),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                '디버깅 정보',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.refresh, size: 20),
+                onPressed: _loadDebugInfo,
+                tooltip: '새로고침',
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ..._debugInfo.entries.map((entry) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 180,
+                    child: Text(
+                      '${entry.key}:',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: SelectableText(
+                      entry.value,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontFamily: 'monospace',
+                        color: _getValueColor(context, entry.key, entry.value),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: _loadDebugInfo,
+            icon: const Icon(Icons.refresh, size: 18),
+            label: const Text('새로고침'),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(double.infinity, 36),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _getValueColor(BuildContext context, String key, String value) {
+    if (key.contains('권한') && value.contains('거부')) {
+      return Theme.of(context).colorScheme.error;
+    }
+    if (key.contains('설정 값') || key.contains('SharedPreferences')) {
+      if (value == 'true') {
+        return Theme.of(context).colorScheme.primary;
+      } else if (value == 'false' || value == 'null' || value.contains('없음')) {
+        return Theme.of(context).colorScheme.error;
+      }
+    }
+    return Theme.of(context).colorScheme.onSurface;
   }
 }
 

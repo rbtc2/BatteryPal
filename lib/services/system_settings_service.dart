@@ -171,5 +171,39 @@ class SystemSettingsService {
       debugPrint('배터리 최적화 설정 화면 열기 실패: $e');
     }
   }
+
+  /// 개발자 모드: 네이티브에서 개발자 모드 충전 테스트 활성화 여부 확인
+  /// 
+  /// Returns: 네이티브에서 읽은 값 (Flutter와 동기화 확인용)
+  Future<bool?> getDeveloperModeChargingTestEnabled() async {
+    try {
+      debugPrint('시스템 설정: 개발자 모드 충전 테스트 활성화 여부 확인 요청');
+      final bool? isEnabled = await _channel.invokeMethod('getDeveloperModeChargingTestEnabled');
+      debugPrint('시스템 설정: 개발자 모드 충전 테스트 활성화 여부 (네이티브) = $isEnabled');
+      return isEnabled;
+    } catch (e) {
+      debugPrint('개발자 모드 충전 테스트 활성화 여부 확인 실패: $e');
+      return null;
+    }
+  }
+
+  /// 개발자 모드: Flutter SharedPreferences의 모든 값 가져오기 (디버깅용)
+  /// 
+  /// Returns: 모든 SharedPreferences 키-값 쌍
+  Future<Map<String, dynamic>?> getAllFlutterSharedPreferences() async {
+    try {
+      debugPrint('시스템 설정: Flutter SharedPreferences 전체 읽기 요청');
+      final Map<dynamic, dynamic>? allPrefs = await _channel.invokeMethod('getAllFlutterSharedPreferences');
+      if (allPrefs != null) {
+        final result = Map<String, dynamic>.from(allPrefs);
+        debugPrint('시스템 설정: Flutter SharedPreferences 읽기 완료 - ${result.length}개 키');
+        return result;
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Flutter SharedPreferences 읽기 실패: $e');
+      return null;
+    }
+  }
 }
 

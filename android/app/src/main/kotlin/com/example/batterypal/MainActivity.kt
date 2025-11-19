@@ -64,6 +64,14 @@ class MainActivity : FlutterActivity() {
                     val sessionInfo = getChargingSessionInfo()
                     result.success(sessionInfo)
                 }
+                "getDeveloperModeChargingTestEnabled" -> {
+                    val isEnabled = getDeveloperModeChargingTestEnabled()
+                    result.success(isEnabled)
+                }
+                "getAllFlutterSharedPreferences" -> {
+                    val allPrefs = getAllFlutterSharedPreferences()
+                    result.success(allPrefs)
+                }
                 else -> {
                     result.notImplemented()
                 }
@@ -147,6 +155,14 @@ class MainActivity : FlutterActivity() {
                 "openBatteryOptimizationSettings" -> {
                     openBatteryOptimizationSettings()
                     result.success(true)
+                }
+                "getDeveloperModeChargingTestEnabled" -> {
+                    val isEnabled = getDeveloperModeChargingTestEnabled()
+                    result.success(isEnabled)
+                }
+                "getAllFlutterSharedPreferences" -> {
+                    val allPrefs = getAllFlutterSharedPreferences()
+                    result.success(allPrefs)
                 }
                 else -> {
                     result.notImplemented()
@@ -859,6 +875,39 @@ class MainActivity : FlutterActivity() {
             }
         } catch (e: Exception) {
             android.util.Log.e("BatteryPal", "배터리 최적화 설정 화면 열기 실패", e)
+        }
+    }
+    
+    // ========== 개발자 모드 디버깅 메서드 ==========
+    
+    /// 개발자 모드 충전 테스트 활성화 여부 확인
+    /// Flutter SharedPreferences에서 직접 읽어옵니다
+    private fun getDeveloperModeChargingTestEnabled(): Boolean {
+        return try {
+            val flutterPrefs = applicationContext.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+            // Flutter SharedPreferences는 키를 그대로 저장
+            val isEnabled = flutterPrefs.getBoolean("developerModeChargingTestEnabled", false)
+            android.util.Log.d("BatteryPal", "개발자 모드 충전 테스트 활성화 여부 (MainActivity): $isEnabled")
+            isEnabled
+        } catch (e: Exception) {
+            android.util.Log.e("BatteryPal", "개발자 모드 설정 읽기 실패", e)
+            false
+        }
+    }
+    
+    /// Flutter SharedPreferences의 모든 키-값 쌍 가져오기 (디버깅용)
+    private fun getAllFlutterSharedPreferences(): Map<String, Any?> {
+        return try {
+            val flutterPrefs = applicationContext.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+            val allEntries = flutterPrefs.all
+            
+            android.util.Log.d("BatteryPal", "Flutter SharedPreferences 전체 키 개수: ${allEntries.size}")
+            
+            // 모든 키를 반환 (디버깅용)
+            allEntries.mapKeys { it.key }
+        } catch (e: Exception) {
+            android.util.Log.e("BatteryPal", "Flutter SharedPreferences 읽기 실패", e)
+            emptyMap()
         }
     }
 }
