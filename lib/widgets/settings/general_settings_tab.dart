@@ -261,26 +261,26 @@ class GeneralSettingsTab extends StatelessWidget {
     }
     
     // 권한 요청
+    if (!context.mounted) return;
     final granted = await PermissionHelper.requestNotificationPermission(context);
     
-    if (context.mounted) {
-      if (granted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('알림 권한이 허용되었습니다.'),
-            duration: Duration(seconds: 2),
-            backgroundColor: Colors.green,
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('알림 권한이 거부되었습니다. 설정에서 수동으로 허용해주세요.'),
-            duration: Duration(seconds: 3),
-            backgroundColor: Colors.orange,
-          ),
-        );
-      }
+    if (!context.mounted) return;
+    if (granted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('알림 권한이 허용되었습니다.'),
+          duration: Duration(seconds: 2),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('알림 권한이 거부되었습니다. 설정에서 수동으로 허용해주세요.'),
+          duration: Duration(seconds: 3),
+          backgroundColor: Colors.orange,
+        ),
+      );
     }
   }
 
@@ -300,23 +300,26 @@ class GeneralSettingsTab extends StatelessWidget {
     }
     
     // 배터리 최적화 예외 요청
+    if (!context.mounted) return;
     await BatteryOptimizationHelper.requestBatteryOptimizationException(context);
     
     // 사용자가 설정 화면에서 돌아온 후 상태 재확인
-    if (context.mounted) {
-      // 잠시 후 상태 재확인 (설정 화면에서 돌아올 때까지 대기)
-      await Future.delayed(const Duration(milliseconds: 500));
-      final newStatus = await BatteryOptimizationHelper.isIgnoringBatteryOptimizations();
-      
-      if (newStatus) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('배터리 최적화 예외가 설정되었습니다.'),
-            duration: Duration(seconds: 2),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
+    if (!context.mounted) return;
+    // 잠시 후 상태 재확인 (설정 화면에서 돌아올 때까지 대기)
+    await Future.delayed(const Duration(milliseconds: 500));
+    
+    if (!context.mounted) return;
+    final newStatus = await BatteryOptimizationHelper.isIgnoringBatteryOptimizations();
+    
+    if (!context.mounted) return;
+    if (newStatus) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('배터리 최적화 예외가 설정되었습니다.'),
+          duration: Duration(seconds: 2),
+          backgroundColor: Colors.green,
+        ),
+      );
     }
   }
 }
