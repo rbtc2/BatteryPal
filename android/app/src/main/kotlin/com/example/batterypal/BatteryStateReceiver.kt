@@ -42,6 +42,7 @@ class BatteryStateReceiver : BroadcastReceiver() {
     /// 충전기 연결 처리
     private fun handlePowerConnected(context: Context) {
         try {
+            Log.d("BatteryPal", "handlePowerConnected 시작")
             val now = System.currentTimeMillis()
             val batteryStatePrefs = context.getSharedPreferences("battery_state", Context.MODE_PRIVATE)
             
@@ -115,6 +116,7 @@ class BatteryStateReceiver : BroadcastReceiver() {
     /// 충전기 분리 처리
     private fun handlePowerDisconnected(context: Context) {
         try {
+            Log.d("BatteryPal", "handlePowerDisconnected 시작")
             val now = System.currentTimeMillis()
             val batteryStatePrefs = context.getSharedPreferences("battery_state", Context.MODE_PRIVATE)
             
@@ -439,6 +441,9 @@ class BatteryStateReceiver : BroadcastReceiver() {
                     .setAutoCancel(true)
                     .setContentIntent(pendingIntent)
                     .setStyle(Notification.BigTextStyle().bigText(message))
+                    .setPriority(Notification.PRIORITY_HIGH) // 높은 우선순위
+                    .setCategory(Notification.CATEGORY_STATUS) // 상태 알림 카테고리
+                    .setVisibility(Notification.VISIBILITY_PUBLIC) // 공개 알림
                     .build()
                 
                 // 고유한 알림 ID 사용 (타임스탬프 기반)
