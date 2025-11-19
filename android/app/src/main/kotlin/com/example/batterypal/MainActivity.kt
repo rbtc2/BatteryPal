@@ -4,7 +4,9 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.os.BatteryManager
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.location.LocationManager
@@ -14,6 +16,8 @@ import android.content.ContentResolver
 import android.app.usage.UsageStatsManager
 import android.app.usage.UsageEvents
 import android.app.AppOpsManager
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -154,6 +158,14 @@ class MainActivity : FlutterActivity() {
                 }
                 "openBatteryOptimizationSettings" -> {
                     openBatteryOptimizationSettings()
+                    result.success(true)
+                }
+                "hasNotificationPermission" -> {
+                    val hasPermission = hasNotificationPermission()
+                    result.success(hasPermission)
+                }
+                "requestNotificationPermission" -> {
+                    requestNotificationPermission()
                     result.success(true)
                 }
                 "getDeveloperModeChargingTestEnabled" -> {
@@ -847,6 +859,63 @@ class MainActivity : FlutterActivity() {
             android.util.Log.e("BatteryPal", "화면 켜짐 시간 가져오기 실패", e)
             -1
         }
+    }
+
+    // ========== 알림 권한 처리 (Android 13+) ==========
+    
+    /// 알림 권한 확인
+    /// 
+    /// Returns: 알림 권한이 허용되었으면 true, 그렇지 않으면 false
+    private fun hasNotificationPermission(): Boolean {
+        return try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                // Android 13+ (API 33+)
+                val result = ContextCompat.checkSelfPermission(
+                    this,
+                    android.Manifest.permission.POST_NOTIFICATIONS
+                )
+                val hasPermission = result == PackageManager.PERMISSION_GRANTED
+                android.util.Log.d("BatteryPal", "알림 권한 확인: $hasPermission")
+                hasPermission
+            } else {
+                // Android 12 이하는 항상 true (런타임 권한 불필요)
+                android.util.Log.d("BatteryPal", "Android 12 이하: 알림 권한 항상 허용")
+                true
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("BatteryPal", "알림 권한 확인 실패", e)
+            false
+        }
+    }
+    
+    /// 알림 권한 요청
+    /// 
+    /// Android 13+ (API 33+)에서만 실제로 권한 요청 다이얼로그를 표시합니다.
+    private fun requestNotificationPermission() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                // Android 13+ (API 33+)
+                if (!hasNotificationPermission()) {
+                    ActivityCompat.requestPermissions(
+                        this,
+                        arrayOf(android.Manifest.permission.POST_NOTIFICATIONS),
+                        REQUEST_NOTIFICATION_PERMISSION
+                    )
+                    android.util.Log.d("BatteryPal", "알림 권한 요청 다이얼로그 표시")
+                } else {
+                    android.util.Log.d("BatteryPal", "알림 권한이 이미 허용되어 있습니다")
+                }
+            } else {
+                // Android 12 이하는 권한 요청 불필요
+                android.util.Log.d("BatteryPal", "Android 12 이하: 알림 권한 요청 불필요")
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("BatteryPal", "알림 권한 요청 실패", e)
+        }
+    }
+    
+    companion object {
+        private const val REQUEST_NOTIFICATION_PERMISSION = 1001
     }
 
     // ========== 배터리 최적화 예외 처리 (Phase 3) ==========

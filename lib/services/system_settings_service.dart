@@ -172,6 +172,34 @@ class SystemSettingsService {
     }
   }
 
+  /// 알림 권한 확인 (Android 13+)
+  /// 
+  /// Returns: 알림 권한이 허용되었으면 true, 그렇지 않으면 false
+  Future<bool?> hasNotificationPermission() async {
+    try {
+      debugPrint('시스템 설정: 알림 권한 확인 요청');
+      final bool hasPermission = await _channel.invokeMethod('hasNotificationPermission');
+      debugPrint('시스템 설정: 알림 권한 = $hasPermission');
+      return hasPermission;
+    } catch (e) {
+      debugPrint('알림 권한 확인 실패: $e');
+      return null;
+    }
+  }
+
+  /// 알림 권한 요청 (Android 13+)
+  /// 
+  /// Android 13+에서만 실제로 권한 요청 다이얼로그를 표시합니다.
+  Future<void> requestNotificationPermission() async {
+    try {
+      debugPrint('시스템 설정: 알림 권한 요청');
+      await _channel.invokeMethod('requestNotificationPermission');
+      debugPrint('시스템 설정: 알림 권한 요청 완료');
+    } catch (e) {
+      debugPrint('알림 권한 요청 실패: $e');
+    }
+  }
+
   /// 개발자 모드: 네이티브에서 개발자 모드 충전 테스트 활성화 여부 확인
   /// 
   /// Returns: 네이티브에서 읽은 값 (Flutter와 동기화 확인용)

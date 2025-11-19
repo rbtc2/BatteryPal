@@ -4,6 +4,8 @@ import 'home/home_tab.dart';
 import 'analysis/analysis_tab.dart';
 import 'settings/settings_tab.dart';
 import '../services/battery_optimization_helper.dart';
+import '../services/system_settings_service.dart';
+import '../services/permission_helper.dart';
 
 /// 메인 네비게이션 화면
 /// Phase 8에서 실제 구현
@@ -26,6 +28,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
   
   // 배터리 최적화 예외 요청 표시 여부 (중복 방지)
   bool _hasShownBatteryOptimizationPrompt = false;
+  
+  // 알림 권한 요청 표시 여부 (중복 방지)
+  bool _hasShownNotificationPermissionPrompt = false;
 
   // 3개 탭 페이지들 (Pro 상태 전달)
   List<Widget> get _pages => [
@@ -46,9 +51,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     
-    // 앱 초기 실행 시 배터리 최적화 예외 요청
+    // 앱 초기 실행 시 권한 체크 및 요청
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkAndRequestBatteryOptimization();
+      _checkAndRequestPermissions();
     });
   }
   
@@ -62,10 +67,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
     
-    // 앱이 포그라운드로 돌아올 때 배터리 최적화 상태 재확인
+    // 앱이 포그라운드로 돌아올 때 권한 상태 재확인
     if (state == AppLifecycleState.resumed) {
       // 사용자가 설정에서 변경했을 수 있으므로 다시 확인
-      _checkBatteryOptimizationOnResume();
+      _checkPermissionsOnResume();
     }
   }
   
@@ -87,13 +92,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
     }
   }
   
-  /// 배터리 최적화 예외 확인 및 요청 (앱 초기 실행 시)
-  Future<void> _checkAndRequestBatteryOptimization() async {
-    // 이미 표시했으면 다시 표시하지 않음
-    if (_hasShownBatteryOptimizationPrompt) {
-      return;
-    }
-    
+  /// 권한 확인 및 요청 (앱 초기 실행 시)
+  Future<void> _checkAndRequestPermissions() async {
     try {
       // 앱이 완전히 로드될 때까지 약간 대기
       await Future.delayed(const Duration(seconds: 1));
@@ -103,6 +103,49 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
       // 앱 초기 실행 여부 확인
       final isFirstLaunch = await _isFirstLaunch();
       
+      // 알림 권한 체크 및 요청
+      await _checkAndRequestNotificationPermission(isFirstLaunch);
+      
+      // 배터리 최적화 예외 체크 및 요청
+      await _checkAndRequestBatteryOptimization(isFirstLaunch);
+    } catch (e) {
+      debugPrint('권한 확인 및 요청 실패: $e');
+    }
+  }
+  
+  /// 알림 권한 확인 및 요청
+  Future<void> _checkAndRequestNotificationPermission(bool isFirstLaunch) async {
+    if (_hasShownNotificationPermissionPrompt) {
+      return;
+    }
+    
+    try {
+      final systemSettings = SystemSettingsService();
+      final hasPermission = await systemSettings.hasNotificationPermission() ?? false;
+      
+      if (hasPermission) {
+        debugPrint('알림 권한이 이미 허용되어 있습니다');
+        return;
+      }
+      
+      // 초기 실행이거나 권한이 없으면 요청
+      if (isFirstLaunch || !hasPermission) {
+        if (!mounted) return;
+        _hasShownNotificationPermissionPrompt = true;
+        await PermissionHelper.requestNotificationPermission(context);
+      }
+    } catch (e) {
+      debugPrint('알림 권한 확인 및 요청 실패: $e');
+    }
+  }
+  
+  /// 배터리 최적화 예외 확인 및 요청
+  Future<void> _checkAndRequestBatteryOptimization(bool isFirstLaunch) async {
+    if (_hasShownBatteryOptimizationPrompt) {
+      return;
+    }
+    
+    try {
       // 초기 실행이 아니면 배터리 최적화 예외가 설정되어 있는지만 확인
       if (!isFirstLaunch) {
         final isIgnoring = await BatteryOptimizationHelper.isIgnoringBatteryOptimizations();
@@ -127,19 +170,25 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
     }
   }
   
-  /// 앱 포그라운드 복귀 시 배터리 최적화 상태 재확인
-  Future<void> _checkBatteryOptimizationOnResume() async {
+  /// 앱 포그라운드 복귀 시 권한 상태 재확인
+  Future<void> _checkPermissionsOnResume() async {
     try {
-      // 사용자가 설정에서 변경했을 수 있으므로 확인
-      final isIgnoring = await BatteryOptimizationHelper.isIgnoringBatteryOptimizations();
+      // 알림 권한 상태 재확인
+      final systemSettings = SystemSettingsService();
+      final hasNotificationPermission = await systemSettings.hasNotificationPermission() ?? false;
+      if (hasNotificationPermission) {
+        _hasShownNotificationPermissionPrompt = false;
+      }
       
+      // 배터리 최적화 상태 재확인
+      final isIgnoring = await BatteryOptimizationHelper.isIgnoringBatteryOptimizations();
       if (isIgnoring) {
         debugPrint('배터리 최적화 예외가 설정되어 있습니다');
         // 설정되어 있으면 플래그 리셋 (다음 초기 실행 시 다시 표시할 수 있도록)
         _hasShownBatteryOptimizationPrompt = false;
       }
     } catch (e) {
-      debugPrint('배터리 최적화 상태 재확인 실패: $e');
+      debugPrint('권한 상태 재확인 실패: $e');
     }
   }
 
