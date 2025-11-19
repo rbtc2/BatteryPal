@@ -310,7 +310,6 @@ class BatteryStateReceiver : BroadcastReceiver() {
                     .setContentTitle("충전 완료")
                     .setContentText("배터리가 100% 충전되었습니다.")
                     .setSmallIcon(android.R.drawable.ic_dialog_info)
-                    .setPriority(android.app.Notification.PRIORITY_HIGH)
                     .setDefaults(android.app.Notification.DEFAULT_ALL)
                     .setAutoCancel(true)
                     .build()
@@ -436,8 +435,6 @@ class BatteryStateReceiver : BroadcastReceiver() {
                     .setContentTitle(title)
                     .setContentText(message)
                     .setSmallIcon(smallIcon)
-                    .setLargeIcon(null) // 큰 아이콘은 필요 없음
-                    .setPriority(Notification.PRIORITY_HIGH)
                     .setDefaults(Notification.DEFAULT_VIBRATE) // 진동만
                     .setAutoCancel(true)
                     .setContentIntent(pendingIntent)

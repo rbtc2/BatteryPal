@@ -172,6 +172,10 @@ class MainActivity : FlutterActivity() {
                     val isRegistered = checkBatteryStateReceiverRegistered()
                     result.success(isRegistered)
                 }
+                "getBatteryPalLogs" -> {
+                    val logs = getBatteryPalLogs()
+                    result.success(logs)
+                }
                 else -> {
                     result.notImplemented()
                 }
@@ -946,6 +950,35 @@ class MainActivity : FlutterActivity() {
         } catch (e: Exception) {
             android.util.Log.e("BatteryPal", "마지막 충전 이벤트 시간 읽기 실패", e)
             mapOf("time" to null, "type" to "error", "formatted" to "오류")
+        }
+    }
+    
+    /// BatteryPal 관련 로그 가져오기 (logcat에서)
+    private fun getBatteryPalLogs(): List<String> {
+        return try {
+            val process = Runtime.getRuntime().exec("logcat -d -s BatteryPal:*")
+            val inputStream = process.inputStream
+            val reader = java.io.BufferedReader(java.io.InputStreamReader(inputStream))
+            val logs = mutableListOf<String>()
+            
+            var line: String?
+            while (reader.readLine().also { line = it } != null) {
+                line?.let { logs.add(it) }
+            }
+            
+            reader.close()
+            inputStream.close()
+            process.destroy()
+            
+            // 최근 100줄만 반환
+            if (logs.size > 100) {
+                logs.takeLast(100)
+            } else {
+                logs
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("BatteryPal", "로그 읽기 실패", e)
+            listOf("로그를 읽을 수 없습니다: ${e.message}")
         }
     }
     

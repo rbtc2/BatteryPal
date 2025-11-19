@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -287,6 +288,11 @@ class _BackgroundDetectionTab extends StatelessWidget {
           
           // 단계별 진단 체크리스트
           _DiagnosticChecklistWidget(settingsService: settingsService),
+          
+          const SizedBox(height: 24),
+          
+          // 실시간 로그 뷰어
+          _LogViewerWidget(settingsService: settingsService),
           
           const SizedBox(height: 24),
           
@@ -1429,6 +1435,249 @@ class _DiagnosticChecklistWidgetState extends State<_DiagnosticChecklistWidget> 
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// 실시간 로그 뷰어 위젯
+class _LogViewerWidget extends StatefulWidget {
+  final SettingsService settingsService;
+
+  const _LogViewerWidget({
+    required this.settingsService,
+  });
+
+  @override
+  State<_LogViewerWidget> createState() => _LogViewerWidgetState();
+}
+
+class _LogViewerWidgetState extends State<_LogViewerWidget> {
+  bool _isLoading = false;
+  List<String> _logs = [];
+  bool _autoRefresh = false;
+  Timer? _refreshTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLogs();
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadLogs() async {
+    if (_isLoading) return;
+    
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final systemSettings = SystemSettingsService();
+      final logs = await systemSettings.getBatteryPalLogs();
+      
+      setState(() {
+        _logs = logs ?? [];
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _logs = ['로그를 읽을 수 없습니다: $e'];
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _toggleAutoRefresh() {
+    setState(() {
+      _autoRefresh = !_autoRefresh;
+    });
+
+    if (_autoRefresh) {
+      _refreshTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
+        _loadLogs();
+      });
+    } else {
+      _refreshTimer?.cancel();
+    }
+  }
+
+  String _formatLogs() {
+    final buffer = StringBuffer();
+    buffer.writeln('=== BatteryPal 실시간 로그 ===');
+    buffer.writeln('생성 시간: ${DateTime.now().toIso8601String()}');
+    buffer.writeln('총 ${_logs.length}줄');
+    buffer.writeln('');
+    
+    for (final log in _logs) {
+      buffer.writeln(log);
+    }
+    
+    buffer.writeln('');
+    buffer.writeln('=== 끝 ===');
+    return buffer.toString();
+  }
+
+  Future<void> _copyLogs() async {
+    final text = _formatLogs();
+    await Clipboard.setData(ClipboardData(text: text));
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.white, size: 20),
+              SizedBox(width: 8),
+              Text('로그가 클립보드에 복사되었습니다'),
+            ],
+          ),
+          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.terminal,
+                      size: 20,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '실시간 로그 뷰어',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    if (_autoRefresh) ...[
+                      const SizedBox(width: 8),
+                      SizedBox(
+                        width: 8,
+                        height: 8,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.primary,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: Icon(
+                        _autoRefresh ? Icons.pause : Icons.play_arrow,
+                        size: 20,
+                      ),
+                      onPressed: _toggleAutoRefresh,
+                      tooltip: _autoRefresh ? '자동 새로고침 중지' : '자동 새로고침 시작',
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.content_copy, size: 20),
+                      onPressed: _logs.isEmpty ? null : _copyLogs,
+                      tooltip: '복사',
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.refresh, size: 20),
+                      onPressed: _loadLogs,
+                      tooltip: '새로고침',
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            
+            if (_isLoading)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(20),
+                  child: CircularProgressIndicator(),
+                ),
+              )
+            else if (_logs.isEmpty)
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Text(
+                    '로그가 없습니다',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                    ),
+                  ),
+                ),
+              )
+            else
+              Container(
+                constraints: const BoxConstraints(maxHeight: 300),
+                decoration: BoxDecoration(
+                  color: Colors.black,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+                  ),
+                ),
+                child: SingleChildScrollView(
+                  reverse: true, // 최신 로그가 아래에 오도록
+                  padding: const EdgeInsets.all(12),
+                  child: SelectableText(
+                    _logs.join('\n'),
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 11,
+                      color: Colors.green,
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ),
+            
+            if (_logs.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                '총 ${_logs.length}줄',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

@@ -239,5 +239,24 @@ class SystemSettingsService {
       return null;
     }
   }
+
+  /// 개발자 모드: BatteryPal 관련 로그 가져오기 (logcat에서)
+  /// 
+  /// Returns: 최근 로그 목록
+  Future<List<String>?> getBatteryPalLogs() async {
+    try {
+      debugPrint('시스템 설정: BatteryPal 로그 읽기 요청');
+      final List<dynamic>? logs = await _channel.invokeMethod('getBatteryPalLogs');
+      if (logs != null) {
+        final result = logs.map((e) => e.toString()).toList();
+        debugPrint('시스템 설정: BatteryPal 로그 읽기 완료 - ${result.length}줄');
+        return result;
+      }
+      return null;
+    } catch (e) {
+      debugPrint('BatteryPal 로그 읽기 실패: $e');
+      return null;
+    }
+  }
 }
 

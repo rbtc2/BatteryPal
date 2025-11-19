@@ -148,7 +148,6 @@ class ChargingForegroundService : Service() {
                 .setSmallIcon(smallIcon)
                 .setContentIntent(pendingIntent)
                 .setOngoing(true) // 사용자가 제거할 수 없도록
-                .setPriority(Notification.PRIORITY_LOW) // 낮은 우선순위
                 .build()
         } else {
             @Suppress("DEPRECATION")

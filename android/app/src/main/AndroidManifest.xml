@@ -21,6 +21,10 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     
+    <!-- 로그 읽기 권한 (개발자 모드 로그 뷰어용) -->
+    <uses-permission android:name="android.permission.READ_LOGS" 
+                     tools:ignore="ProtectedPermissions" />
+    
     <application
         android:label="batterypal"
         android:name=".MainApplication"
