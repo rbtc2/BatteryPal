@@ -23,11 +23,14 @@ class BatteryStateReceiver : BroadcastReceiver() {
         // WorkManager 관련 상수 제거 - 이벤트 기반으로만 작동
     }
     override fun onReceive(context: Context, intent: Intent) {
+        Log.d("BatteryPal", "BatteryStateReceiver: onReceive 호출됨 - action: ${intent.action}")
         when (intent.action) {
             Intent.ACTION_POWER_CONNECTED -> {
+                Log.d("BatteryPal", "BatteryStateReceiver: ACTION_POWER_CONNECTED 감지")
                 handlePowerConnected(context)
             }
             Intent.ACTION_POWER_DISCONNECTED -> {
+                Log.d("BatteryPal", "BatteryStateReceiver: ACTION_POWER_DISCONNECTED 감지")
                 handlePowerDisconnected(context)
             }
             Intent.ACTION_BATTERY_CHANGED -> {
@@ -82,17 +85,23 @@ class BatteryStateReceiver : BroadcastReceiver() {
             }
             
             // 개발자 모드 충전 테스트 알림 표시
-            if (isDeveloperModeChargingTestEnabled(context)) {
+            val isDeveloperModeEnabled = isDeveloperModeChargingTestEnabled(context)
+            Log.d("BatteryPal", "BatteryStateReceiver: 개발자 모드 활성화 여부: $isDeveloperModeEnabled")
+            
+            if (isDeveloperModeEnabled) {
                 val levelText = if (batteryPercent >= 0) {
                     "배터리: ${batteryPercent.toInt()}%, 타입: $chargingType"
                 } else {
                     "타입: $chargingType"
                 }
+                Log.d("BatteryPal", "BatteryStateReceiver: 개발자 모드 알림 표시 시작 - $levelText")
                 showDeveloperChargingTestNotification(
                     context, 
-                    "충전기 연결 감지됨", 
-                    "앱이 백그라운드에서 충전 상태를 감지했습니다.\n$levelText"
+                    "충전 감지", 
+                    "충전이 감지됩니다."
                 )
+            } else {
+                Log.d("BatteryPal", "BatteryStateReceiver: 개발자 모드가 비활성화되어 알림을 표시하지 않음")
             }
             
             // Foreground Service 시작 (충전 모니터링)
@@ -154,7 +163,10 @@ class BatteryStateReceiver : BroadcastReceiver() {
                 .apply()
             
             // 개발자 모드 충전 테스트 알림 표시
-            if (isDeveloperModeChargingTestEnabled(context)) {
+            val isDeveloperModeEnabled = isDeveloperModeChargingTestEnabled(context)
+            Log.d("BatteryPal", "BatteryStateReceiver: 충전기 분리 - 개발자 모드 활성화 여부: $isDeveloperModeEnabled")
+            
+            if (isDeveloperModeEnabled) {
                 val batteryIntent = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
                 val batteryLevel = batteryIntent?.let {
                     val level = it.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
@@ -170,11 +182,14 @@ class BatteryStateReceiver : BroadcastReceiver() {
                     "배터리: 알 수 없음"
                 }
                 
+                Log.d("BatteryPal", "BatteryStateReceiver: 개발자 모드 알림 표시 시작 (분리) - $levelText")
                 showDeveloperChargingTestNotification(
                     context, 
-                    "충전기 분리 감지됨", 
-                    "앱이 백그라운드에서 충전 종료를 감지했습니다.\n$levelText"
+                    "충전 종료 감지", 
+                    "충전이 종료되었음을 감지합니다."
                 )
+            } else {
+                Log.d("BatteryPal", "BatteryStateReceiver: 충전기 분리 - 개발자 모드가 비활성화되어 알림을 표시하지 않음")
             }
             
             // Foreground Service 종료 (충전 종료)
@@ -360,13 +375,38 @@ class BatteryStateReceiver : BroadcastReceiver() {
         message: String
     ) {
         try {
+            Log.d("BatteryPal", "showDeveloperChargingTestNotification 호출: title=$title, message=$message")
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            
+            if (notificationManager == null) {
+                Log.e("BatteryPal", "NotificationManager를 가져올 수 없습니다")
+                return
+            }
+            
+            // 앱 아이콘 리소스 ID 가져오기
+            val packageName = context.packageName
+            val iconResId = context.resources.getIdentifier("ic_launcher", "mipmap", packageName)
+            val smallIcon = if (iconResId != 0) {
+                Log.d("BatteryPal", "앱 아이콘 사용: $iconResId")
+                iconResId
+            } else {
+                Log.w("BatteryPal", "앱 아이콘을 찾을 수 없어 시스템 아이콘 사용")
+                android.R.drawable.ic_dialog_info
+            }
             
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 val channelId = "developer_charging_test_channel"
                 val channelName = "개발자 충전 테스트"
                 
-                // 알림 채널 생성 (이미 있으면 무시됨)
+                // 기존 채널 삭제 후 재생성 (설정 변경 반영을 위해)
+                try {
+                    notificationManager.deleteNotificationChannel(channelId)
+                    Log.d("BatteryPal", "기존 알림 채널 삭제: $channelId")
+                } catch (e: Exception) {
+                    Log.d("BatteryPal", "기존 알림 채널 삭제 실패 (없을 수 있음): $e")
+                }
+                
+                // 알림 채널 생성
                 val channel = NotificationChannel(
                     channelId,
                     channelName,
@@ -376,8 +416,10 @@ class BatteryStateReceiver : BroadcastReceiver() {
                     enableVibration(true)
                     enableLights(true)
                     setShowBadge(true)
+                    setSound(null, null) // 소리 없음 (진동만)
                 }
                 notificationManager.createNotificationChannel(channel)
+                Log.d("BatteryPal", "알림 채널 생성 완료: $channelId, importance=${channel.importance}")
                 
                 // 메인 액티비티로 이동하는 PendingIntent
                 val mainIntent = Intent(context, MainActivity::class.java).apply {
@@ -393,17 +435,33 @@ class BatteryStateReceiver : BroadcastReceiver() {
                 val notification = Notification.Builder(context, channelId)
                     .setContentTitle(title)
                     .setContentText(message)
-                    .setSmallIcon(android.R.drawable.ic_dialog_info)
+                    .setSmallIcon(smallIcon)
+                    .setLargeIcon(null) // 큰 아이콘은 필요 없음
                     .setPriority(Notification.PRIORITY_HIGH)
-                    .setDefaults(Notification.DEFAULT_ALL)
+                    .setDefaults(Notification.DEFAULT_VIBRATE) // 진동만
                     .setAutoCancel(true)
                     .setContentIntent(pendingIntent)
+                    .setStyle(Notification.BigTextStyle().bigText(message))
                     .build()
                 
                 // 고유한 알림 ID 사용 (타임스탬프 기반)
                 val notificationId = (System.currentTimeMillis() % Int.MAX_VALUE).toInt()
+                
+                // 알림 표시 전 로그
+                Log.d("BatteryPal", "개발자 모드 충전 테스트 알림 표시 시도: channelId=$channelId, notificationId=$notificationId")
+                Log.d("BatteryPal", "개발자 모드 충전 테스트 알림 내용: title=$title, message=$message, smallIcon=$smallIcon")
+                
+                // 알림 표시
                 notificationManager.notify(notificationId, notification)
                 
+                // 알림 표시 후 확인
+                val notificationChannel = notificationManager.getNotificationChannel(channelId)
+                Log.d("BatteryPal", "개발자 모드 충전 테스트 알림 표시 완료")
+                Log.d("BatteryPal", "  - channelId: $channelId")
+                Log.d("BatteryPal", "  - channelImportance: ${notificationChannel?.importance}")
+                Log.d("BatteryPal", "  - channelSound: ${notificationChannel?.sound}")
+                Log.d("BatteryPal", "  - channelVibration: ${notificationChannel?.shouldVibrate()}")
+                Log.d("BatteryPal", "  - notificationId: $notificationId")
                 Log.d("BatteryPal", "개발자 모드 충전 테스트 알림 표시: $title - $message")
             } else {
                 // Android 8.0 미만
@@ -418,21 +476,27 @@ class BatteryStateReceiver : BroadcastReceiver() {
                     PendingIntent.FLAG_UPDATE_CURRENT
                 )
                 
+                // 앱 아이콘 리소스 ID 가져오기
+                val packageName = context.packageName
+                val iconResId = context.resources.getIdentifier("ic_launcher", "mipmap", packageName)
+                val smallIcon = if (iconResId != 0) iconResId else android.R.drawable.ic_dialog_info
+                
                 @Suppress("DEPRECATION")
                 val notification = Notification.Builder(context)
                     .setContentTitle(title)
                     .setContentText(message)
-                    .setSmallIcon(android.R.drawable.ic_dialog_info)
+                    .setSmallIcon(smallIcon)
                     .setPriority(Notification.PRIORITY_HIGH)
-                    .setDefaults(Notification.DEFAULT_ALL)
+                    .setDefaults(Notification.DEFAULT_VIBRATE)
                     .setAutoCancel(true)
                     .setContentIntent(pendingIntent)
+                    .setStyle(Notification.BigTextStyle().bigText(message))
                     .build()
                 
                 val notificationId = (System.currentTimeMillis() % Int.MAX_VALUE).toInt()
                 notificationManager.notify(notificationId, notification)
                 
-                Log.d("BatteryPal", "개발자 모드 충전 테스트 알림 표시 (구버전): $title - $message")
+                Log.d("BatteryPal", "개발자 모드 충전 테스트 알림 표시 (구버전): $title - $message, notificationId=$notificationId")
             }
         } catch (e: Exception) {
             Log.e("BatteryPal", "개발자 모드 알림 표시 실패", e)

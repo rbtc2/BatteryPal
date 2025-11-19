@@ -1316,7 +1316,7 @@ class _DiagnosticChecklistWidgetState extends State<_DiagnosticChecklistWidget> 
                         const SizedBox(height: 8),
                       ],
                     );
-                  }).toList(),
+                  }),
                 ],
               ),
           ],
