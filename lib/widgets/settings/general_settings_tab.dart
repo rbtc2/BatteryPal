@@ -148,11 +148,15 @@ class GeneralSettingsTab extends StatelessWidget {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.restore, color: Colors.orange),
-            SizedBox(width: 8),
-            Text('설정 초기화'),
+            Icon(
+              Icons.restore,
+              color: Theme.of(context).colorScheme.primary,
+              size: 24,
+            ),
+            const SizedBox(width: 8),
+            const Text('설정 초기화'),
           ],
         ),
         content: const Text(
@@ -164,22 +168,23 @@ class GeneralSettingsTab extends StatelessWidget {
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('취소'),
           ),
-          ElevatedButton(
+          FilledButton(
             onPressed: () {
               settingsService.resetToDefaults();
               Navigator.of(context).pop();
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('설정이 기본값으로 복원되었습니다.'),
-                    duration: Duration(seconds: 2),
+                  SnackBar(
+                    content: const Text('설정이 기본값으로 복원되었습니다.'),
+                    duration: const Duration(seconds: 2),
+                    backgroundColor: Theme.of(context).colorScheme.primaryContainer,
                   ),
                 );
               }
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange,
-              foregroundColor: Colors.white,
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Theme.of(context).colorScheme.onError,
             ),
             child: const Text('초기화'),
           ),
