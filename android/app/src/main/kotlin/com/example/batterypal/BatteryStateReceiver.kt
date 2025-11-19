@@ -324,40 +324,18 @@ class BatteryStateReceiver : BroadcastReceiver() {
         return try {
             val flutterPrefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
             
-            // 디버깅: 모든 키 확인
-            val allKeys = flutterPrefs.all.keys
-            Log.d("BatteryPal", "BatteryStateReceiver: Flutter SharedPreferences 전체 키 개수: ${allKeys.size}")
+            // Flutter SharedPreferences는 "flutter." 접두사를 사용합니다
+            val key = "flutter.developerModeChargingTestEnabled"
             
-            // 개발자 모드 관련 키 찾기
-            val developerKeys = allKeys.filter { it.contains("developer", ignoreCase = true) }
-            if (developerKeys.isNotEmpty()) {
-                Log.d("BatteryPal", "BatteryStateReceiver: 개발자 관련 키들: $developerKeys")
-            }
-            
-            // 여러 가능한 키 형식 시도
-            var isEnabled = flutterPrefs.getBoolean("developerModeChargingTestEnabled", false)
-            
-            // 키가 없으면 다른 형식 시도
-            if (!flutterPrefs.contains("developerModeChargingTestEnabled")) {
-                Log.w("BatteryPal", "BatteryStateReceiver: 'developerModeChargingTestEnabled' 키를 찾을 수 없음")
-                
-                // Flutter SharedPreferences는 때때로 다른 형식으로 저장될 수 있음
-                // 예: "flutter.developerModeChargingTestEnabled" 또는 다른 형식
-                val alternativeKeys = listOf(
-                    "flutter.developerModeChargingTestEnabled",
-                    "developerModeChargingTestEnabled"
-                )
-                
-                for (key in alternativeKeys) {
-                    if (flutterPrefs.contains(key)) {
-                        isEnabled = flutterPrefs.getBoolean(key, false)
-                        Log.d("BatteryPal", "BatteryStateReceiver: 대체 키 사용 - $key = $isEnabled")
-                        break
-                    }
-                }
+            // 키 존재 여부 확인
+            val isEnabled = if (flutterPrefs.contains(key)) {
+                flutterPrefs.getBoolean(key, false)
             } else {
-                Log.d("BatteryPal", "BatteryStateReceiver: 개발자 모드 충전 테스트 활성화 여부: $isEnabled")
+                // 대체 키 시도 (이전 형식 호환성)
+                flutterPrefs.getBoolean("developerModeChargingTestEnabled", false)
             }
+            
+            Log.d("BatteryPal", "BatteryStateReceiver: 개발자 모드 충전 테스트 활성화 여부: $isEnabled (키: $key)")
             
             isEnabled
         } catch (e: Exception) {

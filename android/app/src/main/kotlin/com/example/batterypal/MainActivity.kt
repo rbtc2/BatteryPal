@@ -885,9 +885,17 @@ class MainActivity : FlutterActivity() {
     private fun getDeveloperModeChargingTestEnabled(): Boolean {
         return try {
             val flutterPrefs = applicationContext.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-            // Flutter SharedPreferences는 키를 그대로 저장
-            val isEnabled = flutterPrefs.getBoolean("developerModeChargingTestEnabled", false)
-            android.util.Log.d("BatteryPal", "개발자 모드 충전 테스트 활성화 여부 (MainActivity): $isEnabled")
+            // Flutter SharedPreferences는 "flutter." 접두사를 사용합니다
+            val key = "flutter.developerModeChargingTestEnabled"
+            
+            val isEnabled = if (flutterPrefs.contains(key)) {
+                flutterPrefs.getBoolean(key, false)
+            } else {
+                // 대체 키 시도 (이전 형식 호환성)
+                flutterPrefs.getBoolean("developerModeChargingTestEnabled", false)
+            }
+            
+            android.util.Log.d("BatteryPal", "개발자 모드 충전 테스트 활성화 여부 (MainActivity): $isEnabled (키: $key)")
             isEnabled
         } catch (e: Exception) {
             android.util.Log.e("BatteryPal", "개발자 모드 설정 읽기 실패", e)
