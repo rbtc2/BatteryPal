@@ -46,6 +46,8 @@ class BatteryStateReceiver : BroadcastReceiver() {
             batteryStatePrefs.edit()
                 .putLong("charging_session_start_time", now)
                 .putBoolean("is_charging_active", true)
+                .putLong("last_charging_event_time", now) // 진단용: 마지막 충전 이벤트 시간
+                .putString("last_charging_event_type", "connected") // 진단용: 마지막 이벤트 타입
                 .apply()
             
             Log.d("BatteryPal", "BatteryStateReceiver: 충전기 연결 감지 - 시작 시간: $now")
@@ -144,6 +146,12 @@ class BatteryStateReceiver : BroadcastReceiver() {
                 
                 Log.d("BatteryPal", "BatteryStateReceiver: 충전기 분리 감지 (시작 시간 없음) - 종료 시간: $now")
             }
+            
+            // 마지막 충전 이벤트 시간 저장 (진단용)
+            batteryStatePrefs.edit()
+                .putLong("last_charging_event_time", now)
+                .putString("last_charging_event_type", "disconnected")
+                .apply()
             
             // 개발자 모드 충전 테스트 알림 표시
             if (isDeveloperModeChargingTestEnabled(context)) {

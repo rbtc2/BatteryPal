@@ -285,6 +285,11 @@ class _BackgroundDetectionTab extends StatelessWidget {
           
           const SizedBox(height: 24),
           
+          // 단계별 진단 체크리스트
+          _DiagnosticChecklistWidget(settingsService: settingsService),
+          
+          const SizedBox(height: 24),
+          
           // 디버깅 정보
           _DebugInfoWidget(settingsService: settingsService),
         ],
@@ -721,6 +726,35 @@ class _NotificationTestTab extends StatelessWidget {
   }
 }
 
+/// 진단 단계 상태
+enum DiagnosticStepStatus {
+  pass,    // ✅ 통과
+  fail,    // ❌ 실패
+  warning, // ⚠️ 경고
+  info,    // ℹ️ 정보
+}
+
+/// 진단 단계 모델
+class DiagnosticStep {
+  final String phase;
+  final int step;
+  final String name;
+  final String description;
+  final DiagnosticStepStatus status;
+  final String details;
+  final String? fixHint;
+
+  DiagnosticStep({
+    required this.phase,
+    required this.step,
+    required this.name,
+    required this.description,
+    required this.status,
+    required this.details,
+    this.fixHint,
+  });
+}
+
 /// 디버깅 정보 위젯
 class _DebugInfoWidget extends StatefulWidget {
   final SettingsService settingsService;
@@ -773,7 +807,9 @@ class _DebugInfoWidgetState extends State<_DebugInfoWidget> {
       // 5. Flutter SharedPreferences 전체 (관련 키만)
       final allPrefs = await systemSettings.getAllFlutterSharedPreferences();
       if (allPrefs != null) {
-        final developerKey = allPrefs['developerModeChargingTestEnabled'];
+        // Flutter SharedPreferences는 "flutter." 접두사를 사용합니다
+        final developerKey = allPrefs['flutter.developerModeChargingTestEnabled'] ?? 
+                             allPrefs['developerModeChargingTestEnabled'];
         info['네이티브 SharedPreferences'] = developerKey?.toString() ?? '키 없음';
         
         // 관련 키들도 표시
@@ -962,5 +998,438 @@ class _DebugInfoWidgetState extends State<_DebugInfoWidget> {
       }
     }
     return Theme.of(context).colorScheme.onSurface;
+  }
+}
+
+/// 단계별 진단 체크리스트 위젯
+class _DiagnosticChecklistWidget extends StatefulWidget {
+  final SettingsService settingsService;
+
+  const _DiagnosticChecklistWidget({
+    required this.settingsService,
+  });
+
+  @override
+  State<_DiagnosticChecklistWidget> createState() => _DiagnosticChecklistWidgetState();
+}
+
+class _DiagnosticChecklistWidgetState extends State<_DiagnosticChecklistWidget> {
+  bool _isLoading = false;
+  List<DiagnosticStep> _steps = [];
+  String? _currentPhase;
+
+  @override
+  void initState() {
+    super.initState();
+    _runDiagnostics();
+  }
+
+  Future<void> _runDiagnostics() async {
+    setState(() {
+      _isLoading = true;
+      _steps = [];
+    });
+
+    try {
+      final steps = <DiagnosticStep>[];
+      final systemSettings = SystemSettingsService();
+
+      // Phase 1: 설정 확인
+      final flutterValue = widget.settingsService.appSettings.developerModeChargingTestEnabled;
+      steps.add(DiagnosticStep(
+        phase: 'Phase 1: 설정 확인',
+        step: 1,
+        name: 'Flutter 설정 값',
+        description: '앱 내부 설정이 활성화되어 있는지 확인',
+        status: flutterValue ? DiagnosticStepStatus.pass : DiagnosticStepStatus.fail,
+        details: flutterValue ? '활성화됨' : '비활성화됨',
+        fixHint: !flutterValue ? '개발자 모드에서 "백그라운드 충전 감지 테스트" 토글을 켜주세요.' : null,
+      ));
+
+      final prefs = await SharedPreferences.getInstance();
+      final prefsValue = prefs.getBool('developerModeChargingTestEnabled');
+      steps.add(DiagnosticStep(
+        phase: 'Phase 1: 설정 확인',
+        step: 2,
+        name: 'SharedPreferences 저장',
+        description: '설정이 영구 저장소에 저장되었는지 확인',
+        status: prefsValue == flutterValue ? DiagnosticStepStatus.pass : DiagnosticStepStatus.fail,
+        details: prefsValue?.toString() ?? 'null',
+        fixHint: prefsValue != flutterValue ? '설정 저장에 문제가 있습니다. 앱을 재시작해보세요.' : null,
+      ));
+
+      final nativeValue = await systemSettings.getDeveloperModeChargingTestEnabled();
+      steps.add(DiagnosticStep(
+        phase: 'Phase 1: 설정 확인',
+        step: 3,
+        name: '네이티브에서 읽기',
+        description: '네이티브 코드에서 설정을 읽을 수 있는지 확인',
+        status: nativeValue == flutterValue ? DiagnosticStepStatus.pass : DiagnosticStepStatus.fail,
+        details: 'Flutter: $flutterValue, Native: $nativeValue',
+        fixHint: nativeValue != flutterValue
+            ? '네이티브에서 설정을 읽지 못했습니다. 앱을 재시작하거나 SharedPreferences 키를 확인해주세요.'
+            : null,
+      ));
+
+      // Phase 2: 권한 확인
+      final notificationPermission = await Permission.notification.status;
+      steps.add(DiagnosticStep(
+        phase: 'Phase 2: 권한 확인',
+        step: 4,
+        name: '알림 권한',
+        description: '알림을 표시할 권한이 있는지 확인',
+        status: notificationPermission.isGranted ? DiagnosticStepStatus.pass : DiagnosticStepStatus.fail,
+        details: notificationPermission.isGranted ? '허용됨' : '거부됨',
+        fixHint: !notificationPermission.isGranted
+            ? '설정 → 앱 → BatteryPal → 알림에서 권한을 허용해주세요.'
+            : null,
+      ));
+
+      final batteryOptimization = await systemSettings.isIgnoringBatteryOptimizations();
+      steps.add(DiagnosticStep(
+        phase: 'Phase 2: 권한 확인',
+        step: 5,
+        name: '배터리 최적화 예외',
+        description: '배터리 최적화에서 제외되었는지 확인',
+        status: batteryOptimization == true ? DiagnosticStepStatus.pass : DiagnosticStepStatus.warning,
+        details: batteryOptimization == true ? '예외 설정됨' : '예외 설정 안됨',
+        fixHint: batteryOptimization != true
+            ? '배터리 최적화 예외를 설정하면 백그라운드 동작이 더 안정적입니다.'
+            : null,
+      ));
+
+      // Phase 3: 시스템 구성 확인
+      final isReceiverRegistered = await systemSettings.checkBatteryStateReceiverRegistered();
+      steps.add(DiagnosticStep(
+        phase: 'Phase 3: 시스템 구성',
+        step: 7,
+        name: 'BatteryStateReceiver 등록',
+        description: 'AndroidManifest에 리시버가 등록되어 있는지 확인',
+        status: isReceiverRegistered == true
+            ? DiagnosticStepStatus.pass
+            : isReceiverRegistered == false
+                ? DiagnosticStepStatus.fail
+                : DiagnosticStepStatus.info,
+        details: isReceiverRegistered == true
+            ? '등록됨'
+            : isReceiverRegistered == false
+                ? '등록 안됨'
+                : '확인 불가',
+        fixHint: isReceiverRegistered == false
+            ? 'AndroidManifest.xml에 BatteryStateReceiver가 등록되어 있는지 확인해주세요.'
+            : null,
+      ));
+
+      // Phase 4: 실제 동작 확인
+      final lastEventInfo = await systemSettings.getLastChargingEventTime();
+      final lastEventTime = lastEventInfo?['time'] as int?;
+      final hasRecentEvent = lastEventTime != null &&
+          (DateTime.now().millisecondsSinceEpoch - lastEventTime) < 3600000; // 1시간 이내
+
+      steps.add(DiagnosticStep(
+        phase: 'Phase 4: 실제 동작',
+        step: 9,
+        name: '최근 충전 이벤트',
+        description: '최근 1시간 이내 충전 이벤트가 감지되었는지 확인',
+        status: hasRecentEvent
+            ? DiagnosticStepStatus.pass
+            : lastEventTime != null
+                ? DiagnosticStepStatus.warning
+                : DiagnosticStepStatus.info,
+        details: lastEventInfo?['formatted'] as String? ?? '이벤트 없음',
+        fixHint: !hasRecentEvent
+            ? '충전기를 연결/분리해보고 다시 확인해주세요. 앱이 완전히 종료된 상태에서 테스트해야 합니다.'
+            : null,
+      ));
+
+      setState(() {
+        _steps = steps;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _steps = [
+          DiagnosticStep(
+            phase: '오류',
+            step: 0,
+            name: '진단 실행 실패',
+            description: '진단을 실행하는 중 오류가 발생했습니다',
+            status: DiagnosticStepStatus.fail,
+            details: e.toString(),
+          ),
+        ];
+        _isLoading = false;
+      });
+    }
+  }
+
+  String _getStatusIcon(DiagnosticStepStatus status) {
+    switch (status) {
+      case DiagnosticStepStatus.pass:
+        return '✅';
+      case DiagnosticStepStatus.fail:
+        return '❌';
+      case DiagnosticStepStatus.warning:
+        return '⚠️';
+      case DiagnosticStepStatus.info:
+        return 'ℹ️';
+    }
+  }
+
+  Color _getStatusColor(DiagnosticStepStatus status) {
+    switch (status) {
+      case DiagnosticStepStatus.pass:
+        return Theme.of(context).colorScheme.primary;
+      case DiagnosticStepStatus.fail:
+        return Theme.of(context).colorScheme.error;
+      case DiagnosticStepStatus.warning:
+        return Colors.orange;
+      case DiagnosticStepStatus.info:
+        return Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6);
+    }
+  }
+
+  int _getPassCount() {
+    return _steps.where((s) => s.status == DiagnosticStepStatus.pass).length;
+  }
+
+  int _getFailCount() {
+    return _steps.where((s) => s.status == DiagnosticStepStatus.fail).length;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.checklist,
+                      size: 20,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '단계별 진단 체크리스트',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                IconButton(
+                  icon: const Icon(Icons.refresh, size: 20),
+                  onPressed: _runDiagnostics,
+                  tooltip: '다시 진단',
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            
+            if (_isLoading)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(20),
+                  child: CircularProgressIndicator(),
+                ),
+              )
+            else if (_steps.isEmpty)
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Text(
+                    '진단 결과가 없습니다',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                    ),
+                  ),
+                ),
+              )
+            else
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 요약 정보
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        _buildSummaryItem(
+                          '통과',
+                          _getPassCount(),
+                          _steps.length,
+                          DiagnosticStepStatus.pass,
+                        ),
+                        _buildSummaryItem(
+                          '실패',
+                          _getFailCount(),
+                          _steps.length,
+                          DiagnosticStepStatus.fail,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // 단계별 리스트
+                  ..._steps.map((step) {
+                    final isNewPhase = _currentPhase != step.phase;
+                    if (isNewPhase) {
+                      _currentPhase = step.phase;
+                    }
+                    
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (isNewPhase) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            step.phase,
+                            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                        ],
+                        _buildStepItem(step),
+                        const SizedBox(height: 8),
+                      ],
+                    );
+                  }).toList(),
+                ],
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSummaryItem(String label, int count, int total, DiagnosticStepStatus status) {
+    return Column(
+      children: [
+        Text(
+          '$count / $total',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: _getStatusColor(status),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStepItem(DiagnosticStep step) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: _getStatusColor(step.status).withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: _getStatusColor(step.status).withValues(alpha: 0.3),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                _getStatusIcon(step.status),
+                style: const TextStyle(fontSize: 18),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '${step.step}. ${step.name}',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: _getStatusColor(step.status),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            step.description,
+            style: TextStyle(
+              fontSize: 12,
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '결과: ${step.details}',
+            style: TextStyle(
+              fontSize: 11,
+              fontFamily: 'monospace',
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
+            ),
+          ),
+          if (step.fixHint != null) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.errorContainer.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.lightbulb_outline,
+                    size: 16,
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      step.fixHint!,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 }

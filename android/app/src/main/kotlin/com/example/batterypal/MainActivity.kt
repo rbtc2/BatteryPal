@@ -164,6 +164,14 @@ class MainActivity : FlutterActivity() {
                     val allPrefs = getAllFlutterSharedPreferences()
                     result.success(allPrefs)
                 }
+                "getLastChargingEventTime" -> {
+                    val eventTime = getLastChargingEventTime()
+                    result.success(eventTime)
+                }
+                "checkBatteryStateReceiverRegistered" -> {
+                    val isRegistered = checkBatteryStateReceiverRegistered()
+                    result.success(isRegistered)
+                }
                 else -> {
                     result.notImplemented()
                 }
@@ -916,6 +924,83 @@ class MainActivity : FlutterActivity() {
         } catch (e: Exception) {
             android.util.Log.e("BatteryPal", "Flutter SharedPreferences 읽기 실패", e)
             emptyMap()
+        }
+    }
+    
+    /// 마지막 충전 이벤트 시간 가져오기 (진단용)
+    private fun getLastChargingEventTime(): Map<String, Any?> {
+        return try {
+            val batteryStatePrefs = applicationContext.getSharedPreferences("battery_state", Context.MODE_PRIVATE)
+            val eventTime = batteryStatePrefs.getLong("last_charging_event_time", -1)
+            val eventType = batteryStatePrefs.getString("last_charging_event_type", null)
+            
+            mapOf(
+                "time" to (if (eventTime > 0) eventTime else null),
+                "type" to (eventType ?: "none"),
+                "formatted" to (if (eventTime > 0) {
+                    val date = java.util.Date(eventTime)
+                    val sdf = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault())
+                    sdf.format(date)
+                } else "없음")
+            )
+        } catch (e: Exception) {
+            android.util.Log.e("BatteryPal", "마지막 충전 이벤트 시간 읽기 실패", e)
+            mapOf("time" to null, "type" to "error", "formatted" to "오류")
+        }
+    }
+    
+    /// BatteryStateReceiver가 AndroidManifest에 등록되어 있는지 확인
+    private fun checkBatteryStateReceiverRegistered(): Boolean {
+        return try {
+            val packageManager = applicationContext.packageManager
+            val packageName = applicationContext.packageName
+            
+            // 방법 1: getReceiverInfo로 리시버 존재 확인
+            var receiverExists = false
+            var isEnabled = false
+            try {
+                val receiverInfo = packageManager.getReceiverInfo(
+                    android.content.ComponentName(packageName, "com.example.batterypal.BatteryStateReceiver"),
+                    android.content.pm.PackageManager.GET_RECEIVERS
+                )
+                receiverExists = true
+                isEnabled = receiverInfo.enabled
+                android.util.Log.d("BatteryPal", "BatteryStateReceiver 존재 확인: enabled=$isEnabled")
+            } catch (e: android.content.pm.PackageManager.NameNotFoundException) {
+                android.util.Log.w("BatteryPal", "BatteryStateReceiver를 찾을 수 없음")
+                receiverExists = false
+            }
+            
+            // 방법 2: queryBroadcastReceivers로 Intent Filter 확인
+            // ACTION_POWER_CONNECTED와 ACTION_POWER_DISCONNECTED에 응답하는 리시버 확인
+            val powerConnectedIntent = android.content.Intent(android.content.Intent.ACTION_POWER_CONNECTED)
+            val powerDisconnectedIntent = android.content.Intent(android.content.Intent.ACTION_POWER_DISCONNECTED)
+            
+            // 패키지 이름으로 필터링하지 않고 모든 리시버를 확인한 후 패키지 이름으로 필터링
+            val allPowerConnectedReceivers = packageManager.queryBroadcastReceivers(
+                powerConnectedIntent,
+                android.content.pm.PackageManager.MATCH_DEFAULT_ONLY
+            )
+            val allPowerDisconnectedReceivers = packageManager.queryBroadcastReceivers(
+                powerDisconnectedIntent,
+                android.content.pm.PackageManager.MATCH_DEFAULT_ONLY
+            )
+            
+            // 우리 앱의 패키지 이름으로 필터링
+            val hasPowerConnected = allPowerConnectedReceivers.any { 
+                it.activityInfo.packageName == packageName 
+            }
+            val hasPowerDisconnected = allPowerDisconnectedReceivers.any { 
+                it.activityInfo.packageName == packageName 
+            }
+            
+            android.util.Log.d("BatteryPal", "BatteryStateReceiver 등록 확인: receiverExists=$receiverExists, enabled=$isEnabled, power_connected=$hasPowerConnected, power_disconnected=$hasPowerDisconnected")
+            
+            // 리시버가 존재하고 활성화되어 있으며, Intent Filter가 등록되어 있어야 함
+            (receiverExists && isEnabled) || (hasPowerConnected && hasPowerDisconnected)
+        } catch (e: Exception) {
+            android.util.Log.e("BatteryPal", "BatteryStateReceiver 등록 확인 실패", e)
+            false
         }
     }
 }

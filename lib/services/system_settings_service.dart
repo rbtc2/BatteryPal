@@ -205,5 +205,39 @@ class SystemSettingsService {
       return null;
     }
   }
+
+  /// 개발자 모드: 마지막 충전 이벤트 시간 가져오기 (진단용)
+  /// 
+  /// Returns: 마지막 충전 이벤트 정보 (time, type, formatted)
+  Future<Map<String, dynamic>?> getLastChargingEventTime() async {
+    try {
+      debugPrint('시스템 설정: 마지막 충전 이벤트 시간 요청');
+      final Map<dynamic, dynamic>? eventInfo = await _channel.invokeMethod('getLastChargingEventTime');
+      if (eventInfo != null) {
+        final result = Map<String, dynamic>.from(eventInfo);
+        debugPrint('시스템 설정: 마지막 충전 이벤트 시간 = ${result['formatted']}');
+        return result;
+      }
+      return null;
+    } catch (e) {
+      debugPrint('마지막 충전 이벤트 시간 읽기 실패: $e');
+      return null;
+    }
+  }
+
+  /// 개발자 모드: BatteryStateReceiver 등록 확인 (진단용)
+  /// 
+  /// Returns: AndroidManifest에 리시버가 등록되어 있는지 여부
+  Future<bool?> checkBatteryStateReceiverRegistered() async {
+    try {
+      debugPrint('시스템 설정: BatteryStateReceiver 등록 확인 요청');
+      final bool? isRegistered = await _channel.invokeMethod('checkBatteryStateReceiverRegistered');
+      debugPrint('시스템 설정: BatteryStateReceiver 등록 여부 = $isRegistered');
+      return isRegistered;
+    } catch (e) {
+      debugPrint('BatteryStateReceiver 등록 확인 실패: $e');
+      return null;
+    }
+  }
 }
 
