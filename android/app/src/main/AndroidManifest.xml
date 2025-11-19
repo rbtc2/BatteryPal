@@ -70,9 +70,10 @@
         </receiver>
         
         <!-- 배터리 상태 변화 감지 리시버 (앱 종료 상태에서도 작동) -->
+        <!-- exported="true"는 시스템 브로드캐스트(POWER_CONNECTED/DISCONNECTED)를 받기 위해 필요합니다 -->
         <receiver 
             android:name=".BatteryStateReceiver"
-            android:exported="false"
+            android:exported="true"
             android:enabled="true">
             <intent-filter>
                 <action android:name="android.intent.action.POWER_CONNECTED" />

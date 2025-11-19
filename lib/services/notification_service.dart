@@ -186,6 +186,104 @@ class NotificationService {
     }
   }
 
+  /// 충전 시작 알림 표시 (개발자 모드용)
+  Future<void> showChargingStartNotification({String? chargingType}) async {
+    if (!_isInitialized) {
+      debugPrint('알림 서비스가 초기화되지 않았습니다.');
+      await initialize();
+    }
+
+    try {
+      const AndroidNotificationDetails androidDetails =
+          AndroidNotificationDetails(
+        'battery_charging_channel',
+        '배터리 충전 알림',
+        channelDescription: '배터리 충전 상태에 대한 알림을 받습니다.',
+        importance: Importance.high,
+        priority: Priority.high,
+        showWhen: true,
+        enableVibration: true,
+        playSound: true,
+      );
+
+      const DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      );
+
+      const NotificationDetails notificationDetails = NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
+      );
+
+      final message = chargingType != null 
+          ? '충전이 시작되었습니다. (타입: $chargingType)'
+          : '충전이 시작되었습니다.';
+
+      // 알림 ID: 2000 (충전 시작 알림용)
+      await _notifications.show(
+        2000,
+        '충전 시작',
+        message,
+        notificationDetails,
+      );
+
+      debugPrint('충전 시작 알림 표시됨: $message');
+    } catch (e) {
+      debugPrint('충전 시작 알림 표시 실패: $e');
+    }
+  }
+
+  /// 충전 종료 알림 표시 (개발자 모드용)
+  Future<void> showChargingEndNotification({double? batteryLevel}) async {
+    if (!_isInitialized) {
+      debugPrint('알림 서비스가 초기화되지 않았습니다.');
+      await initialize();
+    }
+
+    try {
+      const AndroidNotificationDetails androidDetails =
+          AndroidNotificationDetails(
+        'battery_charging_channel',
+        '배터리 충전 알림',
+        channelDescription: '배터리 충전 상태에 대한 알림을 받습니다.',
+        importance: Importance.high,
+        priority: Priority.high,
+        showWhen: true,
+        enableVibration: true,
+        playSound: true,
+      );
+
+      const DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      );
+
+      const NotificationDetails notificationDetails = NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
+      );
+
+      final message = batteryLevel != null 
+          ? '충전이 종료되었습니다. (배터리: ${batteryLevel.toInt()}%)'
+          : '충전이 종료되었습니다.';
+
+      // 알림 ID: 2001 (충전 종료 알림용)
+      await _notifications.show(
+        2001,
+        '충전 종료',
+        message,
+        notificationDetails,
+      );
+
+      debugPrint('충전 종료 알림 표시됨: $message');
+    } catch (e) {
+      debugPrint('충전 종료 알림 표시 실패: $e');
+    }
+  }
+
   /// 알림 권한 확인
   Future<bool> checkPermission() async {
     final status = await Permission.notification.status;

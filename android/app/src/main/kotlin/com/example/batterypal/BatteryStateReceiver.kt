@@ -91,15 +91,15 @@ class BatteryStateReceiver : BroadcastReceiver() {
             
             if (isDeveloperModeEnabled) {
                 val levelText = if (batteryPercent >= 0) {
-                    "배터리: ${batteryPercent.toInt()}%, 타입: $chargingType"
+                    "충전이 시작되었습니다. (배터리: ${batteryPercent.toInt()}%, 타입: $chargingType)"
                 } else {
-                    "타입: $chargingType"
+                    "충전이 시작되었습니다. (타입: $chargingType)"
                 }
                 Log.d("BatteryPal", "BatteryStateReceiver: 개발자 모드 알림 표시 시작 - $levelText")
                 showDeveloperChargingTestNotification(
                     context, 
-                    "충전 감지", 
-                    "충전이 감지됩니다."
+                    "충전 시작", 
+                    levelText
                 )
             } else {
                 Log.d("BatteryPal", "BatteryStateReceiver: 개발자 모드가 비활성화되어 알림을 표시하지 않음")
@@ -179,16 +179,16 @@ class BatteryStateReceiver : BroadcastReceiver() {
                 } ?: -1.0
                 
                 val levelText = if (batteryLevel >= 0) {
-                    "배터리: ${batteryLevel.toInt()}%"
+                    "충전이 종료되었습니다. (배터리: ${batteryLevel.toInt()}%)"
                 } else {
-                    "배터리: 알 수 없음"
+                    "충전이 종료되었습니다."
                 }
                 
                 Log.d("BatteryPal", "BatteryStateReceiver: 개발자 모드 알림 표시 시작 (분리) - $levelText")
                 showDeveloperChargingTestNotification(
                     context, 
-                    "충전 종료 감지", 
-                    "충전이 종료되었음을 감지합니다."
+                    "충전 종료", 
+                    levelText
                 )
             } else {
                 Log.d("BatteryPal", "BatteryStateReceiver: 충전기 분리 - 개발자 모드가 비활성화되어 알림을 표시하지 않음")

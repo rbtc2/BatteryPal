@@ -182,6 +182,49 @@ class BatteryNotificationManager {
     }
   }
   
+  /// 개발자 모드 충전 시작/종료 알림 체크 및 표시
+  /// 
+  /// [batteryInfo]: 현재 배터리 정보
+  /// [wasCharging]: 이전 충전 상태
+  Future<void> checkDeveloperModeChargingNotification(
+    BatteryInfo batteryInfo,
+    bool wasCharging,
+  ) async {
+    // 설정이 없으면 알림 안 함
+    if (_settingsService == null) {
+      return;
+    }
+    
+    // 개발자 모드 충전 테스트가 비활성화되어 있으면 알림 안 함
+    if (!_settingsService!.appSettings.developerModeChargingTestEnabled) {
+      return;
+    }
+    
+    // 충전 시작 감지: 이전에는 충전 중이 아니었고, 현재는 충전 중
+    if (batteryInfo.isCharging && !wasCharging) {
+      try {
+        await NotificationService().showChargingStartNotification(
+          chargingType: batteryInfo.chargingType,
+        );
+        debugPrint('개발자 모드: 충전 시작 알림 표시됨 (타입: ${batteryInfo.chargingType})');
+      } catch (e) {
+        debugPrint('개발자 모드: 충전 시작 알림 표시 실패: $e');
+      }
+    }
+    
+    // 충전 종료 감지: 이전에는 충전 중이었고, 현재는 충전 중이 아님
+    if (!batteryInfo.isCharging && wasCharging) {
+      try {
+        await NotificationService().showChargingEndNotification(
+          batteryLevel: batteryInfo.level,
+        );
+        debugPrint('개발자 모드: 충전 종료 알림 표시됨 (배터리: ${batteryInfo.level.toInt()}%)');
+      } catch (e) {
+        debugPrint('개발자 모드: 충전 종료 알림 표시 실패: $e');
+      }
+    }
+  }
+  
   /// 알림 플래그 리셋 (충전 시작/종료 시 호출)
   void resetNotificationFlags() {
     _hasNotifiedChargingComplete = false;

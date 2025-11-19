@@ -289,6 +289,12 @@ class BatteryService {
       batteryInfo,
       previousLevel,
     );
+    
+    // 개발자 모드 충전 시작/종료 알림 체크
+    await _notificationManager.checkDeveloperModeChargingNotification(
+      batteryInfo,
+      wasCharging,
+    );
   }
   
   /// 네이티브에서 오는 배터리 상태 변화 즉시 처리

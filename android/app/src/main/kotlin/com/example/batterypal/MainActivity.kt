@@ -1020,11 +1020,14 @@ class MainActivity : FlutterActivity() {
             )
             
             // 우리 앱의 패키지 이름으로 필터링
-            val hasPowerConnected = allPowerConnectedReceivers.any { 
-                it.activityInfo.packageName == packageName 
+            // queryBroadcastReceivers는 ResolveInfo 리스트를 반환하며, BroadcastReceiver는 activityInfo에 포함됨
+            val hasPowerConnected = allPowerConnectedReceivers.any { resolveInfo ->
+                resolveInfo.activityInfo?.packageName == packageName ||
+                resolveInfo.serviceInfo?.packageName == packageName
             }
-            val hasPowerDisconnected = allPowerDisconnectedReceivers.any { 
-                it.activityInfo.packageName == packageName 
+            val hasPowerDisconnected = allPowerDisconnectedReceivers.any { resolveInfo ->
+                resolveInfo.activityInfo?.packageName == packageName ||
+                resolveInfo.serviceInfo?.packageName == packageName
             }
             
             android.util.Log.d("BatteryPal", "BatteryStateReceiver 등록 확인: receiverExists=$receiverExists, enabled=$isEnabled, power_connected=$hasPowerConnected, power_disconnected=$hasPowerDisconnected")
