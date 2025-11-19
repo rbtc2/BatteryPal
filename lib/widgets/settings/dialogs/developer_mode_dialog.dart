@@ -127,6 +127,52 @@ class _DeveloperModeDialogContentState extends State<_DeveloperModeDialogContent
           
           const SizedBox(height: 24),
           
+          // 백그라운드 충전 감지 테스트 섹션
+          const Text(
+            '🔋 백그라운드 충전 감지 테스트',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '앱이 꺼져있어도 충전기 연결/분리 시 알림을 받을 수 있습니다. 토글을 켜고 앱을 완전히 종료한 후 충전기를 연결/분리해보세요.',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 12),
+          ListenableBuilder(
+            listenable: widget.settingsService,
+            builder: (context, _) {
+              return SwitchListTile(
+                title: const Text('백그라운드 충전 감지 테스트'),
+                subtitle: Text(
+                  widget.settingsService.appSettings.developerModeChargingTestEnabled
+                      ? '앱이 꺼져있어도 충전 상태 변화 시 알림을 받습니다'
+                      : '알림을 받지 않습니다',
+                ),
+                value: widget.settingsService.appSettings.developerModeChargingTestEnabled,
+                onChanged: (value) {
+                  widget.settingsService.toggleDeveloperModeChargingTest();
+                },
+                contentPadding: EdgeInsets.zero,
+                secondary: Icon(
+                  widget.settingsService.appSettings.developerModeChargingTestEnabled
+                      ? Icons.power
+                      : Icons.power_off,
+                  color: widget.settingsService.appSettings.developerModeChargingTestEnabled
+                      ? Theme.of(context).colorScheme.primary
+                      : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                ),
+              );
+            },
+          ),
+          
+          const SizedBox(height: 24),
+          
           // 충전 완료 알림 테스트 섹션
           const Text(
             '📱 충전 완료 알림 테스트',

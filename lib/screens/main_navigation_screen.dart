@@ -118,6 +118,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
       final isIgnoring = await BatteryOptimizationHelper.isIgnoringBatteryOptimizations();
       if (!isIgnoring) {
         // 배터리 최적화 예외가 설정되지 않았으면 다이얼로그 표시
+        if (!mounted) return;
         _hasShownBatteryOptimizationPrompt = true;
         await BatteryOptimizationHelper.requestBatteryOptimizationException(context);
       }

@@ -16,6 +16,7 @@ class AppSettings {
   final bool autoBrightnessEnabled; // 화면 밝기 자동 조절 활성화
   final bool chargingCompleteNotificationEnabled; // 충전 완료 알림 활성화
   final bool backgroundDataCollectionEnabled; // Phase 4: 백그라운드 데이터 수집 활성화
+  final bool developerModeChargingTestEnabled; // 개발자 모드: 백그라운드 충전 감지 테스트 알림
   
   // 충전 완료 알림 설정
   final bool chargingCompleteNotifyOnFastCharging; // 고속 충전(AC) 시에만 알림
@@ -54,6 +55,7 @@ class AppSettings {
     this.autoBrightnessEnabled = false, // 기본값: false
     this.chargingCompleteNotificationEnabled = false, // 기본값: false (Pro 기능)
     this.backgroundDataCollectionEnabled = true, // Phase 4: 기본값: true (백그라운드 수집 활성화)
+    this.developerModeChargingTestEnabled = false, // 기본값: false (개발자 모드)
     
     // 충전 완료 알림 설정 기본값
     this.chargingCompleteNotifyOnFastCharging = true,
@@ -98,6 +100,7 @@ class AppSettings {
       'autoBrightnessEnabled': autoBrightnessEnabled,
       'chargingCompleteNotificationEnabled': chargingCompleteNotificationEnabled,
       'backgroundDataCollectionEnabled': backgroundDataCollectionEnabled, // Phase 4
+      'developerModeChargingTestEnabled': developerModeChargingTestEnabled,
       
       // 충전 완료 알림 설정
       'chargingCompleteNotifyOnFastCharging': chargingCompleteNotifyOnFastCharging,
@@ -140,6 +143,7 @@ class AppSettings {
       autoBrightnessEnabled: json['autoBrightnessEnabled'] ?? false,
       chargingCompleteNotificationEnabled: json['chargingCompleteNotificationEnabled'] ?? false,
       backgroundDataCollectionEnabled: json['backgroundDataCollectionEnabled'] ?? true, // Phase 4
+      developerModeChargingTestEnabled: json['developerModeChargingTestEnabled'] ?? false,
       
       // 충전 완료 알림 설정
       chargingCompleteNotifyOnFastCharging: json['chargingCompleteNotifyOnFastCharging'] ?? true,
@@ -189,6 +193,7 @@ class AppSettings {
     bool? autoBrightnessEnabled,
     bool? chargingCompleteNotificationEnabled,
     bool? backgroundDataCollectionEnabled, // Phase 4
+    bool? developerModeChargingTestEnabled,
     
     // 충전 완료 알림 설정
     bool? chargingCompleteNotifyOnFastCharging,
@@ -227,6 +232,7 @@ class AppSettings {
       autoBrightnessEnabled: autoBrightnessEnabled ?? this.autoBrightnessEnabled,
       chargingCompleteNotificationEnabled: chargingCompleteNotificationEnabled ?? this.chargingCompleteNotificationEnabled,
       backgroundDataCollectionEnabled: backgroundDataCollectionEnabled ?? this.backgroundDataCollectionEnabled, // Phase 4
+      developerModeChargingTestEnabled: developerModeChargingTestEnabled ?? this.developerModeChargingTestEnabled,
       
       // 충전 완료 알림 설정
       chargingCompleteNotifyOnFastCharging: chargingCompleteNotifyOnFastCharging ?? this.chargingCompleteNotifyOnFastCharging,

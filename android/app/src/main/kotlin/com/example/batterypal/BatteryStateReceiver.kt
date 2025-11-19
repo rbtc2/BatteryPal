@@ -46,16 +46,19 @@ class BatteryStateReceiver : BroadcastReceiver() {
             Log.d("BatteryPal", "BatteryStateReceiver: 충전기 연결 감지 - 시작 시간: $now")
             
             // 배터리 정보 가져오기 (충전 시작 시점의 배터리 레벨 저장)
+            var batteryPercent = -1.0
+            var chargingType = "Unknown"
+            
             val batteryIntent = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
             batteryIntent?.let {
                 val level = it.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
                 val scale = it.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
-                val batteryPercent = if (level != -1 && scale != -1 && scale > 0) {
+                batteryPercent = if (level != -1 && scale != -1 && scale > 0) {
                     (level * 100.0) / scale
                 } else -1.0
                 
                 val plugged = it.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1)
-                val chargingType = when (plugged) {
+                chargingType = when (plugged) {
                     BatteryManager.BATTERY_PLUGGED_AC -> "AC"
                     BatteryManager.BATTERY_PLUGGED_USB -> "USB"
                     BatteryManager.BATTERY_PLUGGED_WIRELESS -> "Wireless"
@@ -69,6 +72,20 @@ class BatteryStateReceiver : BroadcastReceiver() {
                     .apply()
                 
                 Log.d("BatteryPal", "BatteryStateReceiver: 충전 시작 정보 저장 - 레벨: $batteryPercent%, 타입: $chargingType")
+            }
+            
+            // 개발자 모드 충전 테스트 알림 표시
+            if (isDeveloperModeChargingTestEnabled(context)) {
+                val levelText = if (batteryPercent >= 0) {
+                    "배터리: ${batteryPercent.toInt()}%, 타입: $chargingType"
+                } else {
+                    "타입: $chargingType"
+                }
+                showDeveloperChargingTestNotification(
+                    context, 
+                    "충전기 연결 감지됨", 
+                    "앱이 백그라운드에서 충전 상태를 감지했습니다.\n$levelText"
+                )
             }
             
             // Foreground Service 시작 (충전 모니터링)
@@ -121,6 +138,30 @@ class BatteryStateReceiver : BroadcastReceiver() {
                     .apply()
                 
                 Log.d("BatteryPal", "BatteryStateReceiver: 충전기 분리 감지 (시작 시간 없음) - 종료 시간: $now")
+            }
+            
+            // 개발자 모드 충전 테스트 알림 표시
+            if (isDeveloperModeChargingTestEnabled(context)) {
+                val batteryIntent = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+                val batteryLevel = batteryIntent?.let {
+                    val level = it.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+                    val scale = it.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+                    if (level != -1 && scale != -1 && scale > 0) {
+                        (level * 100.0) / scale
+                    } else -1.0
+                } ?: -1.0
+                
+                val levelText = if (batteryLevel >= 0) {
+                    "배터리: ${batteryLevel.toInt()}%"
+                } else {
+                    "배터리: 알 수 없음"
+                }
+                
+                showDeveloperChargingTestNotification(
+                    context, 
+                    "충전기 분리 감지됨", 
+                    "앱이 백그라운드에서 충전 종료를 감지했습니다.\n$levelText"
+                )
             }
             
             // Foreground Service 종료 (충전 종료)
@@ -271,5 +312,107 @@ class BatteryStateReceiver : BroadcastReceiver() {
     // WorkManager 주기적 작업 제거됨
     // 이벤트 기반으로만 작동하므로 주기적 폴링 불필요
     // 충전 상태 변화(ON/OFF)만 감지하여 Foreground Service 시작/종료
+    
+    /// 개발자 모드 충전 테스트 활성화 여부 확인
+    /// Flutter SharedPreferences에서 설정을 읽어옵니다
+    private fun isDeveloperModeChargingTestEnabled(context: Context): Boolean {
+        return try {
+            val flutterPrefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+            // Flutter SharedPreferences는 "flutter." 접두사를 사용하지 않음
+            val isEnabled = flutterPrefs.getBoolean("developerModeChargingTestEnabled", false)
+            Log.d("BatteryPal", "개발자 모드 충전 테스트 활성화 여부: $isEnabled")
+            isEnabled
+        } catch (e: Exception) {
+            Log.e("BatteryPal", "개발자 모드 설정 읽기 실패", e)
+            false
+        }
+    }
+    
+    /// 개발자 모드 충전 테스트 알림 표시
+    /// 앱이 꺼져있어도 충전 상태 변화를 감지했음을 알리는 알림
+    private fun showDeveloperChargingTestNotification(
+        context: Context, 
+        title: String, 
+        message: String
+    ) {
+        try {
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val channelId = "developer_charging_test_channel"
+                val channelName = "개발자 충전 테스트"
+                
+                // 알림 채널 생성 (이미 있으면 무시됨)
+                val channel = NotificationChannel(
+                    channelId,
+                    channelName,
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply {
+                    description = "개발자 모드: 백그라운드 충전 감지 테스트 알림"
+                    enableVibration(true)
+                    enableLights(true)
+                    setShowBadge(true)
+                }
+                notificationManager.createNotificationChannel(channel)
+                
+                // 메인 액티비티로 이동하는 PendingIntent
+                val mainIntent = Intent(context, MainActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                }
+                val pendingIntent = PendingIntent.getActivity(
+                    context,
+                    0,
+                    mainIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+                
+                val notification = Notification.Builder(context, channelId)
+                    .setContentTitle(title)
+                    .setContentText(message)
+                    .setSmallIcon(android.R.drawable.ic_dialog_info)
+                    .setPriority(Notification.PRIORITY_HIGH)
+                    .setDefaults(Notification.DEFAULT_ALL)
+                    .setAutoCancel(true)
+                    .setContentIntent(pendingIntent)
+                    .build()
+                
+                // 고유한 알림 ID 사용 (타임스탬프 기반)
+                val notificationId = (System.currentTimeMillis() % Int.MAX_VALUE).toInt()
+                notificationManager.notify(notificationId, notification)
+                
+                Log.d("BatteryPal", "개발자 모드 충전 테스트 알림 표시: $title - $message")
+            } else {
+                // Android 8.0 미만
+                @Suppress("DEPRECATION")
+                val mainIntent = Intent(context, MainActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                }
+                val pendingIntent = PendingIntent.getActivity(
+                    context,
+                    0,
+                    mainIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT
+                )
+                
+                @Suppress("DEPRECATION")
+                val notification = Notification.Builder(context)
+                    .setContentTitle(title)
+                    .setContentText(message)
+                    .setSmallIcon(android.R.drawable.ic_dialog_info)
+                    .setPriority(Notification.PRIORITY_HIGH)
+                    .setDefaults(Notification.DEFAULT_ALL)
+                    .setAutoCancel(true)
+                    .setContentIntent(pendingIntent)
+                    .build()
+                
+                val notificationId = (System.currentTimeMillis() % Int.MAX_VALUE).toInt()
+                notificationManager.notify(notificationId, notification)
+                
+                Log.d("BatteryPal", "개발자 모드 충전 테스트 알림 표시 (구버전): $title - $message")
+            }
+        } catch (e: Exception) {
+            Log.e("BatteryPal", "개발자 모드 알림 표시 실패", e)
+        }
+    }
 }
 

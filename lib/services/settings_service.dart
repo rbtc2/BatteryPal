@@ -86,6 +86,7 @@ class SettingsService extends ChangeNotifier {
       await prefs.setBool('autoBrightnessEnabled', settingsJson['autoBrightnessEnabled'] as bool);
       await prefs.setBool('chargingCompleteNotificationEnabled', settingsJson['chargingCompleteNotificationEnabled'] as bool);
       await prefs.setBool('backgroundDataCollectionEnabled', settingsJson['backgroundDataCollectionEnabled'] as bool); // Phase 4
+      await prefs.setBool('developerModeChargingTestEnabled', settingsJson['developerModeChargingTestEnabled'] as bool);
       
       // 충전 완료 알림 설정
       await prefs.setBool('chargingCompleteNotifyOnFastCharging', settingsJson['chargingCompleteNotifyOnFastCharging'] as bool);
@@ -135,6 +136,7 @@ class SettingsService extends ChangeNotifier {
         autoBrightnessEnabled: prefs.getBool('autoBrightnessEnabled') ?? false,
         chargingCompleteNotificationEnabled: prefs.getBool('chargingCompleteNotificationEnabled') ?? false,
         backgroundDataCollectionEnabled: prefs.getBool('backgroundDataCollectionEnabled') ?? true, // Phase 4
+        developerModeChargingTestEnabled: prefs.getBool('developerModeChargingTestEnabled') ?? false,
         
         // 충전 완료 알림 설정
         chargingCompleteNotifyOnFastCharging: prefs.getBool('chargingCompleteNotifyOnFastCharging') ?? true,
@@ -188,6 +190,16 @@ class SettingsService extends ChangeNotifier {
   void toggleTheme() {
     _appSettings = _appSettings.copyWith(
       darkModeEnabled: !_appSettings.darkModeEnabled,
+      lastUpdated: DateTime.now(),
+    );
+    notifyListeners();
+    _autoSave();
+  }
+
+  /// 개발자 모드 충전 테스트 토글
+  void toggleDeveloperModeChargingTest() {
+    _appSettings = _appSettings.copyWith(
+      developerModeChargingTestEnabled: !_appSettings.developerModeChargingTestEnabled,
       lastUpdated: DateTime.now(),
     );
     notifyListeners();
