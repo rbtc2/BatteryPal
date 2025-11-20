@@ -384,6 +384,16 @@ class BatteryStateReceiver : BroadcastReceiver() {
                 return
             }
             
+            // Android 13+ (API 33+) 알림 권한 확인
+            // 앱이 꺼진 상태에서도 알림을 표시하려면 알림 권한이 필요합니다
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                if (!notificationManager.areNotificationsEnabled()) {
+                    Log.w("BatteryPal", "알림 권한이 없어서 알림을 표시할 수 없습니다. 앱 설정에서 알림 권한을 허용해주세요.")
+                    return
+                }
+                Log.d("BatteryPal", "알림 권한 확인 완료: 허용됨")
+            }
+            
             // 앱 아이콘 리소스 ID 가져오기
             val packageName = context.packageName
             val iconResId = context.resources.getIdentifier("ic_launcher", "mipmap", packageName)
