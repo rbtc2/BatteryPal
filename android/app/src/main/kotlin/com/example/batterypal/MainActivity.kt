@@ -68,6 +68,11 @@ class MainActivity : FlutterActivity() {
                     val sessionInfo = getChargingSessionInfo()
                     result.success(sessionInfo)
                 }
+                "saveChargingSessionInfo" -> {
+                    val sessionInfo = call.arguments as Map<String, Any?>
+                    saveChargingSessionInfo(sessionInfo)
+                    result.success(true)
+                }
                 "getDeveloperModeChargingTestEnabled" -> {
                     val isEnabled = getDeveloperModeChargingTestEnabled()
                     result.success(isEnabled)
@@ -496,7 +501,33 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    // ========== 시스템 설정 읽기 메서드들 ==========
+    /// 충전 세션 정보 저장 (Flutter에서 호출)
+    private fun saveChargingSessionInfo(sessionInfo: Map<String, Any?>) {
+        try {
+            val batteryStatePrefs = applicationContext.getSharedPreferences("battery_state", Context.MODE_PRIVATE)
+            val editor = batteryStatePrefs.edit()
+            
+            val startTime = sessionInfo["startTime"] as? Long
+            val endTime = sessionInfo["endTime"] as? Long
+            val isChargingActive = sessionInfo["isChargingActive"] as? Boolean ?: false
+            val startBatteryLevel = (sessionInfo["startBatteryLevel"] as? Number)?.toFloat()
+            val endBatteryLevel = (sessionInfo["endBatteryLevel"] as? Number)?.toFloat()
+            val chargingType = sessionInfo["chargingType"] as? String
+            
+            if (startTime != null) editor.putLong("charging_session_start_time", startTime)
+            if (endTime != null) editor.putLong("charging_session_end_time", endTime)
+            editor.putBoolean("is_charging_active", isChargingActive)
+            if (startBatteryLevel != null) editor.putFloat("charging_start_battery_level", startBatteryLevel)
+            if (endBatteryLevel != null) editor.putFloat("charging_end_battery_level", endBatteryLevel)
+            if (chargingType != null) editor.putString("charging_type", chargingType)
+            
+            editor.apply()
+            
+            android.util.Log.d("BatteryPal", "충전 세션 정보 저장 완료: $sessionInfo")
+        } catch (e: Exception) {
+            android.util.Log.e("BatteryPal", "충전 세션 정보 저장 실패", e)
+        }
+    }
 
     /// 화면 밝기 읽기 (0-100)
     private fun getScreenBrightness(): Int {

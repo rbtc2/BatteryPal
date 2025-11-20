@@ -475,6 +475,15 @@ class ChargingSessionService {
       
       debugPrint('ChargingSessionService: 세션 시작 완료 - 시작 배터리: ${batteryInfo.level}%');
       
+      // PHASE 14: 세션 시작 시 네이티브에 정보 저장 (앱 종료 시 복구용)
+      // BatteryStateReceiver가 놓칠 수 있는 정보를 앱에서 직접 저장
+      NativeBatteryService.saveChargingSessionInfo(ChargingSessionInfo(
+        startTime: _stateManager.startTime,
+        isChargingActive: true,
+        startBatteryLevel: batteryInfo.level,
+        chargingType: batteryInfo.chargingType,
+      ));
+      
     } catch (e, stackTrace) {
       debugPrint('ChargingSessionService: 세션 시작 실패 - $e');
       debugPrint('스택 트레이스: $stackTrace');
@@ -609,6 +618,16 @@ class ChargingSessionService {
       
       // 세션이 완전히 종료되었으므로 충전기 정보도 초기화
       _stateManager.clearChargerInfo();
+      
+      // PHASE 14: 세션 종료 시 네이티브 정보 업데이트 (종료 상태로)
+      NativeBatteryService.saveChargingSessionInfo(ChargingSessionInfo(
+        startTime: _stateManager.startTime, // 시작 시간은 유지 (참고용)
+        endTime: DateTime.now(),
+        isChargingActive: false,
+        startBatteryLevel: _stateManager.startBatteryInfo?.level,
+        endBatteryLevel: endBatteryInfo.level,
+        chargingType: _stateManager.startBatteryInfo?.chargingType,
+      ));
       
     } catch (e, stackTrace) {
       debugPrint('ChargingSessionService: 세션 종료 실패 - $e');

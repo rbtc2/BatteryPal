@@ -154,6 +154,28 @@ class NativeBatteryService {
       return null;
     }
   }
+
+  /// 충전 세션 정보 저장 (SharedPreferences에 쓰기)
+  /// 앱에서 감지한 정확한 세션 정보를 네이티브에 저장하여 백그라운드 복구 시 사용
+  static Future<void> saveChargingSessionInfo(ChargingSessionInfo info) async {
+    try {
+      debugPrint('네이티브 충전 세션 정보 저장 요청: $info');
+      
+      final Map<String, dynamic> sessionInfo = {
+        'startTime': info.startTime?.millisecondsSinceEpoch,
+        'endTime': info.endTime?.millisecondsSinceEpoch,
+        'isChargingActive': info.isChargingActive,
+        'startBatteryLevel': info.startBatteryLevel,
+        'endBatteryLevel': info.endBatteryLevel,
+        'chargingType': info.chargingType,
+      };
+      
+      await _channel.invokeMethod('saveChargingSessionInfo', sessionInfo);
+      debugPrint('네이티브 충전 세션 정보 저장 완료');
+    } catch (e) {
+      debugPrint('충전 세션 정보 저장 실패: $e');
+    }
+  }
 }
 
 /// 충전 세션 정보 모델
