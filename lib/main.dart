@@ -5,6 +5,7 @@ import 'services/notification_service.dart';
 import 'services/background_data_recovery_service.dart';
 import 'services/charging_current_history_service.dart';
 import 'screens/analysis/widgets/charging_patterns/services/charging_session_service.dart';
+import 'services/battery_history_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,6 +32,16 @@ void main() async {
     debugPrint('충전 세션 서비스 초기화 완료');
   } catch (e) {
     debugPrint('충전 세션 서비스 초기화 실패: $e');
+  }
+
+  // 배터리 히스토리 서비스 초기화 및 데이터 수집 시작
+  try {
+    final batteryHistoryService = BatteryHistoryService();
+    await batteryHistoryService.initialize();
+    await batteryHistoryService.startDataCollection();
+    debugPrint('배터리 히스토리 서비스 초기화 및 수집 시작 완료');
+  } catch (e) {
+    debugPrint('배터리 히스토리 서비스 초기화 실패: $e');
   }
   
   // Phase 2: 백그라운드 데이터 복구
