@@ -89,24 +89,25 @@ class BatteryStateReceiver : BroadcastReceiver() {
             val isDeveloperModeEnabled = isDeveloperModeChargingTestEnabled(context)
             Log.d("BatteryPal", "BatteryStateReceiver: 개발자 모드 활성화 여부: $isDeveloperModeEnabled")
             
+            // Foreground Service 시작 (충전 모니터링)
+            // 개발자 모드 알림도 Foreground Service를 통해 표시 (앱이 꺼진 상태에서도 작동)
             if (isDeveloperModeEnabled) {
                 val levelText = if (batteryPercent >= 0) {
                     "충전이 시작되었습니다. (배터리: ${batteryPercent.toInt()}%, 타입: $chargingType)"
                 } else {
                     "충전이 시작되었습니다. (타입: $chargingType)"
                 }
-                Log.d("BatteryPal", "BatteryStateReceiver: 개발자 모드 알림 표시 시작 - $levelText")
-                showDeveloperChargingTestNotification(
-                    context, 
-                    "충전 시작", 
-                    levelText
+                Log.d("BatteryPal", "BatteryStateReceiver: 개발자 모드 알림을 Foreground Service를 통해 표시 - $levelText")
+                ChargingForegroundService.startService(
+                    context,
+                    showDeveloperNotification = true,
+                    title = "충전 시작",
+                    message = levelText
                 )
             } else {
                 Log.d("BatteryPal", "BatteryStateReceiver: 개발자 모드가 비활성화되어 알림을 표시하지 않음")
+                ChargingForegroundService.startService(context)
             }
-            
-            // Foreground Service 시작 (충전 모니터링)
-            ChargingForegroundService.startService(context)
             
         } catch (e: Exception) {
             Log.e("BatteryPal", "BatteryStateReceiver: 충전기 연결 처리 오류", e)
@@ -168,6 +169,7 @@ class BatteryStateReceiver : BroadcastReceiver() {
             val isDeveloperModeEnabled = isDeveloperModeChargingTestEnabled(context)
             Log.d("BatteryPal", "BatteryStateReceiver: 충전기 분리 - 개발자 모드 활성화 여부: $isDeveloperModeEnabled")
             
+            // Foreground Service를 통해 알림 표시 후 종료
             if (isDeveloperModeEnabled) {
                 val batteryIntent = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
                 val batteryLevel = batteryIntent?.let {
@@ -184,18 +186,18 @@ class BatteryStateReceiver : BroadcastReceiver() {
                     "충전이 종료되었습니다."
                 }
                 
-                Log.d("BatteryPal", "BatteryStateReceiver: 개발자 모드 알림 표시 시작 (분리) - $levelText")
-                showDeveloperChargingTestNotification(
-                    context, 
-                    "충전 종료", 
-                    levelText
+                Log.d("BatteryPal", "BatteryStateReceiver: 개발자 모드 알림을 Foreground Service를 통해 표시 (분리) - $levelText")
+                // Foreground Service에 알림 표시 요청 후 종료
+                ChargingForegroundService.showNotificationAndStop(
+                    context,
+                    title = "충전 종료",
+                    message = levelText
                 )
             } else {
                 Log.d("BatteryPal", "BatteryStateReceiver: 충전기 분리 - 개발자 모드가 비활성화되어 알림을 표시하지 않음")
+                // Foreground Service 종료 (충전 종료)
+                ChargingForegroundService.stopService(context)
             }
-            
-            // Foreground Service 종료 (충전 종료)
-            ChargingForegroundService.stopService(context)
             
         } catch (e: Exception) {
             Log.e("BatteryPal", "BatteryStateReceiver: 충전기 분리 처리 오류", e)
