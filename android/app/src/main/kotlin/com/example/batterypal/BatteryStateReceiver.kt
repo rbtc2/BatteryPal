@@ -407,30 +407,28 @@ class BatteryStateReceiver : BroadcastReceiver() {
             
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 val channelId = "developer_charging_test_channel"
-                val channelName = "개발자 충전 테스트"
                 
-                // 기존 채널 삭제 후 재생성 (설정 변경 반영을 위해)
-                try {
-                    notificationManager.deleteNotificationChannel(channelId)
-                    Log.d("BatteryPal", "기존 알림 채널 삭제: $channelId")
-                } catch (e: Exception) {
-                    Log.d("BatteryPal", "기존 알림 채널 삭제 실패 (없을 수 있음): $e")
+                // 채널 존재 여부 확인 (NotificationService에서 미리 생성됨)
+                val channel = notificationManager.getNotificationChannel(channelId)
+                if (channel == null) {
+                    // 채널이 없으면 생성 (백업용 - 앱이 처음 실행되거나 채널이 삭제된 경우)
+                    val channelName = "개발자 모드: 충전 테스트"
+                    val newChannel = NotificationChannel(
+                        channelId,
+                        channelName,
+                        NotificationManager.IMPORTANCE_HIGH
+                    ).apply {
+                        description = "개발자 모드 충전 감지 테스트용 알림"
+                        enableVibration(true)
+                        enableLights(true)
+                        setShowBadge(true)
+                        setSound(null, null) // 소리 없음 (진동만)
+                    }
+                    notificationManager.createNotificationChannel(newChannel)
+                    Log.d("BatteryPal", "개발자 모드 알림 채널 생성 (백업): $channelId")
+                } else {
+                    Log.d("BatteryPal", "개발자 모드 알림 채널 확인 완료: $channelId, importance=${channel.importance}")
                 }
-                
-                // 알림 채널 생성
-                val channel = NotificationChannel(
-                    channelId,
-                    channelName,
-                    NotificationManager.IMPORTANCE_HIGH
-                ).apply {
-                    description = "개발자 모드: 백그라운드 충전 감지 테스트 알림"
-                    enableVibration(true)
-                    enableLights(true)
-                    setShowBadge(true)
-                    setSound(null, null) // 소리 없음 (진동만)
-                }
-                notificationManager.createNotificationChannel(channel)
-                Log.d("BatteryPal", "알림 채널 생성 완료: $channelId, importance=${channel.importance}")
                 
                 // 메인 액티비티로 이동하는 PendingIntent
                 val mainIntent = Intent(context, MainActivity::class.java).apply {

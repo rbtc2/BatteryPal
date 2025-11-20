@@ -61,6 +61,7 @@ class NotificationService {
 
   /// Android 알림 채널 생성
   Future<void> _createNotificationChannel() async {
+    // 배터리 충전 알림 채널
     const AndroidNotificationChannel channel = AndroidNotificationChannel(
       'battery_charging_channel',
       '배터리 충전 알림',
@@ -74,6 +75,25 @@ class NotificationService {
         .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>()
         ?.createNotificationChannel(channel);
+
+    // 개발자 모드 충전 테스트 알림 채널
+    // BatteryStateReceiver에서 앱이 꺼진 상태에서도 사용할 수 있도록 미리 생성
+    const AndroidNotificationChannel developerChargingChannel = AndroidNotificationChannel(
+      'developer_charging_test_channel',  // channelId - BatteryStateReceiver와 동일
+      '개발자 모드: 충전 테스트',  // channelName
+      description: '개발자 모드 충전 감지 테스트용 알림',
+      importance: Importance.high,
+      playSound: false,  // 진동만 (BatteryStateReceiver와 동일)
+      enableVibration: true,
+      showBadge: true,
+    );
+
+    await _notifications
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(developerChargingChannel);
+
+    debugPrint('개발자 모드 충전 테스트 알림 채널 생성 완료');
   }
 
   /// 알림 권한 요청
