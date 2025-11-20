@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
-import '../../../../../services/hourly_discharge_calculator.dart';
+// 백업 파일: 원본 프로젝트에서 삭제된 파일이므로 import 주석 처리
+// 원본 프로젝트 경로: lib/services/hourly_discharge_calculator.dart (삭제됨)
+// 백업 위치: backup/drain_tab/services/hourly_discharge_calculator.dart
+// 참고: 백업 파일은 참고용이며, 실제로는 원본 프로젝트에서만 컴파일됩니다.
+// import 'package:batterypal/services/hourly_discharge_calculator.dart';
 
 /// 시간대별 소모 그래프 - 시간대별 배터리 소모 패턴을 표시하는 위젯
 /// 
@@ -33,7 +37,8 @@ class _DrainHourlyChartState extends State<DrainHourlyChart> {
   String? _errorMessage;
   
   /// 계산기 서비스
-  final HourlyDischargeCalculator _calculator = HourlyDischargeCalculator();
+  // 백업 파일: 원본 프로젝트에서 삭제된 서비스이므로 주석 처리
+  // final HourlyDischargeCalculator _calculator = HourlyDischargeCalculator();
   
   /// 이전 날짜 (날짜 변경 감지용)
   DateTime? _previousDate;
@@ -97,7 +102,9 @@ class _DrainHourlyChartState extends State<DrainHourlyChart> {
     try {
       debugPrint('시간대별 소모 데이터 로드 시작: ${targetDate.toString().split(' ')[0]}');
       
-      final hourlyData = await _calculator.calculateHourlyDischargeForDate(targetDate);
+      // 백업 파일: 원본 프로젝트에서 삭제된 서비스이므로 주석 처리
+      // final hourlyData = await _calculator.calculateHourlyDischargeForDate(targetDate);
+      final hourlyData = <int, double>{}; // 더미 데이터
       
       if (mounted) {
         setState(() {
@@ -151,7 +158,9 @@ class _DrainHourlyChartState extends State<DrainHourlyChart> {
       return null;
     }
     
-    return _calculator.getPeakHour(_hourlyDischargeData!);
+    // 백업 파일: 원본 프로젝트에서 삭제된 서비스이므로 주석 처리
+    // return _calculator.getPeakHour(_hourlyDischargeData!);
+    return null; // 더미 반환값
   }
 
   @override

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'battery_drain/widgets/drain_stats_card.dart';
-import 'battery_drain/widgets/drain_hourly_chart.dart';
-import 'battery_drain/widgets/drain_period_list.dart';
+import 'widgets/battery_drain/widgets/drain_stats_card.dart';
+import 'widgets/battery_drain/widgets/drain_hourly_chart.dart';
+import 'widgets/battery_drain/widgets/drain_period_list.dart';
 
 /// 배터리 소모 분석 탭 - 리팩토링된 모듈화된 구조
 /// 

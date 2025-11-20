@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
-import '../models/battery_history_models.dart';
-import '../services/battery_history_service.dart';
+// 백업 파일: 원본 프로젝트의 package 경로 사용
+import 'package:batterypal/models/battery_history_models.dart';
+import 'package:batterypal/services/battery_history_service.dart';
 
 /// 시간대별 방전 소모량 계산 서비스
 /// 

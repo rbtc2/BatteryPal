@@ -23,9 +23,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
   // ignore: prefer_final_fields
   bool _isProUser = false;
   
-  // 분석 탭의 초기 탭 인덱스
-  int _analysisTabInitialIndex = 0;
-  
   // 배터리 최적화 예외 요청 표시 여부 (중복 방지)
   bool _hasShownBatteryOptimizationPrompt = false;
   
@@ -41,7 +38,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
     AnalysisTab(
       isProUser: _isProUser,
       onProToggle: _handleProUpgrade,
-      initialTabIndex: _analysisTabInitialIndex,
     ),
     SettingsTab(isProUser: _isProUser, onProToggle: _handleProUpgrade),
   ];
@@ -201,10 +197,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
         onTap: (index) {
           setState(() {
             _currentIndex = index;
-            // 분석 탭을 직접 선택할 때는 기본 탭(배터리 탭)으로 리셋
-            if (index == 1) {
-              _analysisTabInitialIndex = 0;
-            }
           });
         },
         type: BottomNavigationBarType.fixed,

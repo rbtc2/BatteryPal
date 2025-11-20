@@ -1,9 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../charging_patterns/widgets/stat_card.dart';
-import '../../../../../services/discharge_current_calculator.dart';
-import '../../../../../services/screen_time_service.dart';
+// 백업 파일: 원본 프로젝트의 package 경로 사용
+import 'package:batterypal/screens/analysis/widgets/charging_patterns/widgets/stat_card.dart';
+import 'package:batterypal/services/discharge_current_calculator.dart';
+import 'package:batterypal/services/screen_time_service.dart';
 
 /// 소모 통계 카드 - 배터리 소모량 통계를 표시하는 위젯
 /// 
