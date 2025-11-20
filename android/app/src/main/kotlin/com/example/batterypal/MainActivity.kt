@@ -1025,7 +1025,8 @@ class MainActivity : FlutterActivity() {
     /// BatteryPal 관련 로그 가져오기 (logcat에서)
     private fun getBatteryPalLogs(): List<String> {
         return try {
-            val process = Runtime.getRuntime().exec("logcat -d -s BatteryPal:*")
+            // BatteryPal 태그와 ChargingForegroundService 태그 모두 포함
+            val process = Runtime.getRuntime().exec("logcat -d -s BatteryPal:* ChargingForegroundService:*")
             val inputStream = process.inputStream
             val reader = java.io.BufferedReader(java.io.InputStreamReader(inputStream))
             val logs = mutableListOf<String>()
@@ -1039,15 +1040,16 @@ class MainActivity : FlutterActivity() {
             inputStream.close()
             process.destroy()
             
-            // 최근 100줄만 반환
-            if (logs.size > 100) {
-                logs.takeLast(100)
+            // 최근 200줄만 반환 (더 많은 로그 확인 가능)
+            if (logs.size > 200) {
+                logs.takeLast(200)
             } else {
                 logs
             }
         } catch (e: Exception) {
             android.util.Log.e("BatteryPal", "로그 읽기 실패", e)
-            listOf("로그를 읽을 수 없습니다: ${e.message}")
+            listOf("로그를 읽을 수 없습니다: ${e.message}", 
+                   "권한이 필요할 수 있습니다. READ_LOGS 권한을 확인하세요.")
         }
     }
     
