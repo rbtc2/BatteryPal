@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
-import '../painters/oscilloscope_painter.dart';
+import '../painters/bar_graph_painter.dart';
 import 'blinking_dot.dart';
 
-/// 오실로스코프 그래프 위젯
-/// 충전 전류를 오실로스코프 스타일로 표시하는 위젯
-class OscilloscopeGraph extends StatelessWidget {
+/// 실시간 막대 그래프 위젯
+/// 충전 전류를 막대 그래프 스타일로 표시하는 위젯
+class BarGraph extends StatelessWidget {
   final List<double> dataPoints;
   final double height;
 
-  const OscilloscopeGraph({
+  const BarGraph({
     super.key,
     required this.dataPoints,
     this.height = 180.0,
@@ -21,9 +21,9 @@ class OscilloscopeGraph extends StatelessWidget {
       child: Stack(
         children: [
           CustomPaint(
-            key: ValueKey('oscilloscope_${dataPoints.length}_${dataPoints.isNotEmpty ? dataPoints.last : 0}'),
+            key: ValueKey('bar_${dataPoints.length}_${dataPoints.isNotEmpty ? dataPoints.last : 0}'),
             size: Size(double.infinity, height),
-            painter: OscilloscopePainter(
+            painter: BarGraphPainter(
               dataPoints: dataPoints,
               color: Colors.green,
             ),

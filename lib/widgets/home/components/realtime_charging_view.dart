@@ -29,6 +29,7 @@ class RealtimeChargingView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      key: ValueKey('realtime_charging_view_${graphTheme.name}'),
       decoration: BoxDecoration(
         color: Colors.black,
         borderRadius: BorderRadius.circular(16),
@@ -42,13 +43,10 @@ class RealtimeChargingView extends StatelessWidget {
         children: [
           // 테마에 따른 그래프
           // key를 사용하여 테마 변경 시 위젯이 확실히 rebuild되도록 함
-          KeyedSubtree(
-            key: ValueKey('charging_graph_${graphTheme.name}'),
-            child: ChargingGraphFactory.createGraph(
-              theme: graphTheme,
-              dataPoints: dataPoints,
-              height: graphHeight,
-            ),
+          ChargingGraphFactory.createGraph(
+            theme: graphTheme,
+            dataPoints: dataPoints,
+            height: graphHeight,
           ),
           
           const SizedBox(height: 20),

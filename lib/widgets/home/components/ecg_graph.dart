@@ -21,6 +21,7 @@ class ECGGraph extends StatelessWidget {
       child: Stack(
         children: [
           CustomPaint(
+            key: ValueKey('ecg_${dataPoints.length}_${dataPoints.isNotEmpty ? dataPoints.last : 0}'),
             size: Size(double.infinity, height),
             painter: ECGPainter(
               dataPoints: dataPoints,
