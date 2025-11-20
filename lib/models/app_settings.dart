@@ -1,5 +1,6 @@
 import 'battery_display_cycle_speed.dart';
 import 'charging_monitor_display_mode.dart';
+import 'charging_graph_theme.dart';
 
 /// 설정 데이터 모델
 class AppSettings {
@@ -38,6 +39,7 @@ class AppSettings {
   
   // 실시간 충전 모니터 표시 설정
   final ChargingMonitorDisplayMode chargingMonitorDisplayMode; // 충전 모니터 표시 방식
+  final ChargingGraphTheme chargingGraphTheme; // 충전 그래프 테마
   
   final DateTime lastUpdated;
   
@@ -77,6 +79,7 @@ class AppSettings {
     
     // 실시간 충전 모니터 표시 설정 기본값
     this.chargingMonitorDisplayMode = ChargingMonitorDisplayMode.currentOnly,
+    this.chargingGraphTheme = ChargingGraphTheme.ecg, // 기본값: 심전도
     
     required this.lastUpdated,
   });
@@ -122,6 +125,7 @@ class AppSettings {
       
       // 실시간 충전 모니터 표시 설정
       'chargingMonitorDisplayMode': chargingMonitorDisplayMode.name,
+      'chargingGraphTheme': chargingGraphTheme.name,
       
       'lastUpdated': lastUpdated.toIso8601String(),
     };
@@ -173,6 +177,10 @@ class AppSettings {
         (e) => e.name == json['chargingMonitorDisplayMode'],
         orElse: () => ChargingMonitorDisplayMode.currentOnly,
       ),
+      chargingGraphTheme: ChargingGraphTheme.values.firstWhere(
+        (e) => e.name == json['chargingGraphTheme'],
+        orElse: () => ChargingGraphTheme.ecg,
+      ),
       
       lastUpdated: DateTime.parse(json['lastUpdated']),
     );
@@ -215,6 +223,7 @@ class AppSettings {
     
     // 실시간 충전 모니터 표시 설정
     ChargingMonitorDisplayMode? chargingMonitorDisplayMode,
+    ChargingGraphTheme? chargingGraphTheme,
     
     DateTime? lastUpdated,
   }) {
@@ -254,6 +263,7 @@ class AppSettings {
       
       // 실시간 충전 모니터 표시 설정
       chargingMonitorDisplayMode: chargingMonitorDisplayMode ?? this.chargingMonitorDisplayMode,
+      chargingGraphTheme: chargingGraphTheme ?? this.chargingGraphTheme,
       
       lastUpdated: lastUpdated ?? this.lastUpdated,
     );
@@ -287,6 +297,7 @@ class AppSettings {
         other.enableTapToSwitch == enableTapToSwitch &&
         other.enableSwipeToSwitch == enableSwipeToSwitch &&
         other.chargingMonitorDisplayMode == chargingMonitorDisplayMode &&
+        other.chargingGraphTheme == chargingGraphTheme &&
         other.lastUpdated == lastUpdated;
   }
   
@@ -311,6 +322,7 @@ class AppSettings {
       enableTapToSwitch,
       enableSwipeToSwitch,
       chargingMonitorDisplayMode,
+      chargingGraphTheme,
       lastUpdated,
     );
   }

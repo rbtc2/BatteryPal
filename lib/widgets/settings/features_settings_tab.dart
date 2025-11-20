@@ -6,6 +6,7 @@ import 'dialogs/battery_display_settings_dialog.dart';
 import 'dialogs/charging_complete_notification_dialog.dart';
 import 'dialogs/charging_percent_notification_dialog.dart';
 import 'dialogs/charging_monitor_display_dialog.dart';
+import 'dialogs/charging_graph_theme_dialog.dart';
 import 'dialogs/battery_optimization_dialog.dart';
 import 'features_settings_subtitle_helper.dart';
 
@@ -54,6 +55,17 @@ class FeaturesSettingsTab extends StatelessWidget {
                       context,
                       settingsService.appSettings.chargingMonitorDisplayMode,
                       (mode) => settingsService.updateChargingMonitorDisplayMode(mode),
+                    ),
+                  ),
+                  SettingsActionItem(
+                    title: '충전 그래프 테마',
+                    subtitle: _subtitleHelper.getChargingGraphThemeSubtitle(),
+                    icon: Icons.palette,
+                    onTap: () => ChargingGraphThemeDialog.show(
+                      context,
+                      settingsService.appSettings.chargingGraphTheme,
+                      (theme) => settingsService.updateChargingGraphTheme(theme),
+                      isProUser: isProUser,
                     ),
                   ),
                 ],

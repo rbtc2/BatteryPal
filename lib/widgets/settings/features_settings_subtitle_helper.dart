@@ -25,6 +25,10 @@ class FeaturesSettingsSubtitleHelper {
     return settingsService.appSettings.chargingMonitorDisplayMode.displayName;
   }
 
+  String getChargingGraphThemeSubtitle() {
+    return settingsService.appSettings.chargingGraphTheme.displayName;
+  }
+
   String getChargingCompleteNotificationSubtitle() {
     final enabled = settingsService.appSettings.chargingCompleteNotificationEnabled;
     if (!enabled) return '비활성화';

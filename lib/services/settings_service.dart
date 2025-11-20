@@ -50,6 +50,7 @@ class SettingsService extends ChangeNotifier {
     
     // 실시간 충전 모니터 표시 설정 기본값
     chargingMonitorDisplayMode: ChargingMonitorDisplayMode.currentOnly,
+    chargingGraphTheme: ChargingGraphTheme.ecg,
     
     lastUpdated: DateTime.now(),
   );
@@ -111,6 +112,7 @@ class SettingsService extends ChangeNotifier {
       
       // 실시간 충전 모니터 표시 설정
       await prefs.setString('chargingMonitorDisplayMode', settingsJson['chargingMonitorDisplayMode'] as String);
+      await prefs.setString('chargingGraphTheme', settingsJson['chargingGraphTheme'] as String);
       
     } catch (e) {
       debugPrint('설정 저장 실패: $e');
@@ -165,6 +167,10 @@ class SettingsService extends ChangeNotifier {
         chargingMonitorDisplayMode: ChargingMonitorDisplayMode.values.firstWhere(
           (e) => e.name == prefs.getString('chargingMonitorDisplayMode'),
           orElse: () => ChargingMonitorDisplayMode.currentOnly,
+        ),
+        chargingGraphTheme: ChargingGraphTheme.values.firstWhere(
+          (e) => e.name == prefs.getString('chargingGraphTheme'),
+          orElse: () => ChargingGraphTheme.ecg,
         ),
         
         lastUpdated: DateTime.now(),
@@ -475,6 +481,16 @@ class SettingsService extends ChangeNotifier {
     _autoSave();
   }
 
+  /// 충전 그래프 테마 설정 변경
+  void updateChargingGraphTheme(ChargingGraphTheme theme) {
+    _appSettings = _appSettings.copyWith(
+      chargingGraphTheme: theme,
+      lastUpdated: DateTime.now(),
+    );
+    notifyListeners();
+    _autoSave();
+  }
+
   /// 설정 초기화
   void resetToDefaults() {
     _appSettings = AppSettings(
@@ -511,6 +527,7 @@ class SettingsService extends ChangeNotifier {
       
       // 실시간 충전 모니터 표시 설정 기본값
       chargingMonitorDisplayMode: ChargingMonitorDisplayMode.currentOnly,
+      chargingGraphTheme: ChargingGraphTheme.ecg,
       
       lastUpdated: DateTime.now(),
     );
