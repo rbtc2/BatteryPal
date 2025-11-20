@@ -118,6 +118,7 @@ class _RealtimeChargingMonitorState extends State<RealtimeChargingMonitor> {
       final current = widget.batteryInfo?.chargingCurrent ?? 0;
       final currentAbs = current.abs();
       final displayMode = _settingsService.appSettings.chargingMonitorDisplayMode;
+      final graphTheme = _settingsService.appSettings.chargingGraphTheme;
       final elapsedDuration = _controller.calculateElapsedDuration();
       
       // 데이터 포인트에서 마지막 값 또는 현재 값 사용
@@ -130,6 +131,7 @@ class _RealtimeChargingMonitorState extends State<RealtimeChargingMonitor> {
         dataPoints: dataPoints,
         currentValue: currentValue,
         displayMode: displayMode,
+        graphTheme: graphTheme,
         elapsedDuration: elapsedDuration,
         graphHeight: _graphHeight,
         infoRowHeight: _chargingInfoRowHeight,
