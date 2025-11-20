@@ -39,14 +39,12 @@ class DischargeCurrentCalculator {
         return -1;
       }
       
-      // 방전 구간만 필터링 (isCharging == false)
-      final dischargeData = historyData
-          .where((point) => !point.isCharging)
-          .toList();
+      // 모든 데이터를 사용하여 계산 (충전 중 표시가 있어도 레벨이 떨어지면 방전으로 간주)
+      final dischargeData = historyData;
       
       if (dischargeData.isEmpty) {
-        debugPrint('방전 전류 계산: 방전 구간이 없음');
-        return 0; // 방전이 없었으면 0 mAh
+        debugPrint('방전 전류 계산: 데이터가 없음');
+        return 0;
       }
       
       // 배터리 용량 가져오기
