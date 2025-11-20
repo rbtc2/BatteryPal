@@ -5,27 +5,23 @@ import '../../../models/models.dart';
 class ChargingGraphThemeDialog extends StatefulWidget {
   final ChargingGraphTheme initialTheme;
   final ValueChanged<ChargingGraphTheme> onThemeSelected;
-  final bool isProUser;
 
   const ChargingGraphThemeDialog({
     super.key,
     required this.initialTheme,
     required this.onThemeSelected,
-    this.isProUser = false,
   });
 
   static void show(
     BuildContext context,
     ChargingGraphTheme initialTheme,
-    ValueChanged<ChargingGraphTheme> onThemeSelected, {
-    bool isProUser = false,
-  }) {
+    ValueChanged<ChargingGraphTheme> onThemeSelected,
+  ) {
     showDialog(
       context: context,
       builder: (context) => ChargingGraphThemeDialog(
         initialTheme: initialTheme,
         onThemeSelected: onThemeSelected,
-        isProUser: isProUser,
       ),
     );
   }
@@ -72,38 +68,11 @@ class _ChargingGraphThemeDialogState extends State<ChargingGraphThemeDialog> {
               // 모든 테마 옵션
               ...ChargingGraphTheme.values.map((theme) {
                 final isSelected = _selectedTheme == theme;
-                final isProOnly = theme != ChargingGraphTheme.ecg && !widget.isProUser;
                 
                 return Column(
                   children: [
                     ListTile(
-                      title: Row(
-                        children: [
-                          Expanded(
-                            child: Text(theme.displayName),
-                          ),
-                          if (isProOnly)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: Colors.amber.withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(4),
-                                border: Border.all(
-                                  color: Colors.amber.withValues(alpha: 0.5),
-                                  width: 1,
-                                ),
-                              ),
-                              child: const Text(
-                                'Pro',
-                                style: TextStyle(
-                                  color: Colors.amber,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
+                      title: Text(theme.displayName),
                       subtitle: Text(theme.description),
                       leading: Icon(
                         isSelected
@@ -114,14 +83,11 @@ class _ChargingGraphThemeDialogState extends State<ChargingGraphThemeDialog> {
                             : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                       ),
                       contentPadding: EdgeInsets.zero,
-                      enabled: !isProOnly,
-                      onTap: isProOnly
-                          ? null
-                          : () {
-                              setState(() {
-                                _selectedTheme = theme;
-                              });
-                            },
+                      onTap: () {
+                        setState(() {
+                          _selectedTheme = theme;
+                        });
+                      },
                     ),
                     if (theme != ChargingGraphTheme.values.last)
                       const SizedBox(height: 8),

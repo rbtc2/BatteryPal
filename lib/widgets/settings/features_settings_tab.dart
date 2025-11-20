@@ -65,7 +65,6 @@ class FeaturesSettingsTab extends StatelessWidget {
                       context,
                       settingsService.appSettings.chargingGraphTheme,
                       (theme) => settingsService.updateChargingGraphTheme(theme),
-                      isProUser: isProUser,
                     ),
                   ),
                 ],
