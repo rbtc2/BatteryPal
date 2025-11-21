@@ -168,10 +168,20 @@ class SettingsService extends ChangeNotifier {
           (e) => e.name == prefs.getString('chargingMonitorDisplayMode'),
           orElse: () => ChargingMonitorDisplayMode.currentOnly,
         ),
-        chargingGraphTheme: ChargingGraphTheme.values.firstWhere(
-          (e) => e.name == prefs.getString('chargingGraphTheme'),
-          orElse: () => ChargingGraphTheme.ecg,
-        ),
+        chargingGraphTheme: () {
+          final themeName = prefs.getString('chargingGraphTheme');
+          if (themeName == null) {
+            return ChargingGraphTheme.ecg;
+          }
+          // 삭제된 oscilloscope 테마를 사용 중인 경우 ECG로 fallback
+          if (themeName == 'oscilloscope') {
+            return ChargingGraphTheme.ecg;
+          }
+          return ChargingGraphTheme.values.firstWhere(
+            (e) => e.name == themeName,
+            orElse: () => ChargingGraphTheme.ecg,
+          );
+        }(),
         
         lastUpdated: DateTime.now(),
       );

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../models/charging_graph_theme.dart';
 import 'ecg_graph.dart';
-import 'oscilloscope_graph.dart';
 import 'bar_graph.dart';
 
 /// 충전 그래프 팩토리
@@ -16,12 +15,6 @@ class ChargingGraphFactory {
     switch (theme) {
       case ChargingGraphTheme.ecg:
         return ECGGraph(
-          dataPoints: dataPoints,
-          height: height,
-        );
-      
-      case ChargingGraphTheme.oscilloscope:
-        return OscilloscopeGraph(
           dataPoints: dataPoints,
           height: height,
         );
