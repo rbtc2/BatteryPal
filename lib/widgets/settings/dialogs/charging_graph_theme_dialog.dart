@@ -36,7 +36,29 @@ class _ChargingGraphThemeDialogState extends State<ChargingGraphThemeDialog> {
   @override
   void initState() {
     super.initState();
-    _selectedTheme = widget.initialTheme;
+    // 초기 테마가 스켈레톤 테마인 경우, 구현된 테마로 변경
+    if (_isThemeImplemented(widget.initialTheme)) {
+      _selectedTheme = widget.initialTheme;
+    } else {
+      // 기본값으로 ECG 테마 사용
+      _selectedTheme = ChargingGraphTheme.ecg;
+    }
+  }
+
+  /// 테마가 구현 완료되었는지 확인
+  bool _isThemeImplemented(ChargingGraphTheme theme) {
+    switch (theme) {
+      case ChargingGraphTheme.ecg:
+      case ChargingGraphTheme.oscilloscope:
+      case ChargingGraphTheme.bar:
+        return true;
+      case ChargingGraphTheme.wave:
+      case ChargingGraphTheme.particle:
+      case ChargingGraphTheme.electric:
+      case ChargingGraphTheme.spectrum:
+      case ChargingGraphTheme.dna:
+        return false;
+    }
   }
 
   @override
@@ -68,26 +90,48 @@ class _ChargingGraphThemeDialogState extends State<ChargingGraphThemeDialog> {
               // 모든 테마 옵션
               ...ChargingGraphTheme.values.map((theme) {
                 final isSelected = _selectedTheme == theme;
+                final isImplemented = _isThemeImplemented(theme);
                 
                 return Column(
                   children: [
                     ListTile(
-                      title: Text(theme.displayName),
-                      subtitle: Text(theme.description),
+                      title: Text(
+                        theme.displayName,
+                        style: TextStyle(
+                          color: isImplemented
+                              ? null
+                              : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                        ),
+                      ),
+                      subtitle: Text(
+                        isImplemented
+                            ? theme.description
+                            : '${theme.description} (준비 중)',
+                        style: TextStyle(
+                          color: isImplemented
+                              ? null
+                              : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                        ),
+                      ),
                       leading: Icon(
                         isSelected
                             ? Icons.radio_button_checked
                             : Icons.radio_button_unchecked,
                         color: isSelected
                             ? Theme.of(context).colorScheme.primary
-                            : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                            : isImplemented
+                                ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)
+                                : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
                       ),
                       contentPadding: EdgeInsets.zero,
-                      onTap: () {
-                        setState(() {
-                          _selectedTheme = theme;
-                        });
-                      },
+                      enabled: isImplemented,
+                      onTap: isImplemented
+                          ? () {
+                              setState(() {
+                                _selectedTheme = theme;
+                              });
+                            }
+                          : null,
                     ),
                     if (theme != ChargingGraphTheme.values.last)
                       const SizedBox(height: 8),
@@ -104,10 +148,12 @@ class _ChargingGraphThemeDialogState extends State<ChargingGraphThemeDialog> {
           child: const Text('취소'),
         ),
         TextButton(
-          onPressed: () {
-            widget.onThemeSelected(_selectedTheme);
-            Navigator.of(context).pop();
-          },
+          onPressed: _isThemeImplemented(_selectedTheme)
+              ? () {
+                  widget.onThemeSelected(_selectedTheme);
+                  Navigator.of(context).pop();
+                }
+              : null,
           child: const Text('확인'),
         ),
       ],
