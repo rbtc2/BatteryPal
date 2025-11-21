@@ -1,0 +1,42 @@
+import 'package:flutter/material.dart';
+import '../painters/spectrum_painter.dart';
+import 'blinking_dot.dart';
+
+/// 스펙트럼 분석기 그래프 위젯
+/// 충전 전류를 스펙트럼 분석기 스타일로 표시하는 위젯
+class SpectrumGraph extends StatelessWidget {
+  final List<double> dataPoints;
+  final double height;
+
+  const SpectrumGraph({
+    super.key,
+    required this.dataPoints,
+    this.height = 180.0,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: height,
+      child: Stack(
+        children: [
+          CustomPaint(
+            key: ValueKey('spectrum_${dataPoints.length}_${dataPoints.isNotEmpty ? dataPoints.last : 0}'),
+            size: Size(double.infinity, height),
+            painter: SpectrumPainter(
+              dataPoints: dataPoints,
+              color: Colors.green,
+            ),
+          ),
+          // 깜빡이는 점 (오른쪽 상단)
+          const Positioned(
+            top: 0,
+            right: 0,
+            child: BlinkingDot(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
