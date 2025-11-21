@@ -35,7 +35,6 @@ class ChargingGraphFactory {
       // 아직 구현되지 않은 테마들은 기본값(ECG)으로 대체
       // 향후 각 테마별 구현이 완료되면 해당 case를 추가하여 실제 그래프 위젯을 반환
       case ChargingGraphTheme.particle:
-      case ChargingGraphTheme.electric:
       case ChargingGraphTheme.dna:
         // 임시로 ECG 그래프를 반환 (각 테마 구현 완료 후 교체 예정)
         return ECGGraph(

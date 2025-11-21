@@ -183,7 +183,7 @@ class AppSettings {
           return ChargingGraphTheme.ecg;
         }
         // 삭제된 테마들을 사용 중인 경우 ECG로 fallback
-        if (themeName == 'oscilloscope' || themeName == 'bar') {
+        if (themeName == 'oscilloscope' || themeName == 'bar' || themeName == 'electric') {
           return ChargingGraphTheme.ecg;
         }
         return ChargingGraphTheme.values.firstWhere(

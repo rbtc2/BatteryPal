@@ -17,7 +17,6 @@ class ChargingGraphThemeColors {
         return const Color(0xFF0A1A2E); // 어두운 네이비 블루
       
       case ChargingGraphTheme.particle:
-      case ChargingGraphTheme.electric:
       case ChargingGraphTheme.dna:
         // 아직 구현되지 않은 테마는 기본 검정
         return Colors.black;
@@ -58,7 +57,6 @@ class ChargingGraphThemeColors {
         return Colors.cyan.withValues(alpha: 0.4);
       
       case ChargingGraphTheme.particle:
-      case ChargingGraphTheme.electric:
       case ChargingGraphTheme.dna:
         // 아직 구현되지 않은 테마는 기본 초록색
         return Colors.green.withValues(alpha: 0.3);
@@ -78,7 +76,6 @@ class ChargingGraphThemeColors {
         return Colors.cyan;
       
       case ChargingGraphTheme.particle:
-      case ChargingGraphTheme.electric:
       case ChargingGraphTheme.dna:
         // 아직 구현되지 않은 테마는 기본 초록색
         return Colors.green;
@@ -114,7 +111,6 @@ class ChargingGraphThemeColors {
         return Colors.cyan.withValues(alpha: 0.15);
       
       case ChargingGraphTheme.particle:
-      case ChargingGraphTheme.electric:
       case ChargingGraphTheme.dna:
         // 아직 구현되지 않은 테마는 기본 초록색
         return Colors.green.withValues(alpha: 0.1);

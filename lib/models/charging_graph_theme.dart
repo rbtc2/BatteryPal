@@ -9,9 +9,6 @@ enum ChargingGraphTheme {
   /// 입자 흐름 효과
   particle('입자 흐름', '입자 흐름 효과'),
   
-  /// 전기/번개 효과
-  electric('전기/번개', '번개 효과'),
-  
   /// 스펙트럼 분석기
   spectrum('스펙트럼 분석기', '스펙트럼 분석기 스타일'),
   
