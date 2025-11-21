@@ -3,8 +3,6 @@ import '../../../models/charging_graph_theme.dart';
 import 'ecg_graph.dart';
 import 'spectrum_graph.dart';
 import 'wave_graph.dart';
-import 'particle_graph.dart';
-import 'dna_graph.dart';
 
 /// 충전 그래프 팩토리
 /// 테마에 따라 적절한 그래프 위젯을 생성하는 팩토리 클래스
@@ -30,18 +28,6 @@ class ChargingGraphFactory {
       
       case ChargingGraphTheme.wave:
         return WaveGraph(
-          dataPoints: dataPoints,
-          height: height,
-        );
-      
-      case ChargingGraphTheme.particle:
-        return ParticleGraph(
-          dataPoints: dataPoints,
-          height: height,
-        );
-      
-      case ChargingGraphTheme.dna:
-        return DNAGraph(
           dataPoints: dataPoints,
           height: height,
         );
