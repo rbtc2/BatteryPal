@@ -51,10 +51,9 @@ class _ChargingGraphThemeDialogState extends State<ChargingGraphThemeDialog> {
       case ChargingGraphTheme.ecg:
       case ChargingGraphTheme.spectrum:
       case ChargingGraphTheme.wave:
-        return true;
       case ChargingGraphTheme.particle:
       case ChargingGraphTheme.dna:
-        return false;
+        return true;
     }
   }
 
