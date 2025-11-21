@@ -15,6 +15,10 @@ class ChargingGraphThemeColors {
       case ChargingGraphTheme.wave:
         // 파도/웨이브는 어두운 파란색 배경
         return const Color(0xFF0A1A2E); // 어두운 네이비 블루
+      
+      case ChargingGraphTheme.aurora:
+        // 오로라는 매우 어두운 보라/남색 배경
+        return const Color(0xFF0A0E27); // 매우 어두운 보라/남색
     }
   }
 
@@ -29,6 +33,19 @@ class ChargingGraphThemeColors {
           colors: [
             Color(0xFF0A1A2E), // 어두운 네이비 블루
             Color(0xFF16213E), // 약간 밝은 네이비 블루
+            Color(0xFF0F1419), // 거의 검정
+          ],
+          stops: [0.0, 0.5, 1.0],
+        );
+      
+      case ChargingGraphTheme.aurora:
+        // 오로라는 어두운 보라에서 남색으로 그라데이션
+        return const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF0A0E27), // 매우 어두운 보라/남색
+            Color(0xFF1A1F3A), // 약간 밝은 보라/남색
             Color(0xFF0F1419), // 거의 검정
           ],
           stops: [0.0, 0.5, 1.0],
@@ -50,6 +67,10 @@ class ChargingGraphThemeColors {
       case ChargingGraphTheme.wave:
         // 파도/웨이브는 청록색/하늘색 테두리
         return Colors.cyan.withValues(alpha: 0.4);
+      
+      case ChargingGraphTheme.aurora:
+        // 오로라는 보라색 테두리
+        return Colors.purple.withValues(alpha: 0.3);
     }
   }
 
@@ -64,6 +85,10 @@ class ChargingGraphThemeColors {
       case ChargingGraphTheme.wave:
         // 파도/웨이브는 청록색
         return Colors.cyan;
+      
+      case ChargingGraphTheme.aurora:
+        // 오로라는 보라색 (기본 색상, 실제로는 그라데이션 사용)
+        return Colors.purple;
     }
   }
 
@@ -76,6 +101,14 @@ class ChargingGraphThemeColors {
           Colors.cyan,
           Colors.lightBlue,
           Colors.blue.shade300,
+        ];
+      
+      case ChargingGraphTheme.aurora:
+        // 오로라는 보라→핑크→청록 그라데이션
+        return [
+          const Color(0xFF9D4EDD), // 보라색
+          const Color(0xFFE6399F), // 핑크색
+          const Color(0xFF06D6A0), // 청록색
         ];
       
       default:
@@ -94,6 +127,10 @@ class ChargingGraphThemeColors {
       case ChargingGraphTheme.wave:
         // 파도/웨이브는 청록색 그리드
         return Colors.cyan.withValues(alpha: 0.15);
+      
+      case ChargingGraphTheme.aurora:
+        // 오로라는 보라색 그리드
+        return Colors.purple.withValues(alpha: 0.1);
     }
   }
 }

@@ -88,6 +88,7 @@ class _ChargingGraphThemeDialogState extends State<ChargingGraphThemeDialog> wit
       case ChargingGraphTheme.ecg:
       case ChargingGraphTheme.spectrum:
       case ChargingGraphTheme.wave:
+      case ChargingGraphTheme.aurora:
         return true;
     }
   }

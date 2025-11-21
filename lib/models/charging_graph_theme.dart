@@ -7,7 +7,10 @@ enum ChargingGraphTheme {
   wave('파도/웨이브', '파도 애니메이션'),
   
   /// 스펙트럼 분석기
-  spectrum('스펙트럼 분석기', '스펙트럼 분석기 스타일');
+  spectrum('스펙트럼 분석기', '스펙트럼 분석기 스타일'),
+  
+  /// 오로라 (북극광 스타일)
+  aurora('오로라', '북극광 스타일 다중 리본 그래프');
 
   const ChargingGraphTheme(this.displayName, this.description);
   

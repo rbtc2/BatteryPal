@@ -51,6 +51,10 @@ class GraphPreviewDataGenerator {
         // 파도: 부드러운 파형
         return _generateWaveStyleData(pointCount, animationValue);
       
+      case 'aurora':
+        // 오로라: 부드러운 다중 파형 (리본 효과)
+        return _generateAuroraStyleData(pointCount, animationValue);
+      
       default:
         return generateSampleData(pointCount: pointCount, animationValue: animationValue);
     }
@@ -118,6 +122,31 @@ class GraphPreviewDataGenerator {
       
       final value = baseOffset + wave1 + wave2;
       data.add(value);
+    }
+    
+    return data;
+  }
+  
+  /// 오로라 스타일 데이터 생성 (부드러운 다중 파형)
+  static List<double> _generateAuroraStyleData(int pointCount, double animationValue) {
+    final data = <double>[];
+    final baseOffset = 100.0;
+    final amplitude = 50.0;
+    
+    for (int i = 0; i < pointCount; i++) {
+      final x = i / (pointCount - 1);
+      
+      // 오로라 특유의 부드러운 다중 파형
+      // 여러 주파수를 조합하여 리본처럼 흐르는 효과
+      final wave1 = math.sin((x * 2 * math.pi * 1.5) + (animationValue * 2 * math.pi)) * amplitude;
+      final wave2 = math.cos((x * 2 * math.pi * 2.3) + (animationValue * 2 * math.pi * 1.5)) * (amplitude * 0.6);
+      final wave3 = math.sin((x * 2 * math.pi * 3.7) + (animationValue * 2 * math.pi * 0.8)) * (amplitude * 0.4);
+      
+      // 부드러운 변조
+      final modulation = math.sin((x * 2 * math.pi * 0.5) + (animationValue * 2 * math.pi * 0.3)) * 15;
+      
+      final value = baseOffset + wave1 + wave2 + wave3 + modulation;
+      data.add(value.clamp(0, 200));
     }
     
     return data;
