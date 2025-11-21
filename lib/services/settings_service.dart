@@ -173,8 +173,8 @@ class SettingsService extends ChangeNotifier {
           if (themeName == null) {
             return ChargingGraphTheme.ecg;
           }
-          // 삭제된 oscilloscope 테마를 사용 중인 경우 ECG로 fallback
-          if (themeName == 'oscilloscope') {
+          // 삭제된 테마들을 사용 중인 경우 ECG로 fallback
+          if (themeName == 'oscilloscope' || themeName == 'bar') {
             return ChargingGraphTheme.ecg;
           }
           return ChargingGraphTheme.values.firstWhere(

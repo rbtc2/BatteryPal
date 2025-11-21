@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
-import '../painters/bar_graph_painter.dart';
+import '../painters/wave_painter.dart';
 import 'blinking_dot.dart';
 
-/// 실시간 막대 그래프 위젯
-/// 충전 전류를 막대 그래프 스타일로 표시하는 위젯
-class BarGraph extends StatelessWidget {
+/// 파도/웨이브 그래프 위젯
+/// 충전 전류를 파도 애니메이션 스타일로 표시하는 위젯
+class WaveGraph extends StatelessWidget {
   final List<double> dataPoints;
   final double height;
 
-  const BarGraph({
+  const WaveGraph({
     super.key,
     required this.dataPoints,
     this.height = 180.0,
@@ -21,9 +21,9 @@ class BarGraph extends StatelessWidget {
       child: Stack(
         children: [
           CustomPaint(
-            key: ValueKey('bar_${dataPoints.length}_${dataPoints.isNotEmpty ? dataPoints.last : 0}'),
+            key: ValueKey('wave_${dataPoints.length}_${dataPoints.isNotEmpty ? dataPoints.last : 0}'),
             size: Size(double.infinity, height),
-            painter: BarGraphPainter(
+            painter: WavePainter(
               dataPoints: dataPoints,
               color: Colors.green,
             ),

@@ -49,10 +49,9 @@ class _ChargingGraphThemeDialogState extends State<ChargingGraphThemeDialog> {
   bool _isThemeImplemented(ChargingGraphTheme theme) {
     switch (theme) {
       case ChargingGraphTheme.ecg:
-      case ChargingGraphTheme.bar:
       case ChargingGraphTheme.spectrum:
-        return true;
       case ChargingGraphTheme.wave:
+        return true;
       case ChargingGraphTheme.particle:
       case ChargingGraphTheme.electric:
       case ChargingGraphTheme.dna:

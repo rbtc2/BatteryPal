@@ -16,10 +16,7 @@ enum ChargingGraphTheme {
   spectrum('스펙트럼 분석기', '스펙트럼 분석기 스타일'),
   
   /// DNA 나선 구조
-  dna('DNA 나선', 'DNA 나선 구조'),
-  
-  /// 실시간 막대 그래프
-  bar('실시간 막대 그래프', '실시간 막대 그래프');
+  dna('DNA 나선', 'DNA 나선 구조');
 
   const ChargingGraphTheme(this.displayName, this.description);
   
