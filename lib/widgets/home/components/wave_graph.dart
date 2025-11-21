@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../models/charging_graph_theme.dart';
+import '../../../utils/charging_graph_theme_colors.dart';
 import '../painters/wave_painter.dart';
 import 'blinking_dot.dart';
 
@@ -16,6 +18,11 @@ class WaveGraph extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 파도/웨이브 테마 색상 가져오기
+    final graphColor = ChargingGraphThemeColors.getGraphColor(ChargingGraphTheme.wave);
+    final gradientColors = ChargingGraphThemeColors.getGraphGradientColors(ChargingGraphTheme.wave);
+    final gridColor = ChargingGraphThemeColors.getGridColor(ChargingGraphTheme.wave);
+
     return SizedBox(
       height: height,
       child: Stack(
@@ -25,7 +32,9 @@ class WaveGraph extends StatelessWidget {
             size: Size(double.infinity, height),
             painter: WavePainter(
               dataPoints: dataPoints,
-              color: Colors.green,
+              color: graphColor,
+              gradientColors: gradientColors,
+              gridColor: gridColor,
             ),
           ),
           // 깜빡이는 점 (오른쪽 상단)

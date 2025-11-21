@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../models/charging_monitor_display_mode.dart';
 import '../../../models/charging_graph_theme.dart';
+import '../../../utils/charging_graph_theme_colors.dart';
 import 'charging_info_row.dart';
 import 'charging_graph_factory.dart';
 
@@ -28,13 +29,20 @@ class RealtimeChargingView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 테마별 색상 스키마 가져오기
+    final backgroundColor = ChargingGraphThemeColors.getBackgroundColor(graphTheme);
+    final backgroundGradient = ChargingGraphThemeColors.getBackgroundGradient(graphTheme);
+    final borderColor = ChargingGraphThemeColors.getBorderColor(graphTheme);
+
     return Container(
       key: ValueKey('realtime_charging_view_${graphTheme.name}'),
       decoration: BoxDecoration(
-        color: Colors.black,
+        // 그라데이션이 있으면 그라데이션 사용, 없으면 단색 사용
+        gradient: backgroundGradient,
+        color: backgroundGradient == null ? backgroundColor : null,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Colors.green.withValues(alpha: 0.3),
+          color: borderColor,
           width: 1.5,
         ),
       ),

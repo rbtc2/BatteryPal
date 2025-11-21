@@ -7,21 +7,45 @@ import 'dart:math' as math;
 class WavePainter extends CustomPainter {
   final List<double> dataPoints;
   final Color color;
+  final List<Color>? gradientColors;
+  final Color? gridColor;
 
-  WavePainter({required this.dataPoints, required this.color});
+  WavePainter({
+    required this.dataPoints,
+    required this.color,
+    this.gradientColors,
+    this.gridColor,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
     if (dataPoints.isEmpty) return;
 
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = 2.5
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-
     // 그리드 배경
-    _drawGrid(canvas, size);
+    _drawGrid(canvas, size, gridColor ?? color.withValues(alpha: 0.1));
+
+    // 그라데이션 페인트 설정
+    Paint paint;
+    if (gradientColors != null && gradientColors!.length >= 2) {
+      // 그라데이션 색상이 있으면 그라데이션 적용
+      final gradient = LinearGradient(
+        colors: gradientColors!,
+        begin: Alignment.centerLeft,
+        end: Alignment.centerRight,
+      );
+      paint = Paint()
+        ..shader = gradient.createShader(Rect.fromLTWH(0, 0, size.width, size.height))
+        ..strokeWidth = 2.5
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round;
+    } else {
+      // 그라데이션 없으면 단색 사용
+      paint = Paint()
+        ..color = color
+        ..strokeWidth = 2.5
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round;
+    }
 
     // 데이터 정규화
     if (dataPoints.length < 2) return;
@@ -71,9 +95,12 @@ class WavePainter extends CustomPainter {
 
     canvas.drawPath(path, paint);
 
-    // 그림자 효과 (글로우)
+    // 그림자 효과 (글로우) - 그라데이션 색상의 첫 번째 색상 사용
+    final glowColor = gradientColors != null && gradientColors!.isNotEmpty
+        ? gradientColors!.first
+        : color;
     final shadowPaint = Paint()
-      ..color = color.withValues(alpha: 0.3)
+      ..color = glowColor.withValues(alpha: 0.3)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6)
       ..strokeWidth = 2.5
       ..style = PaintingStyle.stroke;
@@ -103,18 +130,33 @@ class WavePainter extends CustomPainter {
       }
     }
     
-    final secondaryPaint = Paint()
-      ..color = color.withValues(alpha: 0.4)
-      ..strokeWidth = 1.5
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
+    // 두 번째 파도 레이어도 그라데이션 적용
+    Paint secondaryPaint;
+    if (gradientColors != null && gradientColors!.length >= 2) {
+      final secondaryGradient = LinearGradient(
+        colors: gradientColors!.map((c) => c.withValues(alpha: 0.4)).toList(),
+        begin: Alignment.centerLeft,
+        end: Alignment.centerRight,
+      );
+      secondaryPaint = Paint()
+        ..shader = secondaryGradient.createShader(Rect.fromLTWH(0, 0, size.width, size.height))
+        ..strokeWidth = 1.5
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round;
+    } else {
+      secondaryPaint = Paint()
+        ..color = color.withValues(alpha: 0.4)
+        ..strokeWidth = 1.5
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round;
+    }
     canvas.drawPath(secondaryPath, secondaryPaint);
   }
 
   /// 그리드 배경 그리기
-  void _drawGrid(Canvas canvas, Size size) {
+  void _drawGrid(Canvas canvas, Size size, Color gridColor) {
     final gridPaint = Paint()
-      ..color = color.withValues(alpha: 0.1)
+      ..color = gridColor
       ..strokeWidth = 0.5;
 
     // 수평선
@@ -132,6 +174,9 @@ class WavePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(WavePainter oldDelegate) =>
-      oldDelegate.dataPoints != dataPoints;
+      oldDelegate.dataPoints != dataPoints ||
+      oldDelegate.color != color ||
+      oldDelegate.gradientColors != gradientColors ||
+      oldDelegate.gridColor != gridColor;
 }
 
