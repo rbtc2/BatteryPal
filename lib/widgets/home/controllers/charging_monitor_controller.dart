@@ -818,6 +818,55 @@ class ChargingMonitorController extends ChangeNotifier {
     }
   }
 
+  /// 강제 세션 리셋 (개발자 모드용)
+  /// 세션 시작 시간을 null로 설정하고 모든 타이머를 중지합니다.
+  /// 새 세션이 시작되면 0분 0초부터 시작하도록 보장합니다.
+  void forceResetSession() {
+    debugPrint('ChargingMonitorController: ========== 강제 세션 리셋 시작 ==========');
+    
+    try {
+      // 세션 시작 시간 강제 리셋
+      final hadSessionTime = _sessionStartTime != null;
+      final previousSessionStartTime = _sessionStartTime;
+      _sessionStartTime = null;
+      
+      if (hadSessionTime) {
+        debugPrint('ChargingMonitorController: ✅ 강제 리셋 - 세션 시작 시간 리셋 완료 (이전: $previousSessionStartTime → null)');
+      } else {
+        debugPrint('ChargingMonitorController: 강제 리셋 - 세션 시작 시간 이미 null');
+      }
+      
+      // 지속 시간 타이머 중지
+      _stopDurationUpdateTimer();
+      
+      // 실시간 업데이트 중지
+      if (_isActive) {
+        debugPrint('ChargingMonitorController: 강제 리셋 - 실시간 업데이트 중지');
+        stopRealTimeUpdate();
+      }
+      
+      // 데이터 포인트 초기화
+      _dataPoints.clear();
+      
+      // UI 업데이트
+      notifyListeners();
+      
+      debugPrint('ChargingMonitorController: ✅ 강제 세션 리셋 완료 - 모든 상태 초기화됨');
+      debugPrint('ChargingMonitorController: ========== 강제 세션 리셋 완료 ==========');
+    } catch (e, stackTrace) {
+      debugPrint('ChargingMonitorController: ⚠️ 강제 세션 리셋 중 오류 - $e');
+      debugPrint('스택 트레이스: $stackTrace');
+      // 에러 발생 시에도 기본 정리 작업 수행
+      _sessionStartTime = null;
+      _stopDurationUpdateTimer();
+      if (_isActive) {
+        stopRealTimeUpdate();
+      }
+      notifyListeners();
+      debugPrint('ChargingMonitorController: 에러 발생 후 기본 정리 작업 완료');
+    }
+  }
+
   /// 실시간 업데이트 중지
   void stopRealTimeUpdate() {
     _updateTimer?.cancel();

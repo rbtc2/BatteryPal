@@ -1080,6 +1080,73 @@ class ChargingSessionService {
   /// 세션 시작 시 배터리 정보 가져오기
   BatteryInfo? get startBatteryInfo => _stateManager.startBatteryInfo;
 
+  /// 강제 세션 리셋 (개발자 모드용)
+  /// 세션 시작 시간을 null로 설정하고 모든 상태를 초기화합니다.
+  /// 새 세션이 시작되면 0분 0초부터 시작하도록 보장합니다.
+  void forceResetSession() {
+    debugPrint('ChargingSessionService: ========== 강제 세션 리셋 시작 ==========');
+    
+    try {
+      if (_isDisposed) {
+        debugPrint('ChargingSessionService: 서비스가 dispose됨 - 강제 리셋 불가');
+        return;
+      }
+      
+      // 현재 상태 확인
+      final wasActive = _stateManager.isActive;
+      final wasEnding = _stateManager.isEnding;
+      final hadStartTime = _stateManager.startTime != null;
+      final previousStartTime = _stateManager.startTime;
+      
+      debugPrint('ChargingSessionService: 강제 리셋 전 상태 - wasActive: $wasActive, wasEnding: $wasEnding, hadStartTime: $hadStartTime');
+      
+      // 세션 리셋 (내부 메서드 사용)
+      _resetSession();
+      
+      // 세션 상태 알림 (세션이 활성화되어 있거나 ending 상태였다면)
+      if (wasActive || wasEnding) {
+        debugPrint('ChargingSessionService: 강제 리셋 - 세션 상태 변화 알림 전송 (false)');
+        _notifySessionStateChanged(false);
+      }
+      
+      // 네이티브 세션 정보도 초기화
+      try {
+        NativeBatteryService.saveChargingSessionInfo(ChargingSessionInfo(
+          startTime: null,
+          endTime: null,
+          isChargingActive: false,
+          startBatteryLevel: null,
+          endBatteryLevel: null,
+          chargingType: null,
+        ));
+        debugPrint('ChargingSessionService: 강제 리셋 - 네이티브 세션 정보 초기화 완료');
+      } catch (e) {
+        debugPrint('ChargingSessionService: 강제 리셋 - 네이티브 세션 정보 초기화 실패: $e');
+      }
+      
+      if (hadStartTime) {
+        debugPrint('ChargingSessionService: ✅ 강제 리셋 - 세션 시작 시간 리셋 완료 (이전: $previousStartTime → null)');
+      } else {
+        debugPrint('ChargingSessionService: 강제 리셋 - 세션 시작 시간 이미 null');
+      }
+      
+      debugPrint('ChargingSessionService: ✅ 강제 세션 리셋 완료 - 모든 상태 초기화됨');
+      debugPrint('ChargingSessionService: ========== 강제 세션 리셋 완료 ==========');
+    } catch (e, stackTrace) {
+      debugPrint('ChargingSessionService: ⚠️ 강제 세션 리셋 중 오류 - $e');
+      debugPrint('스택 트레이스: $stackTrace');
+      // 에러 발생 시에도 기본 정리 작업 수행
+      try {
+        _resetSession();
+        if (_stateManager.isActive || _stateManager.isEnding) {
+          _notifySessionStateChanged(false);
+        }
+      } catch (resetError) {
+        debugPrint('ChargingSessionService: 강제 리셋 중 에러 발생 후 정리 작업도 실패: $resetError');
+      }
+    }
+  }
+
   /// 서비스 상태 검증 (디버깅 및 통합 테스트용)
   Map<String, dynamic> getServiceStatus() {
     return {

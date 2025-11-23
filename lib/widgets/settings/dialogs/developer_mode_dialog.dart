@@ -5,6 +5,8 @@ import 'package:permission_handler/permission_handler.dart';
 import '../../../services/settings_service.dart';
 import '../../../services/notification_service.dart';
 import '../../../services/system_settings_service.dart';
+import '../../../screens/analysis/widgets/charging_patterns/services/charging_session_service.dart';
+import '../../../widgets/home/controllers/charging_monitor_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// 개발자 모드 다이얼로그
@@ -118,7 +120,7 @@ class _DeveloperModeDialogContentState extends State<_DeveloperModeDialogContent
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
   }
 
   @override
@@ -154,6 +156,10 @@ class _DeveloperModeDialogContentState extends State<_DeveloperModeDialogContent
                 icon: Icon(Icons.notifications, size: 20),
                 text: '알림 테스트',
               ),
+              Tab(
+                icon: Icon(Icons.timer_off, size: 20),
+                text: '세션 관리',
+              ),
             ],
           ),
         ),
@@ -180,6 +186,7 @@ class _DeveloperModeDialogContentState extends State<_DeveloperModeDialogContent
                   selectedPercentTestValues.addAll(values);
                 }),
               ),
+              _SessionManagementTab(settingsService: widget.settingsService),
             ],
           ),
         ),
@@ -1678,6 +1685,324 @@ class _LogViewerWidgetState extends State<_LogViewerWidget> {
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// 세션 관리 탭
+class _SessionManagementTab extends StatefulWidget {
+  final SettingsService settingsService;
+
+  const _SessionManagementTab({
+    required this.settingsService,
+  });
+
+  @override
+  State<_SessionManagementTab> createState() => _SessionManagementTabState();
+}
+
+class _SessionManagementTabState extends State<_SessionManagementTab> {
+  bool _isResetting = false;
+  String? _sessionInfo;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSessionInfo();
+  }
+
+  Future<void> _loadSessionInfo() async {
+    try {
+      // ChargingSessionService는 싱글톤이므로 바로 가져올 수 있음
+      final sessionService = ChargingSessionService();
+      
+      // ChargingMonitorController는 새로 생성해서 정보 확인
+      // (실제로는 RealtimeChargingMonitor에서 생성되지만, 개발자 모드에서는 새로 생성)
+      final monitorController = ChargingMonitorController();
+      
+      final sessionStartTime = sessionService.sessionStartTime;
+      final monitorStartTime = monitorController.sessionStartTime;
+      final sessionState = sessionService.sessionState;
+      final isSessionActive = sessionService.isSessionActive;
+      
+      final info = StringBuffer();
+      info.writeln('=== 세션 정보 ===');
+      info.writeln('세션 서비스 시작 시간: ${sessionStartTime?.toIso8601String() ?? "null"}');
+      info.writeln('모니터 컨트롤러 시작 시간: ${monitorStartTime?.toIso8601String() ?? "null"}');
+      info.writeln('세션 상태: ${sessionState.name}');
+      info.writeln('세션 활성화 여부: $isSessionActive');
+      
+      if (sessionStartTime != null) {
+        final elapsed = DateTime.now().difference(sessionStartTime);
+        info.writeln('경과 시간: ${elapsed.inMinutes}분 ${elapsed.inSeconds % 60}초');
+      }
+      
+      // 컨트롤러 정리
+      monitorController.dispose();
+      
+      setState(() {
+        _sessionInfo = info.toString();
+      });
+    } catch (e) {
+      setState(() {
+        _sessionInfo = '세션 정보 로드 실패: $e';
+      });
+    }
+  }
+
+  Future<void> _resetSession() async {
+    if (_isResetting) return;
+    
+    // 확인 다이얼로그 표시
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('세션 리셋'),
+        content: const Text(
+          '충전 세션 시작 시간을 강제로 리셋하시겠습니까?\n\n'
+          '이 작업은 다음을 수행합니다:\n'
+          '• 세션 시작 시간을 null로 설정\n'
+          '• 지속 시간 타이머 중지\n'
+          '• 새 세션이 0분 0초부터 시작되도록 초기화',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.error,
+            ),
+            child: const Text('리셋'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() {
+      _isResetting = true;
+    });
+
+    try {
+      // PHASE 2, 3에서 구현할 리셋 메서드 호출
+      await _performReset();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white, size: 20),
+                SizedBox(width: 8),
+                Text('세션이 성공적으로 리셋되었습니다'),
+              ],
+            ),
+            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+      
+      // 세션 정보 다시 로드
+      await _loadSessionInfo();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('세션 리셋 실패: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isResetting = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _performReset() async {
+    // ChargingSessionService는 싱글톤이므로 바로 가져올 수 있음
+    final sessionService = ChargingSessionService();
+    
+    // ChargingMonitorController는 새로 생성해서 리셋
+    // (실제로는 RealtimeChargingMonitor에서 생성되지만, 개발자 모드에서는 새로 생성)
+    final monitorController = ChargingMonitorController();
+    
+    try {
+      // 세션 서비스 리셋
+      sessionService.forceResetSession();
+      
+      // 모니터 컨트롤러 리셋
+      monitorController.forceResetSession();
+      
+      // 컨트롤러 정리
+      monitorController.dispose();
+      
+      debugPrint('개발자 모드: 세션 강제 리셋 완료');
+    } catch (e) {
+      debugPrint('개발자 모드: 세션 강제 리셋 실패 - $e');
+      rethrow;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 설명 카드
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      size: 20,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '세션 관리',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  '충전 세션의 시작 시간을 강제로 리셋할 수 있습니다. '
+                  '리셋 후 새로운 충전 세션이 시작되면 0분 0초부터 카운팅됩니다.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          const SizedBox(height: 20),
+          
+          // 세션 정보 카드
+          Card(
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(
+                color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.info,
+                            size: 20,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '현재 세션 정보',
+                            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.refresh, size: 20),
+                        onPressed: _loadSessionInfo,
+                        tooltip: '새로고침',
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  if (_sessionInfo != null)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.black,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+                        ),
+                      ),
+                      child: SelectableText(
+                        _sessionInfo!,
+                        style: const TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 11,
+                          color: Colors.green,
+                          height: 1.4,
+                        ),
+                      ),
+                    )
+                  else
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(20),
+                        child: CircularProgressIndicator(),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          
+          const SizedBox(height: 20),
+          
+          // 리셋 버튼
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _isResetting ? null : _resetSession,
+              icon: _isResetting
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.restart_alt),
+              label: Text(_isResetting ? '리셋 중...' : '세션 강제 리셋'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                backgroundColor: Theme.of(context).colorScheme.errorContainer,
+                foregroundColor: Theme.of(context).colorScheme.onErrorContainer,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
