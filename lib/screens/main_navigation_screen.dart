@@ -18,6 +18,7 @@ class MainNavigationScreen extends StatefulWidget {
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> with WidgetsBindingObserver {
   int _currentIndex = 0;
+  late PageController _pageController;
   
   // Pro 모드 상태 관리 (실제 결제 시스템과 연동 예정)
   // ignore: prefer_final_fields
@@ -45,6 +46,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
   @override
   void initState() {
     super.initState();
+    _pageController = PageController(initialPage: _currentIndex);
     WidgetsBinding.instance.addObserver(this);
     
     // 앱 초기 실행 시 권한 체크 및 요청
@@ -55,6 +57,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
   
   @override
   void dispose() {
+    _pageController.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -191,13 +194,23 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _pages[_currentIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) {
+      body: PageView(
+        controller: _pageController,
+        onPageChanged: (index) {
           setState(() {
             _currentIndex = index;
           });
+        },
+        children: _pages,
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        onTap: (index) {
+          _pageController.animateToPage(
+            index,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+          );
         },
         type: BottomNavigationBarType.fixed,
         backgroundColor: Theme.of(context).colorScheme.surface,
