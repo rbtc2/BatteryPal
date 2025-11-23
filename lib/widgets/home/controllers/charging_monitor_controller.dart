@@ -158,6 +158,7 @@ class ChargingMonitorController extends ChangeNotifier {
   /// PHASE 4: 다른 충전기 감지 후 새 세션 시작 시 즉시 동기화
   /// PHASE 5: 세션 시작 시간 동기화 로직 최적화 및 중복 처리 방지
   /// PHASE 6-1: 완전 종료 후 새 세션 감지 로직 추가 - 이전 세션 시간이 남아있지 않도록 보장
+  /// FIX: 새 세션이 시작될 때 항상 0분 0초부터 시작하도록 보장
   void _handleSessionActivated() {
     // 세션 서비스의 시작 시간과 동기화
     final sessionStartTime = _sessionService.sessionStartTime;
@@ -168,48 +169,37 @@ class ChargingMonitorController extends ChangeNotifier {
       return;
     }
     
-    // PHASE 6-1 & 6-3: 새 세션인지 재활성화인지 명확히 구분
+    // FIX: 새 세션인지 재활성화인지 명확히 구분
     // 1. 모니터 컨트롤러의 세션 시작 시간이 null이면 → 새 세션 (완전 종료 후 재시작)
-    // 2. 모니터 컨트롤러의 시간이 있지만, 세션 서비스의 시간이 더 최신이면 → 새 세션 (완전 종료 후 재시작)
+    // 2. 세션 서비스의 시간이 모니터 컨트롤러의 시간보다 최신이면 → 새 세션 (완전 종료 후 재시작)
     // 3. 세션 서비스의 시간이 모니터 컨트롤러의 시간보다 오래되었으면 → 재활성화 (ending 상태에서 재연결)
     
     final isNewSession = _sessionStartTime == null;
     
-    // PHASE 6-3: 시간 차이 기반 새 세션 판단
-    // 세션 서비스의 시간이 모니터 컨트롤러의 시간보다 최신이면 새 세션으로 간주
+    // FIX: 세션 서비스의 시간이 모니터 컨트롤러의 시간보다 최신이면 무조건 새 세션으로 간주
     // (완전 종료 후 재시작한 경우를 확실히 감지)
     bool isNewSessionAfterCompleteEnd = false;
     Duration? timeDiff;
     
     if (_sessionStartTime != null && sessionStartTime.isAfter(_sessionStartTime!)) {
       timeDiff = sessionStartTime.difference(_sessionStartTime!);
-      // 10초 이상 차이나면 확실히 새 세션 (완전 종료 후 재시작)
-      // 10초 미만이면 재활성화일 수 있으므로 추가 확인 필요
-      if (timeDiff.inSeconds >= 10) {
-        // 10초 이상 차이: 확실히 새 세션 (완전 종료 후 재시작)
-        isNewSessionAfterCompleteEnd = true;
-      } else {
-        // 10초 미만 차이: 세션 상태 확인
-        // active 상태면 새 세션, ending 상태면 재활성화 가능성
-        if (sessionState == SessionState.active) {
-          // active 상태면 이미 새 세션이 시작된 것
-          isNewSessionAfterCompleteEnd = true;
-        }
-        // ending 상태면 재활성화로 간주 (isNewSessionAfterCompleteEnd = false 유지)
-      }
+      // 세션 서비스의 시간이 더 최신이면 무조건 새 세션으로 간주
+      // (완전 종료 후 재시작한 경우)
+      isNewSessionAfterCompleteEnd = true;
+      debugPrint('ChargingMonitorController: 새 세션 감지 (세션 서비스 시간이 더 최신) - 이전: $_sessionStartTime, 새: $sessionStartTime, 차이: ${timeDiff.inSeconds}초');
     }
     
-    // PHASE 6-1 & 6-3: 완전 종료 후 새 세션인 경우
+    // FIX: 완전 종료 후 새 세션인 경우
     // 이전 세션의 시간이 남아있어도 무시하고 새 세션 시간으로 강제 업데이트
     if (isNewSession || isNewSessionAfterCompleteEnd) {
-      // 새 세션 시작: 세션 서비스의 시간 사용 (0초부터 시작)
+      // 새 세션 시작: 세션 서비스의 시간 사용 (0분 0초부터 시작)
       final previousTime = _sessionStartTime;
       _sessionStartTime = sessionStartTime;
       
       if (isNewSession) {
-        debugPrint('ChargingMonitorController: 새 세션 시작 (완전 종료 후) - 시작 시간: $_sessionStartTime');
+        debugPrint('ChargingMonitorController: ✅ 새 세션 시작 (완전 종료 후) - 시작 시간: $_sessionStartTime (0분 0초부터 시작)');
       } else {
-        debugPrint('ChargingMonitorController: 새 세션 시작 (완전 종료 후 재시작, 이전 시간 무시) - 이전: $previousTime, 새: $sessionStartTime, 차이: ${timeDiff!.inSeconds}초');
+        debugPrint('ChargingMonitorController: ✅ 새 세션 시작 (완전 종료 후 재시작, 이전 시간 무시) - 이전: $previousTime, 새: $sessionStartTime, 차이: ${timeDiff!.inSeconds}초 (0분 0초부터 시작)');
       }
       
       notifyListeners();
