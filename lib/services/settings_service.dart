@@ -312,6 +312,38 @@ class SettingsService extends ChangeNotifier {
     _autoSave();
   }
 
+  /// 과충전 방지 알림 활성화 설정 변경
+  void updateOverchargeProtection(bool enabled) {
+    _appSettings = _appSettings.copyWith(
+      overchargeProtectionEnabled: enabled,
+      lastUpdated: DateTime.now(),
+    );
+    notifyListeners();
+    _autoSave();
+  }
+
+  /// 과충전 알림 속도 설정 변경
+  /// 
+  /// [speed]: 'fast', 'normal', 'slow' 중 하나
+  void updateOverchargeAlertSpeed(String speed) {
+    _appSettings = _appSettings.copyWith(
+      overchargeAlertSpeed: speed,
+      lastUpdated: DateTime.now(),
+    );
+    notifyListeners();
+    _autoSave();
+  }
+
+  /// 온도 기반 알림 조정 설정 변경
+  void updateTemperatureBasedAdjustment(bool enabled) {
+    _appSettings = _appSettings.copyWith(
+      temperatureBasedAdjustment: enabled,
+      lastUpdated: DateTime.now(),
+    );
+    notifyListeners();
+    _autoSave();
+  }
+
   /// Phase 4: 백그라운드 데이터 수집 설정 변경
   void updateBackgroundDataCollection(bool enabled) {
     _appSettings = _appSettings.copyWith(

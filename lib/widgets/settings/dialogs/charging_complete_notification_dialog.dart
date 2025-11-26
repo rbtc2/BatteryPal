@@ -92,6 +92,94 @@ class ChargingCompleteNotificationDialog extends StatelessWidget {
                       ),
                     ),
                   ),
+                
+                const SizedBox(height: 24),
+                const Divider(),
+                const SizedBox(height: 16),
+                
+                // 과충전 방지 설정
+                const Text(
+                  '과충전 방지 알림',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SwitchListTile(
+                  title: const Text('과충전 방지 알림 활성화'),
+                  subtitle: const Text('100% 도달 후 과충전 경고 알림 받기'),
+                  value: settingsService.appSettings.overchargeProtectionEnabled,
+                  onChanged: (value) {
+                    settingsService.updateOverchargeProtection(value);
+                    setState(() {});
+                  },
+                  contentPadding: EdgeInsets.zero,
+                ),
+                
+                // 알림 속도 설정 (과충전 방지 활성화 시에만 표시)
+                if (settingsService.appSettings.overchargeProtectionEnabled) ...[
+                  const SizedBox(height: 8),
+                  const Text(
+                    '알림 속도',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  RadioListTile<String>(
+                    title: const Text('빠름'),
+                    subtitle: const Text('기본값의 50% (더 빠른 알림)'),
+                    value: 'fast',
+                    groupValue: settingsService.appSettings.overchargeAlertSpeed,
+                    onChanged: (value) {
+                      if (value != null) {
+                        settingsService.updateOverchargeAlertSpeed(value);
+                        setState(() {});
+                      }
+                    },
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  RadioListTile<String>(
+                    title: const Text('보통'),
+                    subtitle: const Text('기본값 (권장)'),
+                    value: 'normal',
+                    groupValue: settingsService.appSettings.overchargeAlertSpeed,
+                    onChanged: (value) {
+                      if (value != null) {
+                        settingsService.updateOverchargeAlertSpeed(value);
+                        setState(() {});
+                      }
+                    },
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  RadioListTile<String>(
+                    title: const Text('느림'),
+                    subtitle: const Text('기본값의 150% (더 느린 알림)'),
+                    value: 'slow',
+                    groupValue: settingsService.appSettings.overchargeAlertSpeed,
+                    onChanged: (value) {
+                      if (value != null) {
+                        settingsService.updateOverchargeAlertSpeed(value);
+                        setState(() {});
+                      }
+                    },
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  
+                  const SizedBox(height: 8),
+                  SwitchListTile(
+                    title: const Text('온도 기반 알림 조정'),
+                    subtitle: const Text('온도 40°C 이상 시 알림 타이밍 50% 단축'),
+                    value: settingsService.appSettings.temperatureBasedAdjustment,
+                    onChanged: (value) {
+                      settingsService.updateTemperatureBasedAdjustment(value);
+                      setState(() {});
+                    },
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ],
               ],
             ],
           ),

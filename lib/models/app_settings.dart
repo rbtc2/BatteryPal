@@ -23,6 +23,11 @@ class AppSettings {
   final bool chargingCompleteNotifyOnFastCharging; // 고속 충전(AC) 시에만 알림
   final bool chargingCompleteNotifyOnNormalCharging; // 일반 충전(USB/Wireless) 시에만 알림
   
+  // 과충전 방지 알림 설정
+  final bool overchargeProtectionEnabled; // 과충전 방지 알림 활성화
+  final String overchargeAlertSpeed; // 알림 속도 ('fast', 'normal', 'slow')
+  final bool temperatureBasedAdjustment; // 온도 기반 알림 조정 활성화
+  
   // 충전 퍼센트 알림 설정
   final bool chargingPercentNotificationEnabled; // 충전 퍼센트 알림 활성화
   final List<double> chargingPercentThresholds; // 알림 받을 퍼센트 목록 [70, 80, 90, 100]
@@ -62,6 +67,11 @@ class AppSettings {
     // 충전 완료 알림 설정 기본값
     this.chargingCompleteNotifyOnFastCharging = true,
     this.chargingCompleteNotifyOnNormalCharging = true,
+    
+    // 과충전 방지 알림 설정 기본값
+    this.overchargeProtectionEnabled = true, // 기본값: 활성화
+    this.overchargeAlertSpeed = 'normal', // 기본값: 보통
+    this.temperatureBasedAdjustment = true, // 기본값: 활성화
     
     // 충전 퍼센트 알림 설정 기본값
     this.chargingPercentNotificationEnabled = false,
@@ -109,6 +119,11 @@ class AppSettings {
       'chargingCompleteNotifyOnFastCharging': chargingCompleteNotifyOnFastCharging,
       'chargingCompleteNotifyOnNormalCharging': chargingCompleteNotifyOnNormalCharging,
       
+      // 과충전 방지 알림 설정
+      'overchargeProtectionEnabled': overchargeProtectionEnabled,
+      'overchargeAlertSpeed': overchargeAlertSpeed,
+      'temperatureBasedAdjustment': temperatureBasedAdjustment,
+      
       // 충전 퍼센트 알림 설정
       'chargingPercentNotificationEnabled': chargingPercentNotificationEnabled,
       'chargingPercentThresholds': chargingPercentThresholds,
@@ -152,6 +167,11 @@ class AppSettings {
       // 충전 완료 알림 설정
       chargingCompleteNotifyOnFastCharging: json['chargingCompleteNotifyOnFastCharging'] ?? true,
       chargingCompleteNotifyOnNormalCharging: json['chargingCompleteNotifyOnNormalCharging'] ?? true,
+      
+      // 과충전 방지 알림 설정
+      overchargeProtectionEnabled: json['overchargeProtectionEnabled'] ?? true,
+      overchargeAlertSpeed: json['overchargeAlertSpeed'] ?? 'normal',
+      temperatureBasedAdjustment: json['temperatureBasedAdjustment'] ?? true,
       
       // 충전 퍼센트 알림 설정
       chargingPercentNotificationEnabled: json['chargingPercentNotificationEnabled'] ?? false,
@@ -217,6 +237,11 @@ class AppSettings {
     bool? chargingCompleteNotifyOnFastCharging,
     bool? chargingCompleteNotifyOnNormalCharging,
     
+    // 과충전 방지 알림 설정
+    bool? overchargeProtectionEnabled,
+    String? overchargeAlertSpeed,
+    bool? temperatureBasedAdjustment,
+    
     // 충전 퍼센트 알림 설정
     bool? chargingPercentNotificationEnabled,
     List<double>? chargingPercentThresholds,
@@ -256,6 +281,11 @@ class AppSettings {
       // 충전 완료 알림 설정
       chargingCompleteNotifyOnFastCharging: chargingCompleteNotifyOnFastCharging ?? this.chargingCompleteNotifyOnFastCharging,
       chargingCompleteNotifyOnNormalCharging: chargingCompleteNotifyOnNormalCharging ?? this.chargingCompleteNotifyOnNormalCharging,
+      
+      // 과충전 방지 알림 설정
+      overchargeProtectionEnabled: overchargeProtectionEnabled ?? this.overchargeProtectionEnabled,
+      overchargeAlertSpeed: overchargeAlertSpeed ?? this.overchargeAlertSpeed,
+      temperatureBasedAdjustment: temperatureBasedAdjustment ?? this.temperatureBasedAdjustment,
       
       // 충전 퍼센트 알림 설정
       chargingPercentNotificationEnabled: chargingPercentNotificationEnabled ?? this.chargingPercentNotificationEnabled,

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'native_battery_service.dart';
 import '../models/models.dart';
 import 'settings_service.dart';
+import 'notification_service.dart';
 import 'battery/battery_info_validator.dart';
 import 'battery/battery_data_collector.dart';
 import 'battery/charging_current_monitor.dart';
@@ -53,6 +54,11 @@ class BatteryService {
   /// SettingsService 설정 (선택적)
   void setSettingsService(SettingsService? settingsService) {
     _notificationManager.setSettingsService(settingsService);
+    
+    // 알림 액션 핸들러 설정
+    NotificationService.setActionHandler((actionId, payload) {
+      _notificationManager.handleNotificationAction(actionId, payload);
+    });
   }
   
   Stream<BatteryInfo> get batteryInfoStream {
@@ -288,6 +294,11 @@ class BatteryService {
     await _notificationManager.checkChargingPercentNotification(
       batteryInfo,
       previousLevel,
+    );
+    
+    // 과충전 방지 알림 체크
+    await _notificationManager.checkOverchargeNotification(
+      batteryInfo,
     );
     
     // 개발자 모드 충전 시작/종료 알림 체크

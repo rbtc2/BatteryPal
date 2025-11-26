@@ -111,8 +111,69 @@ class NotificationService {
 
   /// 알림 탭 처리
   static void _onNotificationTapped(NotificationResponse response) {
-    debugPrint('알림 탭됨: ${response.payload}');
-    // 필요시 알림 탭 시 처리 로직 추가
+    debugPrint('알림 탭됨: ${response.payload}, actionId: ${response.actionId}');
+    
+    // 액션 ID에 따른 처리
+    if (response.actionId != null) {
+      _handleNotificationAction(response.actionId!, response.payload);
+    } else if (response.payload != null) {
+      // 페이로드가 있으면 처리
+      _handleNotificationPayload(response.payload!);
+    }
+  }
+  
+  // 알림 액션 처리 콜백 (BatteryNotificationManager에서 설정)
+  static Function(String actionId, String? payload)? _actionHandler;
+  
+  /// 알림 액션 핸들러 설정
+  static void setActionHandler(Function(String actionId, String? payload)? handler) {
+    _actionHandler = handler;
+  }
+  
+  /// 알림 액션 처리
+  static void _handleNotificationAction(String actionId, String? payload) {
+    try {
+      debugPrint('알림 액션 처리: $actionId, payload: $payload');
+      
+      // 외부 핸들러가 있으면 호출
+      final handler = _actionHandler;
+      if (handler != null) {
+        try {
+          handler(actionId, payload);
+        } catch (e, stackTrace) {
+          debugPrint('알림 액션 핸들러 실행 중 에러 발생: $e');
+          debugPrint('스택 트레이스: $stackTrace');
+        }
+        return;
+      }
+      
+      // 기본 처리
+      switch (actionId) {
+        case 'dismiss':
+          // 알림 끄기 - 이번 충전 세션 동안 알림 중지
+          debugPrint('알림 끄기 액션 처리');
+          break;
+        case 'remind_5min':
+          // 5분 후 다시 알림
+          debugPrint('5분 후 다시 알림 액션 처리');
+          break;
+        case 'open_app':
+          // 앱 열기 - 기본 동작 (이미 구현됨)
+          debugPrint('앱 열기 액션 처리');
+          break;
+        default:
+          debugPrint('알 수 없는 액션: $actionId');
+      }
+    } catch (e, stackTrace) {
+      debugPrint('알림 액션 처리 중 에러 발생: $e');
+      debugPrint('스택 트레이스: $stackTrace');
+    }
+  }
+  
+  /// 알림 페이로드 처리
+  static void _handleNotificationPayload(String payload) {
+    debugPrint('알림 페이로드 처리: $payload');
+    // 필요시 페이로드 기반 처리 로직 추가
   }
 
   /// 충전 완료 알림 표시
@@ -301,6 +362,175 @@ class NotificationService {
       debugPrint('충전 종료 알림 표시됨: $message');
     } catch (e) {
       debugPrint('충전 종료 알림 표시 실패: $e');
+    }
+  }
+
+  /// 과충전 경고 알림 표시
+  /// 
+  /// [minutes]: 100% 도달 후 경과 시간 (분)
+  /// [level]: 알림 단계 (1: 1차, 2: 2차, 3: 3차)
+  /// [message]: 알림 메시지
+  /// [chargingSpeed]: 충전 속도 타입 ('ultra_fast', 'fast', 'normal')
+  /// [temperature]: 배터리 온도 (선택적)
+  Future<void> showOverchargeWarningNotification({
+    required int minutes,
+    required int level,
+    required String message,
+    String? chargingSpeed,
+    double? temperature,
+  }) async {
+    try {
+      if (!_isInitialized) {
+        debugPrint('알림 서비스가 초기화되지 않았습니다. 초기화 시도...');
+        await initialize();
+      }
+
+      // 입력값 검증
+      if (minutes < 0) {
+        debugPrint('경과 시간이 음수입니다: $minutes');
+        return;
+      }
+      
+      if (level < 1 || level > 3) {
+        debugPrint('알림 단계가 유효하지 않습니다: $level');
+        return;
+      }
+
+      // 알림 단계에 따라 중요도 조정
+      final importance = level >= 3 
+          ? Importance.max 
+          : Importance.high;
+      
+      final priority = level >= 3 
+          ? Priority.max 
+          : Priority.high;
+
+      // 상황별 맞춤 메시지 생성
+      String enhancedMessage = _buildEnhancedMessage(
+        message: message,
+        minutes: minutes,
+        level: level,
+        chargingSpeed: chargingSpeed,
+        temperature: temperature,
+      );
+
+      // 알림 액션 버튼 정의
+      final actions = <AndroidNotificationAction>[
+        const AndroidNotificationAction(
+          'dismiss',
+          '알림 끄기',
+          showsUserInterface: false,
+        ),
+        const AndroidNotificationAction(
+          'remind_5min',
+          '5분 후 다시',
+          showsUserInterface: false,
+        ),
+      ];
+
+      final AndroidNotificationDetails androidDetails =
+          AndroidNotificationDetails(
+        'battery_charging_channel',
+        '배터리 충전 알림',
+        channelDescription: '배터리 충전 상태에 대한 알림을 받습니다.',
+        importance: importance,
+        priority: priority,
+        showWhen: true,
+        enableVibration: true,
+        playSound: level >= 2, // 2차 이상 알림만 소리 재생
+        actions: actions,
+        styleInformation: BigTextStyleInformation(
+          enhancedMessage,
+          contentTitle: level >= 3 
+              ? '⚠️ 과충전 위험'
+              : level >= 2 
+                  ? '⚠️ 과충전 주의'
+                  : '충전 완료',
+        ),
+      );
+
+      const DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      );
+
+      final NotificationDetails notificationDetails = NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
+      );
+
+      final title = level >= 3 
+          ? '⚠️ 과충전 위험'
+          : level >= 2 
+              ? '⚠️ 과충전 주의'
+              : '충전 완료';
+
+      // 알림 ID: 3000 + level (과충전 알림용)
+      final notificationId = 3000 + level;
+      
+      // 페이로드에 정보 포함
+      final payload = 'overcharge|$level|$minutes|${chargingSpeed ?? 'unknown'}|${temperature ?? -1}';
+
+      await _notifications.show(
+        notificationId,
+        title,
+        enhancedMessage,
+        notificationDetails,
+        payload: payload,
+      );
+
+      debugPrint('과충전 경고 알림 표시됨: $title - $enhancedMessage (경과: ${minutes}분)');
+    } catch (e, stackTrace) {
+      debugPrint('과충전 경고 알림 표시 실패: $e');
+      debugPrint('스택 트레이스: $stackTrace');
+    }
+  }
+  
+  /// 상황별 맞춤 메시지 생성
+  String _buildEnhancedMessage({
+    required String message,
+    required int minutes,
+    required int level,
+    String? chargingSpeed,
+    double? temperature,
+  }) {
+    try {
+      final buffer = StringBuffer(message);
+      
+      // 온도 정보 추가
+      if (temperature != null && temperature >= 40.0) {
+        buffer.write('\n\n🌡️ 배터리 온도: ${temperature.toStringAsFixed(1)}°C');
+        buffer.write('\n온도가 높아 즉시 분리 권장합니다.');
+      }
+      
+      // 충전 속도 정보 추가
+      if (chargingSpeed != null) {
+        final speedText = _getChargingSpeedText(chargingSpeed);
+        buffer.write('\n⚡ $speedText');
+      }
+      
+      // 경과 시간 정보 추가
+      buffer.write('\n⏱️ 100% 도달 후 ${minutes}분 경과');
+      
+      return buffer.toString();
+    } catch (e) {
+      debugPrint('메시지 생성 중 에러 발생: $e');
+      return message; // 에러 발생 시 기본 메시지 반환
+    }
+  }
+  
+  /// 충전 속도 텍스트 가져오기
+  String _getChargingSpeedText(String chargingSpeed) {
+    switch (chargingSpeed) {
+      case 'ultra_fast':
+        return '초고속 충전';
+      case 'fast':
+        return '고속 충전';
+      case 'normal':
+        return '일반 충전';
+      default:
+        return '충전';
     }
   }
 
