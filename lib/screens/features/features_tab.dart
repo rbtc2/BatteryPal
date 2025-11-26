@@ -299,8 +299,8 @@ class _FeaturesTabState extends State<FeaturesTab> with TickerProviderStateMixin
                         ? (Theme.of(context).brightness == Brightness.light
                             ? LinearGradient(
                                 colors: [
-                                  Colors.green[400]!.withValues(alpha: 0.15),
-                                  Colors.teal[400]!.withValues(alpha: 0.15),
+                                  Colors.green[400]!.withValues(alpha: 0.2),
+                                  Colors.teal[400]!.withValues(alpha: 0.2),
                                 ],
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
@@ -321,7 +321,7 @@ class _FeaturesTabState extends State<FeaturesTab> with TickerProviderStateMixin
                     border: Border.all(
                       color: isCharging
                           ? (Theme.of(context).brightness == Brightness.light
-                              ? Colors.green[400]!.withValues(alpha: 0.3)
+                              ? Colors.green[400]!.withValues(alpha: 0.4)
                               : Theme.of(context).colorScheme.primary.withValues(alpha: 0.3))
                           : Colors.grey.withValues(alpha: 0.2),
                       width: 1,
@@ -335,9 +335,19 @@ class _FeaturesTabState extends State<FeaturesTab> with TickerProviderStateMixin
                         height: 6,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
+                          gradient: isCharging && Theme.of(context).brightness == Brightness.light
+                              ? LinearGradient(
+                                  colors: [
+                                    Colors.green[400]!,
+                                    Colors.teal[400]!,
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                )
+                              : null,
                           color: isCharging
                               ? (Theme.of(context).brightness == Brightness.light
-                                  ? Colors.green[400]!
+                                  ? null
                                   : Theme.of(context).colorScheme.primary)
                               : Colors.grey.shade600,
                         ),
@@ -350,7 +360,7 @@ class _FeaturesTabState extends State<FeaturesTab> with TickerProviderStateMixin
                           fontWeight: FontWeight.w600,
                           color: isCharging
                               ? (Theme.of(context).brightness == Brightness.light
-                                  ? Colors.green[700]!
+                                  ? Colors.green[600]!
                                   : Theme.of(context).colorScheme.primary)
                               : Colors.grey.shade700,
                         ),
