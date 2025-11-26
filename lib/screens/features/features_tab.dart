@@ -410,38 +410,12 @@ class _FeaturesTabState extends State<FeaturesTab> with TickerProviderStateMixin
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          const Text(
-                            '배터리 알림',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          if (!widget.isProUser) ...[
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: Colors.amber.withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(4),
-                                border: Border.all(
-                                  color: Colors.amber.withValues(alpha: 0.5),
-                                  width: 1,
-                                ),
-                              ),
-                              child: const Text(
-                                'Pro',
-                                style: TextStyle(
-                                  color: Colors.amber,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
+                      const Text(
+                        '배터리 알림',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -493,54 +467,15 @@ class _FeaturesTabState extends State<FeaturesTab> with TickerProviderStateMixin
                   ),
                   Switch(
                     value: isNotificationsEnabled,
-                    onChanged: widget.isProUser
-                        ? (value) {
-                            _settingsService.updateBatteryNotifications(value);
-                          }
-                        : null,
+                    onChanged: (value) {
+                      _settingsService.updateBatteryNotifications(value);
+                    },
                   ),
                 ],
               ),
             ),
             
-            if (!widget.isProUser) ...[
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.amber.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: Colors.amber.withValues(alpha: 0.3),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.info_outline,
-                      size: 16,
-                      color: Colors.amber.shade700,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Pro 기능입니다. 업그레이드하여 모든 알림 기능을 사용하세요.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.amber.shade700,
-                        ),
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: widget.onProToggle,
-                      child: const Text('업그레이드'),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-            
-            if (isNotificationsEnabled && widget.isProUser) ...[
+            if (isNotificationsEnabled) ...[
               const SizedBox(height: 24),
               const Divider(),
               const SizedBox(height: 16),
@@ -888,7 +823,7 @@ class _FeaturesTabState extends State<FeaturesTab> with TickerProviderStateMixin
         
         // PageView 기반 미리보기
         Container(
-          height: 360,
+          height: 450,
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
             borderRadius: BorderRadius.circular(16),

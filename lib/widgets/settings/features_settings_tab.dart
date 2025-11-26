@@ -72,7 +72,7 @@ class FeaturesSettingsTab extends StatelessWidget {
               
               const SizedBox(height: 16),
               
-              // 배터리 알림 설정 (Pro 기능)
+              // 배터리 알림 설정
               _buildFeatureSettingsCard(
                 context,
                 '배터리 알림',
@@ -98,7 +98,7 @@ class FeaturesSettingsTab extends StatelessWidget {
                     onTap: () => ChargingPercentNotificationDialog.show(context, settingsService),
                   ),
                 ],
-                isProFeature: true,
+                isProFeature: false,
                 isProUser: isProUser,
               ),
               
