@@ -5,8 +5,10 @@ import 'package:permission_handler/permission_handler.dart';
 import '../../../services/settings_service.dart';
 import '../../../services/notification_service.dart';
 import '../../../services/system_settings_service.dart';
-import '../../../screens/analysis/widgets/charging_patterns/services/charging_session_service.dart';
-import '../../../widgets/home/controllers/charging_monitor_controller.dart';
+// 분석 탭 제거로 인해 주석 처리 (backup/analysis/)
+// // 분석 탭 제거로 인해 주석 처리 (backup/analysis/)
+// import '../../../screens/analysis/widgets/charging_patterns/services/charging_session_service.dart';
+// import '../../../widgets/home/controllers/charging_monitor_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// 개발자 모드 다이얼로그
@@ -1713,12 +1715,14 @@ class _SessionManagementTabState extends State<_SessionManagementTab> {
   }
 
   Future<void> _loadSessionInfo() async {
+    // 분석 탭 제거로 인해 주석 처리 (backup/analysis/)
+    return; // 분석 탭 제거로 인해 비활성화
+    
+    // 분석 탭 제거로 인해 주석 처리 (backup/analysis/)
+    // 아래 코드는 모두 주석 처리됨
+    /*
     try {
-      // ChargingSessionService는 싱글톤이므로 바로 가져올 수 있음
       final sessionService = ChargingSessionService();
-      
-      // ChargingMonitorController는 새로 생성해서 정보 확인
-      // (실제로는 RealtimeChargingMonitor에서 생성되지만, 개발자 모드에서는 새로 생성)
       final monitorController = ChargingMonitorController();
       
       final sessionStartTime = sessionService.sessionStartTime;
@@ -1749,6 +1753,7 @@ class _SessionManagementTabState extends State<_SessionManagementTab> {
         _sessionInfo = '세션 정보 로드 실패: $e';
       });
     }
+    */
   }
 
   Future<void> _resetSession() async {
@@ -1832,28 +1837,25 @@ class _SessionManagementTabState extends State<_SessionManagementTab> {
   }
 
   Future<void> _performReset() async {
-    // ChargingSessionService는 싱글톤이므로 바로 가져올 수 있음
-    final sessionService = ChargingSessionService();
+    // 분석 탭 제거로 인해 주석 처리 (backup/analysis/)
+    return; // 분석 탭 제거로 인해 비활성화
     
-    // ChargingMonitorController는 새로 생성해서 리셋
-    // (실제로는 RealtimeChargingMonitor에서 생성되지만, 개발자 모드에서는 새로 생성)
+    // 분석 탭 제거로 인해 주석 처리 (backup/analysis/)
+    // 아래 코드는 모두 주석 처리됨
+    /*
+    final sessionService = ChargingSessionService();
     final monitorController = ChargingMonitorController();
     
     try {
-      // 세션 서비스 리셋
       sessionService.forceResetSession();
-      
-      // 모니터 컨트롤러 리셋
       monitorController.forceResetSession();
-      
-      // 컨트롤러 정리
       monitorController.dispose();
-      
       debugPrint('개발자 모드: 세션 강제 리셋 완료');
     } catch (e) {
       debugPrint('개발자 모드: 세션 강제 리셋 실패 - $e');
       rethrow;
     }
+    */
   }
 
   @override

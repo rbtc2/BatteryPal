@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart';
 import '../models/models.dart';
 import '../services/battery_service.dart';
 import '../services/battery_history_database_service.dart';
-import '../screens/analysis/widgets/charging_patterns/models/charging_data_models.dart';
 
 /// 충전 전류 히스토리 관리 서비스 (싱글톤)
 /// Phase 1: 실시간 충전 전류 수집 및 메모리 저장

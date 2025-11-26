@@ -4,7 +4,8 @@ import 'app/battery_pal_app.dart';
 import 'services/notification_service.dart';
 import 'services/background_data_recovery_service.dart';
 import 'services/charging_current_history_service.dart';
-import 'screens/analysis/widgets/charging_patterns/services/charging_session_service.dart';
+// 분석 탭 제거로 인해 주석 처리 (backup/analysis/)
+// import 'screens/analysis/widgets/charging_patterns/services/charging_session_service.dart';
 import 'services/battery_history_service.dart';
 
 void main() async {
@@ -26,13 +27,14 @@ void main() async {
     debugPrint('충전 전류 히스토리 서비스 초기화 실패: $e');
   }
   
-  // 충전 세션 서비스 초기화
-  try {
-    await ChargingSessionService().initialize();
-    debugPrint('충전 세션 서비스 초기화 완료');
-  } catch (e) {
-    debugPrint('충전 세션 서비스 초기화 실패: $e');
-  }
+  // 충전 세션 서비스 초기화 (분석 탭 제거로 인해 주석 처리)
+  // 나중에 기능 탭에서 사용할 수 있으므로 백업됨 (backup/analysis/)
+  // try {
+  //   await ChargingSessionService().initialize();
+  //   debugPrint('충전 세션 서비스 초기화 완료');
+  // } catch (e) {
+  //   debugPrint('충전 세션 서비스 초기화 실패: $e');
+  // }
 
   // 배터리 히스토리 서비스 초기화 및 데이터 수집 시작
   try {

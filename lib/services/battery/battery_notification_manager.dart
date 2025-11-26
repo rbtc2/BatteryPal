@@ -538,7 +538,7 @@ class BatteryNotificationManager {
             );
             
             _overchargeAlertsSent.add(alertLevel);
-            debugPrint('과충전 알림 표시됨: ${alertLevel}단계 (경과: ${elapsedMinutes}분)');
+            debugPrint('과충전 알림 표시됨: $alertLevel단계 (경과: $elapsedMinutes분)');
           } catch (e, stackTrace) {
             debugPrint('과충전 알림 표시 실패: $e');
             debugPrint('스택 트레이스: $stackTrace');

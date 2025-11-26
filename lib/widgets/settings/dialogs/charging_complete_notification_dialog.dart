@@ -128,44 +128,40 @@ class ChargingCompleteNotificationDialog extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  RadioListTile<String>(
-                    title: const Text('빠름'),
-                    subtitle: const Text('기본값의 50% (더 빠른 알림)'),
-                    value: 'fast',
-                    groupValue: settingsService.appSettings.overchargeAlertSpeed,
-                    onChanged: (value) {
-                      if (value != null) {
-                        settingsService.updateOverchargeAlertSpeed(value);
+                  SegmentedButton<String>(
+                    segments: const [
+                      ButtonSegment<String>(
+                        value: 'fast',
+                        label: Text('빠름'),
+                        tooltip: '기본값의 50% (더 빠른 알림)',
+                      ),
+                      ButtonSegment<String>(
+                        value: 'normal',
+                        label: Text('보통'),
+                        tooltip: '기본값 (권장)',
+                      ),
+                      ButtonSegment<String>(
+                        value: 'slow',
+                        label: Text('느림'),
+                        tooltip: '기본값의 150% (더 느린 알림)',
+                      ),
+                    ],
+                    selected: {settingsService.appSettings.overchargeAlertSpeed},
+                    onSelectionChanged: (Set<String> newSelection) {
+                      if (newSelection.isNotEmpty) {
+                        settingsService.updateOverchargeAlertSpeed(newSelection.first);
                         setState(() {});
                       }
                     },
-                    contentPadding: EdgeInsets.zero,
                   ),
-                  RadioListTile<String>(
-                    title: const Text('보통'),
-                    subtitle: const Text('기본값 (권장)'),
-                    value: 'normal',
-                    groupValue: settingsService.appSettings.overchargeAlertSpeed,
-                    onChanged: (value) {
-                      if (value != null) {
-                        settingsService.updateOverchargeAlertSpeed(value);
-                        setState(() {});
-                      }
-                    },
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                  RadioListTile<String>(
-                    title: const Text('느림'),
-                    subtitle: const Text('기본값의 150% (더 느린 알림)'),
-                    value: 'slow',
-                    groupValue: settingsService.appSettings.overchargeAlertSpeed,
-                    onChanged: (value) {
-                      if (value != null) {
-                        settingsService.updateOverchargeAlertSpeed(value);
-                        setState(() {});
-                      }
-                    },
-                    contentPadding: EdgeInsets.zero,
+                  const SizedBox(height: 8),
+                  // 설명 텍스트
+                  Text(
+                    _getSpeedDescription(settingsService.appSettings.overchargeAlertSpeed),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
                   ),
                   
                   const SizedBox(height: 8),
@@ -192,6 +188,19 @@ class ChargingCompleteNotificationDialog extends StatelessWidget {
         ],
       ),
     );
+  }
+  
+  /// 알림 속도 설명 텍스트 가져오기
+  String _getSpeedDescription(String speed) {
+    switch (speed) {
+      case 'fast':
+        return '기본값의 50% (더 빠른 알림)';
+      case 'slow':
+        return '기본값의 150% (더 느린 알림)';
+      case 'normal':
+      default:
+        return '기본값 (권장)';
+    }
   }
 }
 

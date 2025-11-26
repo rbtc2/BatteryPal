@@ -2,7 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'native_battery_service.dart';
 import 'battery_history_database_service.dart';
 import 'charging_current_history_service.dart';
-import '../screens/analysis/widgets/charging_patterns/services/charging_session_service.dart';
+// 분석 탭 제거로 인해 주석 처리 (backup/analysis/)
+// import '../screens/analysis/widgets/charging_patterns/services/charging_session_service.dart';
 
 /// 백그라운드에서 수집된 데이터 복구 서비스
 /// 
@@ -16,7 +17,8 @@ class BackgroundDataRecoveryService {
 
   final BatteryHistoryDatabaseService _databaseService = BatteryHistoryDatabaseService();
   final ChargingCurrentHistoryService _chargingCurrentHistoryService = ChargingCurrentHistoryService();
-  final ChargingSessionService _chargingSessionService = ChargingSessionService();
+  // 분석 탭 제거로 인해 주석 처리 (backup/analysis/)
+  // final ChargingSessionService _chargingSessionService = ChargingSessionService();
   
   bool _isRecovering = false;
   DateTime? _lastRecoveryTime;
@@ -212,34 +214,36 @@ class BackgroundDataRecoveryService {
   }
 
   /// 충전 세션 복구 (Phase 2 개선)
+  /// 분석 탭 제거로 인해 주석 처리 (backup/analysis/)
   Future<void> _recoverChargingSession(
     ChargingSessionInfo sessionInfo,
     BackgroundDataInfo dataInfo,
   ) async {
-    try {
-      if (!dataInfo.hasBackgroundData) {
-        return;
-      }
-
-      debugPrint('BackgroundDataRecoveryService: 충전 세션 복구 시작...');
-      
-      // ChargingSessionService가 초기화되지 않았다면 초기화
-      if (!_chargingSessionService.isInitialized) {
-        await _chargingSessionService.initialize();
-      }
-
-      // Phase 2: ChargingSessionService의 _recoverBackgroundSession()이 
-      // 이미 initialize()에서 호출되므로, 여기서는 추가 복구가 필요 없음
-      // 다만, 명시적으로 복구를 강제하려면 서비스에 복구 메서드를 추가할 수 있음
-      
-      // 세션이 아직 진행 중인 경우, ChargingSessionService가 자동으로 감지할 수 있도록
-      // BatteryService의 현재 상태를 확인
-      // (ChargingSessionService는 BatteryService 스트림을 구독하므로 자동으로 처리됨)
-      
-      debugPrint('BackgroundDataRecoveryService: 충전 세션 복구 완료');
-    } catch (e) {
-      debugPrint('BackgroundDataRecoveryService: 충전 세션 복구 실패 - $e');
-    }
+    // 분석 탭 제거로 인해 주석 처리
+    // try {
+    //   if (!dataInfo.hasBackgroundData) {
+    //     return;
+    //   }
+    //
+    //   debugPrint('BackgroundDataRecoveryService: 충전 세션 복구 시작...');
+    //   
+    //   // ChargingSessionService가 초기화되지 않았다면 초기화
+    //   if (!_chargingSessionService.isInitialized) {
+    //     await _chargingSessionService.initialize();
+    //   }
+    //
+    //   // Phase 2: ChargingSessionService의 _recoverBackgroundSession()이 
+    //   // 이미 initialize()에서 호출되므로, 여기서는 추가 복구가 필요 없음
+    //   // 다만, 명시적으로 복구를 강제하려면 서비스에 복구 메서드를 추가할 수 있음
+    //   
+    //   // 세션이 아직 진행 중인 경우, ChargingSessionService가 자동으로 감지할 수 있도록
+    //   // BatteryService의 현재 상태를 확인
+    //   // (ChargingSessionService는 BatteryService 스트림을 구독하므로 자동으로 처리됨)
+    //   
+    //   debugPrint('BackgroundDataRecoveryService: 충전 세션 복구 완료');
+    // } catch (e) {
+    //   debugPrint('BackgroundDataRecoveryService: 충전 세션 복구 실패 - $e');
+    // }
   }
 
   /// 마지막 복구 시간 가져오기

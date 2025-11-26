@@ -1,5 +1,35 @@
 import 'package:flutter/material.dart';
 
+/// 충전 전류 원본 데이터 포인트 클래스
+/// 충전 전류 히스토리 서비스에서 사용하는 기본 데이터 모델
+class ChargingCurrentPoint {
+  final DateTime timestamp;  // 예: 2025-11-04 13:00:00
+  final int currentMa;        // 예: 500 (단위: mA)
+  
+  ChargingCurrentPoint({
+    required this.timestamp,
+    required this.currentMa,
+  });
+
+  @override
+  String toString() {
+    return 'ChargingCurrentPoint(timestamp: $timestamp, currentMa: ${currentMa}mA)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is ChargingCurrentPoint &&
+        other.timestamp == timestamp &&
+        other.currentMa == currentMa;
+  }
+
+  @override
+  int get hashCode {
+    return Object.hash(timestamp, currentMa);
+  }
+}
+
 /// 충전 속도 정보 모델
 /// 충전 속도 분석 결과를 담는 모델
 class ChargingSpeedInfo {

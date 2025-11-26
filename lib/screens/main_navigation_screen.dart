@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'home/home_tab.dart';
-import 'analysis/analysis_tab.dart';
+import 'features/features_tab.dart';
 import 'settings/settings_tab.dart';
 import '../services/battery_optimization_helper.dart';
 import '../services/system_settings_service.dart';
@@ -31,12 +31,14 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
   bool _hasShownNotificationPermissionPrompt = false;
 
   // 3개 탭 페이지들 (Pro 상태 전달)
+  // 분석 탭은 백업되어 제거됨 (backup/analysis/)
+  // Features 탭이 중간 탭으로 추가됨
   List<Widget> get _pages => [
     HomeTab(
       isProUser: _isProUser,
       onProToggle: _handleProUpgrade,
     ),
-    AnalysisTab(
+    FeaturesTab(
       isProUser: _isProUser,
       onProToggle: _handleProUpgrade,
     ),
@@ -222,8 +224,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
             label: '홈',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.analytics),
-            label: '분석',
+            icon: Icon(Icons.tune),
+            label: '기능',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.settings),

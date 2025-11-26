@@ -262,7 +262,9 @@ class DialogUtils {
     );
   }
 
-  /// 분석 탭용 Pro 업그레이드 다이얼로그
+  /// 분석 탭용 Pro 업그레이드 다이얼로그 (분석 탭 제거로 인해 주석 처리)
+  // 분석 탭이 백업되어 제거됨 (backup/analysis/)
+  // 나중에 기능 탭에서 사용할 수 있으므로 메서드는 유지하되 주석 처리
   static void showAnalysisProUpgradeDialog(
     BuildContext context, {
     required VoidCallback onUpgrade,

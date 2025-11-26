@@ -480,7 +480,7 @@ class NotificationService {
         payload: payload,
       );
 
-      debugPrint('과충전 경고 알림 표시됨: $title - $enhancedMessage (경과: ${minutes}분)');
+      debugPrint('과충전 경고 알림 표시됨: $title - $enhancedMessage (경과: $minutes분)');
     } catch (e, stackTrace) {
       debugPrint('과충전 경고 알림 표시 실패: $e');
       debugPrint('스택 트레이스: $stackTrace');
@@ -511,7 +511,7 @@ class NotificationService {
       }
       
       // 경과 시간 정보 추가
-      buffer.write('\n⏱️ 100% 도달 후 ${minutes}분 경과');
+      buffer.write('\n⏱️ 100% 도달 후 $minutes분 경과');
       
       return buffer.toString();
     } catch (e) {
