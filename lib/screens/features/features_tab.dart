@@ -295,13 +295,34 @@ class _FeaturesTabState extends State<FeaturesTab> with TickerProviderStateMixin
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
+                    gradient: isCharging
+                        ? (Theme.of(context).brightness == Brightness.light
+                            ? LinearGradient(
+                                colors: [
+                                  Colors.green[400]!.withValues(alpha: 0.15),
+                                  Colors.teal[400]!.withValues(alpha: 0.15),
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              )
+                            : LinearGradient(
+                                colors: [
+                                  Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
+                                  Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ))
+                        : null,
                     color: isCharging
-                        ? Colors.green.withValues(alpha: 0.15)
+                        ? null
                         : Colors.grey.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
                       color: isCharging
-                          ? Colors.green.withValues(alpha: 0.3)
+                          ? (Theme.of(context).brightness == Brightness.light
+                              ? Colors.green[400]!.withValues(alpha: 0.3)
+                              : Theme.of(context).colorScheme.primary.withValues(alpha: 0.3))
                           : Colors.grey.withValues(alpha: 0.2),
                       width: 1,
                     ),
@@ -315,7 +336,9 @@ class _FeaturesTabState extends State<FeaturesTab> with TickerProviderStateMixin
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: isCharging
-                              ? Colors.green.shade600
+                              ? (Theme.of(context).brightness == Brightness.light
+                                  ? Colors.green[400]!
+                                  : Theme.of(context).colorScheme.primary)
                               : Colors.grey.shade600,
                         ),
                       ),
@@ -326,7 +349,9 @@ class _FeaturesTabState extends State<FeaturesTab> with TickerProviderStateMixin
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
                           color: isCharging
-                              ? Colors.green.shade700
+                              ? (Theme.of(context).brightness == Brightness.light
+                                  ? Colors.green[700]!
+                                  : Theme.of(context).colorScheme.primary)
                               : Colors.grey.shade700,
                         ),
                       ),
@@ -634,7 +659,9 @@ class _FeaturesTabState extends State<FeaturesTab> with TickerProviderStateMixin
                 context,
                 '활성 알림',
                 '$activeCount개',
-                Colors.green,
+                Theme.of(context).brightness == Brightness.light
+                    ? Colors.green[400]!
+                    : Theme.of(context).colorScheme.primary,
               ),
               const SizedBox(width: 16),
               _buildStatusItem(
