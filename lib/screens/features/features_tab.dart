@@ -3,11 +3,11 @@ import 'dart:async';
 import '../../services/settings_service.dart';
 import '../../services/battery_service.dart';
 import '../../widgets/home/controllers/charging_monitor_controller.dart';
+import '../../widgets/home/components/realtime_charging_view.dart';
 import '../../widgets/settings/dialogs/charging_complete_notification_dialog.dart';
 import '../../widgets/settings/dialogs/charging_percent_notification_dialog.dart';
 import '../../widgets/settings/dialogs/widgets/theme_preview_card.dart';
 import '../../models/models.dart';
-import '../../utils/charging_graph_theme_colors.dart';
 
 /// Features 탭
 /// 충전 모니터 및 배터리 알림 기능을 주력 기능으로 제시
@@ -143,13 +143,20 @@ class _FeaturesTabState extends State<FeaturesTab> with TickerProviderStateMixin
     final displayMode = _settingsService.appSettings.chargingMonitorDisplayMode;
     final graphTheme = _settingsService.appSettings.chargingGraphTheme;
     
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Theme.of(context).colorScheme.shadow.withValues(alpha: 0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -157,15 +164,29 @@ class _FeaturesTabState extends State<FeaturesTab> with TickerProviderStateMixin
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(12),
+                    gradient: LinearGradient(
+                      colors: [
+                        Theme.of(context).colorScheme.primary,
+                        Theme.of(context).colorScheme.primary.withValues(alpha: 0.8),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
                   child: Icon(
                     Icons.monitor_heart,
-                    color: Theme.of(context).colorScheme.primary,
-                    size: 24,
+                    color: Theme.of(context).colorScheme.onPrimary,
+                    size: 28,
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -176,8 +197,9 @@ class _FeaturesTabState extends State<FeaturesTab> with TickerProviderStateMixin
                       const Text(
                         '충전 모니터',
                         style: TextStyle(
-                          fontSize: 20,
+                          fontSize: 22,
                           fontWeight: FontWeight.bold,
+                          letterSpacing: -0.5,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -185,7 +207,8 @@ class _FeaturesTabState extends State<FeaturesTab> with TickerProviderStateMixin
                         '실시간 충전 상태 모니터링',
                         style: TextStyle(
                           fontSize: 14,
-                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ],
@@ -194,19 +217,23 @@ class _FeaturesTabState extends State<FeaturesTab> with TickerProviderStateMixin
               ],
             ),
             
-            const SizedBox(height: 24),
+            const SizedBox(height: 28),
             
             // 실시간 미리보기
             _buildChargingMonitorPreview(context, displayMode, graphTheme),
             
-            const SizedBox(height: 24),
-            const Divider(),
-            const SizedBox(height: 16),
+            const SizedBox(height: 28),
+            Divider(
+              height: 1,
+              thickness: 1,
+              color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.1),
+            ),
+            const SizedBox(height: 20),
             
             // 표시 방식 설정 (인라인 선택)
             _buildDisplayModeSelector(context, displayMode),
             
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
             
             // 그래프 테마 설정 (시각적 미리보기)
             _buildGraphThemeSelector(context, graphTheme),
@@ -222,154 +249,143 @@ class _FeaturesTabState extends State<FeaturesTab> with TickerProviderStateMixin
     ChargingMonitorDisplayMode displayMode,
     ChargingGraphTheme graphTheme,
   ) {
-    final lineColor = ChargingGraphThemeColors.getGraphColor(graphTheme);
-    final backgroundColor = ChargingGraphThemeColors.getBackgroundColor(graphTheme);
     final batteryInfo = _batteryService.currentBatteryInfo;
     final isCharging = batteryInfo?.isCharging ?? false;
     final currentMa = batteryInfo?.chargingCurrent ?? 0;
+    final dataPoints = _monitorController.dataPoints;
+    final elapsedDuration = _monitorController.calculateElapsedDuration();
     
     return Container(
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(12),
+        color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.1),
+          width: 1,
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                '실시간 미리보기',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                ),
-              ),
-              if (isCharging)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.green.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.bolt,
-                        size: 12,
-                        color: Colors.green.shade700,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '충전 중',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.green.shade700,
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-              else
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    '대기 중',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey.shade700,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          
-          // 충전 전류 표시
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '충전 전류',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${currentMa}mA',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: lineColor,
-                    ),
-                  ),
-                ],
-              ),
-              
-              // 지속 시간 표시 (표시 방식에 따라)
-              if (displayMode == ChargingMonitorDisplayMode.currentWithDuration)
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
+          // 헤더
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
                   children: [
-                    Text(
-                      '지속 시간',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                      ),
+                    Icon(
+                      Icons.visibility,
+                      size: 16,
+                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.8),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(width: 6),
                     Text(
-                      _formatDuration(_monitorController.calculateElapsedDuration()),
+                      '실시간 미리보기',
                       style: TextStyle(
-                        fontSize: 20,
+                        fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: Theme.of(context).colorScheme.onSurface,
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
+                        letterSpacing: 0.2,
                       ),
                     ),
                   ],
                 ),
-            ],
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: isCharging
+                        ? Colors.green.withValues(alpha: 0.15)
+                        : Colors.grey.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: isCharging
+                          ? Colors.green.withValues(alpha: 0.3)
+                          : Colors.grey.withValues(alpha: 0.2),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: isCharging
+                              ? Colors.green.shade600
+                              : Colors.grey.shade600,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        isCharging ? '충전 중' : '대기 중',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: isCharging
+                              ? Colors.green.shade700
+                              : Colors.grey.shade700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
           
-          const SizedBox(height: 12),
-          
-          // 그래프 미리보기 (간단한 바)
-          Container(
-            height: 4,
-            decoration: BoxDecoration(
-              color: backgroundColor.withValues(alpha: 0.3),
-              borderRadius: BorderRadius.circular(2),
-            ),
-            child: FractionallySizedBox(
-              alignment: Alignment.centerLeft,
-              widthFactor: (currentMa / 3000).clamp(0.0, 1.0),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: lineColor,
-                  borderRadius: BorderRadius.circular(2),
+          // 실제 그래프 미리보기
+          if (isCharging && dataPoints.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: RealtimeChargingView(
+                dataPoints: dataPoints,
+                currentValue: currentMa.abs().toInt(),
+                displayMode: displayMode,
+                graphTheme: graphTheme,
+                elapsedDuration: elapsedDuration,
+                graphHeight: 160.0,
+                infoRowHeight: 50.0,
+              ),
+            )
+          else
+            // 충전 중이 아닐 때 플레이스홀더
+            Container(
+              height: 160,
+              margin: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.1),
+                ),
+              ),
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.battery_charging_full,
+                      size: 48,
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      '충전을 시작하면\n실시간 그래프가 표시됩니다',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
-          ),
         ],
       ),
     );
@@ -380,13 +396,20 @@ class _FeaturesTabState extends State<FeaturesTab> with TickerProviderStateMixin
     final settings = _settingsService.appSettings;
     final isNotificationsEnabled = settings.batteryNotificationsEnabled;
     
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Theme.of(context).colorScheme.shadow.withValues(alpha: 0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -394,15 +417,29 @@ class _FeaturesTabState extends State<FeaturesTab> with TickerProviderStateMixin
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.secondaryContainer,
-                    borderRadius: BorderRadius.circular(12),
+                    gradient: LinearGradient(
+                      colors: [
+                        Theme.of(context).colorScheme.secondary,
+                        Theme.of(context).colorScheme.secondary.withValues(alpha: 0.8),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
                   child: Icon(
                     Icons.notifications_active,
-                    color: Theme.of(context).colorScheme.secondary,
-                    size: 24,
+                    color: Theme.of(context).colorScheme.onSecondary,
+                    size: 28,
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -413,8 +450,9 @@ class _FeaturesTabState extends State<FeaturesTab> with TickerProviderStateMixin
                       const Text(
                         '배터리 알림',
                         style: TextStyle(
-                          fontSize: 20,
+                          fontSize: 22,
                           fontWeight: FontWeight.bold,
+                          letterSpacing: -0.5,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -422,7 +460,8 @@ class _FeaturesTabState extends State<FeaturesTab> with TickerProviderStateMixin
                         '스마트 배터리 알림 관리',
                         style: TextStyle(
                           fontSize: 14,
-                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ],
@@ -431,40 +470,69 @@ class _FeaturesTabState extends State<FeaturesTab> with TickerProviderStateMixin
               ],
             ),
             
-            const SizedBox(height: 24),
+            const SizedBox(height: 28),
             
             // 알림 활성화 스위치
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(12),
+                color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.08),
+                ),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Row(
                       children: [
-                        const Text(
-                          '배터리 알림 활성화',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: isNotificationsEnabled
+                                ? Theme.of(context).colorScheme.primaryContainer
+                                : Theme.of(context).colorScheme.surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            Icons.power_settings_new,
+                            size: 20,
+                            color: isNotificationsEnabled
+                                ? Theme.of(context).colorScheme.primary
+                                : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '모든 배터리 알림 기능 사용',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                '배터리 알림 활성화',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: -0.2,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '모든 배터리 알림 기능 사용',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
                   ),
+                  const SizedBox(width: 12),
                   Switch(
                     value: isNotificationsEnabled,
                     onChanged: (value) {
@@ -476,16 +544,24 @@ class _FeaturesTabState extends State<FeaturesTab> with TickerProviderStateMixin
             ),
             
             if (isNotificationsEnabled) ...[
-              const SizedBox(height: 24),
-              const Divider(),
-              const SizedBox(height: 16),
+              const SizedBox(height: 28),
+              Divider(
+                height: 1,
+                thickness: 1,
+                color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.1),
+              ),
+              const SizedBox(height: 20),
               
               // 알림 상태 요약
               _buildNotificationStatusSummary(context, settings),
               
               const SizedBox(height: 24),
-              const Divider(),
-              const SizedBox(height: 16),
+              Divider(
+                height: 1,
+                thickness: 1,
+                color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.1),
+              ),
+              const SizedBox(height: 20),
               
               // 충전 완료 알림 설정
               _buildSettingItem(
@@ -496,7 +572,7 @@ class _FeaturesTabState extends State<FeaturesTab> with TickerProviderStateMixin
                 onTap: () => ChargingCompleteNotificationDialog.show(context, _settingsService),
               ),
               
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
               
               // 충전 퍼센트 알림 설정
               _buildSettingItem(
@@ -615,60 +691,69 @@ class _FeaturesTabState extends State<FeaturesTab> with TickerProviderStateMixin
     required String subtitle,
     required VoidCallback onTap,
   }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.1),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.08),
+            ),
           ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primaryContainer,
-                borderRadius: BorderRadius.circular(8),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  icon,
+                  size: 22,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
               ),
-              child: Icon(
-                icon,
-                size: 20,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: -0.2,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                    const SizedBox(height: 5),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            Icon(
-              Icons.chevron_right,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
-            ),
-          ],
+              const SizedBox(width: 12),
+              Icon(
+                Icons.chevron_right,
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+                size: 24,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -954,22 +1039,6 @@ class _FeaturesTabState extends State<FeaturesTab> with TickerProviderStateMixin
         return '현재 충전 전류만 실시간으로 표시합니다.';
       case ChargingMonitorDisplayMode.currentWithDuration:
         return '충전 전류와 함께 이 세션의 충전 지속 시간을 표시합니다.';
-    }
-  }
-
-
-  String _formatDuration(Duration? duration) {
-    if (duration == null) {
-      return '0분 0초';
-    }
-    
-    final minutes = duration.inMinutes;
-    final seconds = duration.inSeconds % 60;
-    
-    if (minutes > 0) {
-      return '$minutes분 $seconds초';
-    } else {
-      return '$seconds초';
     }
   }
 }
