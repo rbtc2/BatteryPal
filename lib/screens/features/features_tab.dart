@@ -5,6 +5,7 @@ import '../../services/battery_service.dart';
 import '../../widgets/home/controllers/charging_monitor_controller.dart';
 import '../../widgets/settings/dialogs/charging_complete_notification_dialog.dart';
 import '../../widgets/settings/dialogs/charging_percent_notification_dialog.dart';
+import '../../widgets/settings/dialogs/widgets/theme_preview_card.dart';
 import '../../models/models.dart';
 import '../../utils/charging_graph_theme_colors.dart';
 
@@ -24,13 +25,19 @@ class FeaturesTab extends StatefulWidget {
   State<FeaturesTab> createState() => _FeaturesTabState();
 }
 
-class _FeaturesTabState extends State<FeaturesTab> {
+class _FeaturesTabState extends State<FeaturesTab> with TickerProviderStateMixin {
   final SettingsService _settingsService = SettingsService();
   final BatteryService _batteryService = BatteryService();
   final ChargingMonitorController _monitorController = ChargingMonitorController();
   
   StreamSubscription<BatteryInfo>? _batteryInfoSubscription;
   Timer? _updateTimer;
+  
+  // 그래프 테마 미리보기용
+  late PageController _themePageController;
+  late AnimationController _themeAnimationController;
+  int _currentThemeIndex = 0;
+  double _themeAnimationValue = 0.0;
 
   @override
   void initState() {
@@ -38,6 +45,27 @@ class _FeaturesTabState extends State<FeaturesTab> {
     _monitorController.addListener(_onMonitorControllerChanged);
     _setupBatteryStreamListener();
     _startUpdateTimer();
+    
+    // 그래프 테마 미리보기 초기화
+    final currentTheme = _settingsService.appSettings.chargingGraphTheme;
+    _currentThemeIndex = ChargingGraphTheme.values.indexOf(currentTheme);
+    if (_currentThemeIndex < 0) _currentThemeIndex = 0;
+    
+    _themePageController = PageController(initialPage: _currentThemeIndex);
+    
+    // 애니메이션 컨트롤러 (그래프 애니메이션용)
+    _themeAnimationController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 3),
+    )..repeat();
+    
+    _themeAnimationController.addListener(() {
+      if (mounted) {
+        setState(() {
+          _themeAnimationValue = _themeAnimationController.value;
+        });
+      }
+    });
   }
 
   @override
@@ -46,6 +74,8 @@ class _FeaturesTabState extends State<FeaturesTab> {
     _updateTimer?.cancel();
     _monitorController.removeListener(_onMonitorControllerChanged);
     _monitorController.dispose();
+    _themePageController.dispose();
+    _themeAnimationController.dispose();
     super.dispose();
   }
 
@@ -810,11 +840,30 @@ class _FeaturesTabState extends State<FeaturesTab> {
     );
   }
 
-  /// 그래프 테마 선택 위젯 (시각적 미리보기)
+  /// 그래프 테마 선택 위젯 (PageView 기반 미리보기)
   Widget _buildGraphThemeSelector(
     BuildContext context,
     ChargingGraphTheme currentTheme,
   ) {
+    final themes = ChargingGraphTheme.values;
+    final currentIndex = themes.indexOf(currentTheme);
+    
+    // 외부에서 테마가 변경된 경우 (예: 다른 곳에서 변경) 페이지 동기화
+    if (currentIndex >= 0 && _currentThemeIndex != currentIndex && _themePageController.hasClients) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _themePageController.hasClients) {
+          _themePageController.animateToPage(
+            currentIndex,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+          );
+          setState(() {
+            _currentThemeIndex = currentIndex;
+          });
+        }
+      });
+    }
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -835,99 +884,133 @@ class _FeaturesTabState extends State<FeaturesTab> {
             ),
           ],
         ),
-        const SizedBox(height: 12),
-        // 테마 미리보기 그리드
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            childAspectRatio: 2.5,
+        const SizedBox(height: 16),
+        
+        // PageView 기반 미리보기
+        Container(
+          height: 360,
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.1),
+            ),
           ),
-          itemCount: ChargingGraphTheme.values.length,
-          itemBuilder: (context, index) {
-            final theme = ChargingGraphTheme.values[index];
-            final isSelected = theme == currentTheme;
-            final themeColor = ChargingGraphThemeColors.getGraphColor(theme);
-            
-            return InkWell(
-              onTap: () {
-                _settingsService.updateChargingGraphTheme(theme);
-              },
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? themeColor.withValues(alpha: 0.1)
-                      : Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isSelected
-                        ? themeColor
-                        : Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
-                    width: isSelected ? 2 : 1,
-                  ),
-                ),
+          child: Column(
+            children: [
+              // 네비게이션 바 (테마 이름과 좌우 버튼)
+              Padding(
+                padding: const EdgeInsets.all(16),
                 child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // 색상 미리보기
-                    Container(
-                      width: 24,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        color: themeColor,
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(
-                          color: themeColor.withValues(alpha: 0.3),
+                    // 좌측 버튼
+                    IconButton(
+                      icon: const Icon(Icons.chevron_left),
+                      onPressed: _currentThemeIndex > 0 ? _previousTheme : null,
+                      style: IconButton.styleFrom(
+                        backgroundColor: _currentThemeIndex > 0
+                            ? Theme.of(context).colorScheme.surfaceContainerHighest
+                            : Colors.transparent,
+                      ),
+                    ),
+                    // 테마 이름
+                    Expanded(
+                      child: Text(
+                        themes[_currentThemeIndex].displayName,
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            _getGraphThemeName(theme),
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                              color: isSelected
-                                  ? themeColor
-                                  : Theme.of(context).colorScheme.onSurface,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            _getGraphThemeDescription(theme),
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
+                    // 우측 버튼
+                    IconButton(
+                      icon: const Icon(Icons.chevron_right),
+                      onPressed: _currentThemeIndex < themes.length - 1 ? _nextTheme : null,
+                      style: IconButton.styleFrom(
+                        backgroundColor: _currentThemeIndex < themes.length - 1
+                            ? Theme.of(context).colorScheme.surfaceContainerHighest
+                            : Colors.transparent,
                       ),
                     ),
-                    if (isSelected)
-                      Icon(
-                        Icons.check_circle,
-                        size: 20,
-                        color: themeColor,
-                      ),
                   ],
                 ),
               ),
-            );
-          },
+              
+              // PageView (그래프 미리보기)
+              Expanded(
+                child: PageView.builder(
+                  controller: _themePageController,
+                  onPageChanged: (index) {
+                    setState(() {
+                      _currentThemeIndex = index;
+                      final selectedTheme = themes[index];
+                      _settingsService.updateChargingGraphTheme(selectedTheme);
+                    });
+                  },
+                  itemCount: themes.length,
+                  itemBuilder: (context, index) {
+                    final theme = themes[index];
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      child: ThemePreviewCard(
+                        theme: theme,
+                        animationValue: _themeAnimationValue,
+                      ),
+                    );
+                  },
+                ),
+              ),
+              
+              const SizedBox(height: 12),
+              
+              // 페이지 인디케이터
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(
+                  themes.length,
+                  (index) => Container(
+                    width: 8,
+                    height: 8,
+                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: index == _currentThemeIndex
+                          ? Theme.of(context).colorScheme.primary
+                          : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+                    ),
+                  ),
+                ),
+              ),
+              
+              const SizedBox(height: 16),
+            ],
+          ),
         ),
       ],
     );
+  }
+
+  /// 이전 테마로 이동
+  void _previousTheme() {
+    if (_currentThemeIndex > 0 && _themePageController.hasClients) {
+      _themePageController.previousPage(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
+  /// 다음 테마로 이동
+  void _nextTheme() {
+    final themes = ChargingGraphTheme.values;
+    if (_currentThemeIndex < themes.length - 1 && _themePageController.hasClients) {
+      _themePageController.nextPage(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
   }
 
   String _getDisplayModeDescription(ChargingMonitorDisplayMode mode) {
@@ -939,31 +1022,6 @@ class _FeaturesTabState extends State<FeaturesTab> {
     }
   }
 
-  String _getGraphThemeName(ChargingGraphTheme theme) {
-    switch (theme) {
-      case ChargingGraphTheme.ecg:
-        return '심전도';
-      case ChargingGraphTheme.wave:
-        return '파도/웨이브';
-      case ChargingGraphTheme.spectrum:
-        return '스펙트럼';
-      case ChargingGraphTheme.aurora:
-        return '오로라';
-    }
-  }
-
-  String _getGraphThemeDescription(ChargingGraphTheme theme) {
-    switch (theme) {
-      case ChargingGraphTheme.ecg:
-        return '심전도 스타일';
-      case ChargingGraphTheme.wave:
-        return '파도 애니메이션';
-      case ChargingGraphTheme.spectrum:
-        return '스펙트럼 분석기';
-      case ChargingGraphTheme.aurora:
-        return '북극광 스타일';
-    }
-  }
 
   String _formatDuration(Duration? duration) {
     if (duration == null) {
