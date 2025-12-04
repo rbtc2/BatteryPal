@@ -584,6 +584,10 @@ class SettingsService extends ChangeNotifier {
 
   /// dispose 오버라이드 - 싱글톤이므로 아무것도 하지 않음
   /// 각 화면에서 dispose를 호출해도 인스턴스와 리스너는 유지됨
+  /// 
+  /// 주의: ChangeNotifier의 dispose()를 오버라이드하지만 super.dispose()를 호출하지 않음
+  /// 싱글톤이므로 앱이 종료될 때까지 인스턴스와 리스너를 유지해야 함
+  /// 이는 의도적인 설계이지만, lint 규칙 위반이므로 경고가 표시됩니다.
   @override
   // ignore: must_call_super
   void dispose() {

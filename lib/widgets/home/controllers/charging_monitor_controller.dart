@@ -127,36 +127,7 @@ class ChargingMonitorController extends ChangeNotifier {
   }
 
   /// 세션 상태 스트림 리스너 설정
-  /// ChargingSessionService의 세션 활성 상태 변화를 직접 감지합니다
-  /// 이를 통해 5초 대기 로직과 동기화됩니다
-  /// 분석 탭 제거로 인해 주석 처리 (backup/analysis/)
-  // ignore: unused_element
-  void _setupSessionStateStreamListener() {
-    // 분석 탭 제거로 인해 주석 처리
-    // _sessionStateSubscription?.cancel();
-    // 
-    // _sessionStateSubscription = _sessionService.sessionActiveStream.listen(
-    //   (isSessionActive) {
-    //     debugPrint('ChargingMonitorController: 세션 상태 변화 감지 - isActive: $isSessionActive');
-    //     
-    //     if (isSessionActive) {
-    //       // 세션이 활성화됨: 세션 시작 시간 동기화
-    //       _handleSessionActivated();
-    //     } else {
-    //       // 세션이 비활성화됨: 완전 종료 (5초 대기 완료 후)
-    //       // PHASE 3에서 처리할 예정
-    //       _handleSessionDeactivated();
-    //     }
-    //   },
-    //   onError: (error, stackTrace) {
-    //     debugPrint('ChargingMonitorController: 세션 상태 스트림 오류 - $error');
-    //     debugPrint('스택 트레이스: $stackTrace');
-    //   },
-    //   cancelOnError: false, // 에러 발생 시에도 스트림 유지
-    // );
-    // 
-    // debugPrint('ChargingMonitorController: 세션 상태 스트림 리스너 설정 완료');
-  }
+  // 분석 탭 제거로 인해 _setupSessionStateStreamListener 메서드 제거됨 (backup/analysis/)
 
   /// 세션 활성화 처리
   /// 세션 서비스에서 세션이 활성화되었을 때 호출됩니다
@@ -166,7 +137,6 @@ class ChargingMonitorController extends ChangeNotifier {
   /// PHASE 6-1: 완전 종료 후 새 세션 감지 로직 추가 - 이전 세션 시간이 남아있지 않도록 보장
   /// FIX: 새 세션이 시작될 때 항상 0분 0초부터 시작하도록 보장
   /// 분석 탭 제거로 인해 주석 처리 (backup/analysis/)
-  // ignore: unused_element
   void _handleSessionActivated() {
     // 분석 탭 제거로 인해 주석 처리 (backup/analysis/)
     // // 세션 서비스의 시작 시간과 동기화
@@ -239,7 +209,6 @@ class ChargingMonitorController extends ChangeNotifier {
   /// PHASE 6-2: 세션 시작 시간 리셋 보장 - 항상 null로 설정하여 완전 종료 확실히 처리
   /// PHASE 8-2: 세션 시작 시간 리셋 보장 강화 - 더 확실한 리셋 및 검증 로직 추가
   /// 분석 탭 제거로 인해 주석 처리 (backup/analysis/)
-  // ignore: unused_element
   void _handleSessionDeactivated() {
     // 분석 탭 제거로 인해 주석 처리 (backup/analysis/)
     debugPrint('ChargingMonitorController: 세션 비활성화 처리 (분석 탭 제거로 인해 비활성화)');

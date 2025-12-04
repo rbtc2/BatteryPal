@@ -1,3 +1,15 @@
 {
-    "java.configuration.updateBuildConfiguration": "interactive"
+    "java.configuration.updateBuildConfiguration": "interactive",
+    "dart.analysisExcludedFolders": [],
+    "dart.enableSdkFormatter": true,
+    "dart.showTodos": true,
+    "dart.analysisServerFolding": true,
+    "dart.previewFlutterUiGuides": true,
+    "dart.previewFlutterUiGuidesCustomTracking": true,
+    "dart.onlyAnalyzeProjectsWithOpenFiles": false,
+    "dart.warnWhenFilesNotInAnalysisRoot": true,
+    "problems.showCurrentInStatus": true,
+    "problems.decorations.enabled": true,
+    "dart.reportAnalyzerErrors": true,
+    "dart.enableLints": true
 }

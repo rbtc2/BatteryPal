@@ -19,16 +19,11 @@ class HomeLifecycleManager {
   // 배터리 서비스
   final BatteryService _batteryService = BatteryService();
   
-  // 설정 서비스 (선택적) - BatteryService에 전달용
-  // ignore: unused_field
-  SettingsService? _settingsService;
-  
   // 스트림 구독 관리
   StreamSubscription<BatteryInfo>? _batteryInfoSubscription;
   
   /// SettingsService 설정
   void setSettingsService(SettingsService? settingsService) {
-    _settingsService = settingsService;
     _batteryService.setSettingsService(settingsService);
   }
   
