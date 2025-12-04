@@ -22,7 +22,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
   
   // Pro 모드 상태 관리 (실제 결제 시스템과 연동 예정)
   // 현재는 변경되지 않지만, 향후 결제 시스템 연동 시 변경될 수 있으므로 final이 아님
-  bool _isProUser = false;
+  final bool _isProUser = false;
   
   // 배터리 최적화 예외 요청 표시 여부 (중복 방지)
   bool _hasShownBatteryOptimizationPrompt = false;

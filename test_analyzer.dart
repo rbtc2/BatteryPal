@@ -7,8 +7,8 @@ class TestClass {
   void unusedMethod() {}
   
   void test() {
-    // 사용되지 않는 변수
-    int unused = 0;
+    // 사용되지 않는 변수 제거됨
   }
 }
+
 
